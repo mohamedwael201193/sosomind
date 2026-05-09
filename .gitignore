@@ -1,0 +1,77 @@
+# ── Dependencies ───────────────────────────────────────────────────────────────
+node_modules/
+package-lock.json
+
+# ── Build outputs ───────────────────────────────────────────────────────────────
+dist/
+.next/
+.turbo/
+coverage/
+out/
+build/
+
+# ── Environment / secrets ───────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.env
+
+# ── Logs / data ─────────────────────────────────────────────────────────────────
+*.log
+logs/
+data/
+
+# ── OS / editor ─────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.cursor/
+.idea/
+
+# ── Deploy artifacts ─────────────────────────────────────────────────────────────
+.vercel
+
+# ── AI / prompt / design doc files (not for public repo) ────────────────────────
+about.md
+AI_SETUP_GUIDE.md
+ARCHITECTURE.md
+PHASE1.md
+projects.md
+prompt_front.md
+prompt_sosomind.md
+prompt_sosomind0.md
+summary.md
+summary1.md
+summarybot.md
+SKILL.md
+SKILL2.md
+skill.md
+sosomind_copilot_master_prompt.md
+sosomind_ultimate_prompt.md
+unique_features_prompt.md
+workshop.md
+ultimate-uiux-elite.skill
+
+# ── Kimi agent design skill (internal) ──────────────────────────────────────────
+Kimi_Agent_Ultimate Design Skill.md/
+
+# ── Docs folder (keep only README.md at root) ────────────────────────────────────
+docs/
+
+# ── Internal prompts and references ─────────────────────────────────────────────
+prompts/
+references/
+scripts/
+
+# ── Root skills folder (UI/agent skills — internal) ─────────────────────────────
+skills/
+
+# ── GitHub Copilot internal config ──────────────────────────────────────────────
+.github/copilot-instructions.md
+
+# ── Dashboard internal AI assistant config ───────────────────────────────────────
+packages/dashboard/AGENTS.md
+packages/dashboard/CLAUDE.md
+
+# ── Supabase local dev ───────────────────────────────────────────────────────────
+packages/backend/supabase/.temp/
