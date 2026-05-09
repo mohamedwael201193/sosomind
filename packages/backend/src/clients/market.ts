@@ -1,0 +1,406 @@
+/**
+ * Free Market Data Aggregator
+ * Sources (no API key required unless noted):
+ *  - Binance: price, 24hr stats, klines, orderbook — NO KEY needed
+ *  - DefiLlama: TVL, protocols, chains, yields — NO KEY needed
+ *  - CoinGecko: global stats, trending, prices — optional COINGECKO_API_KEY (demo tier)
+ *  - CryptoPanic: curated news feed — optional CRYPTOPANIC_API_KEY (free dev tier)
+ *
+ * All data sources are best-effort. Errors are silently swallowed and null returned.
+ * Use cachedFetch for data that changes slowly (TVL, global stats, etc.)
+ */
+import axios from 'axios';
+import { cachedFetch } from './redis';
+
+// ─── Binance config ──────────────────────────────────────────────────────────
+const BINANCE_BASE = 'https://api.binance.com';
+const binanceHttp = axios.create({ baseURL: BINANCE_BASE, timeout: 8000 });
+
+// Map SosoMind/SoSoValue asset names → Binance symbol
+const BINANCE_SYMBOL_MAP: Record<string, string> = {
+  BTC: 'BTCUSDT', ETH: 'ETHUSDT', SOL: 'SOLUSDT', BNB: 'BNBUSDT',
+  AVAX: 'AVAXUSDT', LINK: 'LINKUSDT', DOGE: 'DOGEUSDT', ARB: 'ARBUSDT',
+  OP: 'OPUSDT', SUI: 'SUIUSDT', MATIC: 'MATICUSDT', DOT: 'DOTUSDT',
+  ADA: 'ADAUSDT', XRP: 'XRPUSDT', LTC: 'LTCUSDT', ATOM: 'ATOMUSDT',
+  UNI: 'UNIUSDT', AAVE: 'AAVEUSDT', INJ: 'INJUSDT', TIA: 'TIAUSDT',
+  JUP: 'JUPUSDT', WIF: 'WIFUSDT', PEPE: 'PEPEUSDT', SHIB: 'SHIBUSDT',
+};
+
+function toBinanceSymbol(asset: string): string {
+  const a = asset.toUpperCase().replace(/^V/, ''); // strip SoDEX "v" prefix
+  return BINANCE_SYMBOL_MAP[a] || `${a}USDT`;
+}
+
+// ─── CoinGecko coin ID map ────────────────────────────────────────────────────
+const COINGECKO_ID_MAP: Record<string, string> = {
+  BTC: 'bitcoin', ETH: 'ethereum', SOL: 'solana', BNB: 'binancecoin',
+  AVAX: 'avalanche-2', LINK: 'chainlink', DOGE: 'dogecoin', ARB: 'arbitrum',
+  OP: 'optimism', SUI: 'sui', MATIC: 'matic-network', DOT: 'polkadot',
+  ADA: 'cardano', XRP: 'ripple', LTC: 'litecoin', ATOM: 'cosmos',
+  UNI: 'uniswap', AAVE: 'aave', INJ: 'injective-protocol', TIA: 'celestia',
+};
+
+function toCoinGeckoId(asset: string): string {
+  const a = asset.toUpperCase().replace(/^V/, '');
+  return COINGECKO_ID_MAP[a] || a.toLowerCase();
+}
+
+// ─── DefiLlama config ────────────────────────────────────────────────────────
+const LLAMA_BASE = 'https://api.llama.fi';
+const llamaHttp = axios.create({ baseURL: LLAMA_BASE, timeout: 10000 });
+
+// ─── CoinGecko config ────────────────────────────────────────────────────────
+const GECKO_BASE = 'https://api.coingecko.com/api/v3';
+const geckoHttp = axios.create({ baseURL: GECKO_BASE, timeout: 8000 });
+
+// ─── CryptoPanic config ───────────────────────────────────────────────────────
+const CRYPTOPANIC_BASE = 'https://cryptopanic.com/api/developer/v2';
+const panicHttp = axios.create({ baseURL: CRYPTOPANIC_BASE, timeout: 8000 });
+
+// ─── safe wrapper ────────────────────────────────────────────────────────────
+async function safe<T>(p: Promise<T>): Promise<T | null> {
+  try { return await p; } catch { return null; }
+}
+
+// ============================================================================
+// BINANCE — free, no API key
+// ============================================================================
+
+export interface BinanceTicker {
+  symbol: string;
+  price: number;
+  priceChange: number;
+  priceChangePercent: number;
+  highPrice: number;
+  lowPrice: number;
+  volume: number;
+  quoteVolume: number;
+  bidPrice: number;
+  askPrice: number;
+  count: number;
+}
+
+/**
+ * GET /api/v3/ticker/24hr — rolling 24h stats + last price for one asset.
+ * Returns null on error (no API key needed).
+ */
+export async function getBinanceTicker(asset: string): Promise<BinanceTicker | null> {
+  const sym = toBinanceSymbol(asset);
+  return cachedFetch(`binance:ticker:${sym}`, async () => {
+    const r = await binanceHttp.get('/api/v3/ticker/24hr', { params: { symbol: sym } });
+    const d = r.data;
+    return {
+      symbol: d.symbol,
+      price: Number(d.lastPrice),
+      priceChange: Number(d.priceChange),
+      priceChangePercent: Number(d.priceChangePercent),
+      highPrice: Number(d.highPrice),
+      lowPrice: Number(d.lowPrice),
+      volume: Number(d.volume),
+      quoteVolume: Number(d.quoteVolume),
+      bidPrice: Number(d.bidPrice),
+      askPrice: Number(d.askPrice),
+      count: Number(d.count),
+    } as BinanceTicker;
+  }, 15); // 15s cache
+}
+
+export interface BinanceKline {
+  openTime: number;
+  open: number; high: number; low: number; close: number;
+  volume: number;
+  closeTime: number;
+  quoteVolume: number;
+  trades: number;
+}
+
+/**
+ * GET /api/v3/klines — OHLCV candlesticks.
+ * interval: '1m'|'5m'|'15m'|'1h'|'4h'|'1d'|'1w'
+ */
+export async function getBinanceKlines(asset: string, interval = '1h', limit = 24): Promise<BinanceKline[] | null> {
+  const sym = toBinanceSymbol(asset);
+  return cachedFetch(`binance:klines:${sym}:${interval}:${limit}`, async () => {
+    const r = await binanceHttp.get('/api/v3/klines', { params: { symbol: sym, interval, limit } });
+    return (r.data as any[]).map((k: any[]) => ({
+      openTime: k[0], open: Number(k[1]), high: Number(k[2]),
+      low: Number(k[3]), close: Number(k[4]), volume: Number(k[5]),
+      closeTime: k[6], quoteVolume: Number(k[7]), trades: Number(k[8]),
+    }));
+  }, 60); // 60s cache
+}
+
+/**
+ * GET /api/v3/ticker/price — simple latest price only.
+ * Fastest Binance price endpoint, lowest weight.
+ */
+export async function getBinancePrice(asset: string): Promise<number | null> {
+  const sym = toBinanceSymbol(asset);
+  return cachedFetch(`binance:price:${sym}`, async () => {
+    const r = await binanceHttp.get('/api/v3/ticker/price', { params: { symbol: sym } });
+    return Number(r.data.price);
+  }, 10); // 10s cache
+}
+
+/**
+ * GET /api/v3/depth — order book top N levels.
+ */
+export async function getBinanceOrderbook(asset: string, limit = 5): Promise<{ bids: [number, number][]; asks: [number, number][] } | null> {
+  const sym = toBinanceSymbol(asset);
+  return safe(binanceHttp.get('/api/v3/depth', { params: { symbol: sym, limit } }).then(r => ({
+    bids: (r.data.bids as string[][]).map(b => [Number(b[0]), Number(b[1])] as [number, number]),
+    asks: (r.data.asks as string[][]).map(a => [Number(a[0]), Number(a[1])] as [number, number]),
+  })));
+}
+
+/**
+ * GET multiple prices at once — Binance supports batch with symbols param or all.
+ */
+export async function getBinancePrices(assets: string[]): Promise<Record<string, number>> {
+  const syms = assets.map(a => toBinanceSymbol(a));
+  return cachedFetch(`binance:prices:${syms.join(',')}`, async () => {
+    const r = await binanceHttp.get('/api/v3/ticker/price');
+    const all: any[] = r.data;
+    const map: Record<string, number> = {};
+    for (const item of all) {
+      const asset = Object.entries(BINANCE_SYMBOL_MAP).find(([, v]) => v === item.symbol)?.[0];
+      if (asset) map[asset] = Number(item.price);
+    }
+    return map;
+  }, 15);
+}
+
+// ============================================================================
+// DEFILLAMA — free, no API key
+// ============================================================================
+
+export interface DefiLlamaProtocol {
+  name: string;
+  slug: string;
+  tvl: number;
+  change_1h?: number;
+  change_1d?: number;
+  change_7d?: number;
+  category?: string;
+  chains?: string[];
+}
+
+/**
+ * GET /protocols — top DeFi protocols by TVL.
+ */
+export async function getDefiProtocols(limit = 20): Promise<DefiLlamaProtocol[] | null> {
+  return cachedFetch(`defillama:protocols:${limit}`, async () => {
+    const r = await llamaHttp.get('/protocols');
+    const all: any[] = r.data;
+    return all.slice(0, limit).map(p => ({
+      name: p.name, slug: p.slug, tvl: Number(p.tvl),
+      change_1h: p.change_1h, change_1d: p.change_1d, change_7d: p.change_7d,
+      category: p.category, chains: p.chains,
+    }));
+  }, 300); // 5 min cache
+}
+
+/**
+ * GET /v2/historicalChainTvl — total DeFi TVL over time.
+ */
+export async function getDefiTotalTVL(): Promise<{ date: number; tvl: number }[] | null> {
+  return cachedFetch('defillama:totaltvl', async () => {
+    const r = await llamaHttp.get('/v2/historicalChainTvl');
+    return (r.data as any[]).slice(-30).map(d => ({ date: d.date, tvl: d.tvl }));
+  }, 600); // 10 min cache
+}
+
+/**
+ * GET /v2/chains — current TVL by chain.
+ */
+export async function getDefiChains(): Promise<{ name: string; tvl: number }[] | null> {
+  return cachedFetch('defillama:chains', async () => {
+    const r = await llamaHttp.get('/v2/chains');
+    return (r.data as any[])
+      .sort((a, b) => Number(b.tvl ?? 0) - Number(a.tvl ?? 0))  // sort by TVL descending
+      .slice(0, 15)
+      .map(c => ({ name: c.name, tvl: Number(c.tvl) }));
+  }, 300);
+}
+
+/**
+ * GET /stablecoins — stablecoin market cap data.
+ */
+export async function getDefiStablecoins(): Promise<{ name: string; symbol: string; circulating: number }[] | null> {
+  return cachedFetch('defillama:stablecoins', async () => {
+    const r = await llamaHttp.get('/stablecoins');
+    const items: any[] = r.data?.peggedAssets || [];
+    return items.slice(0, 10).map(s => ({
+      name: s.name, symbol: s.symbol,
+      circulating: Number(s.circulating?.peggedUSD ?? 0),
+    }));
+  }, 600);
+}
+
+/**
+ * GET /yields/pools — top yield pools by APY.
+ */
+export async function getDefiYields(limit = 10): Promise<{ pool: string; project: string; chain: string; apy: number; tvlUsd: number }[] | null> {
+  return cachedFetch(`defillama:yields:${limit}`, async () => {
+    const r = await llamaHttp.get('/yields/pools');
+    const pools: any[] = r.data?.data || [];
+    return pools
+      .filter(p => p.apy > 0 && p.tvlUsd > 100_000)
+      .sort((a, b) => b.tvlUsd - a.tvlUsd)
+      .slice(0, limit)
+      .map(p => ({ pool: p.pool, project: p.project, chain: p.chain, apy: p.apy, tvlUsd: p.tvlUsd }));
+  }, 600);
+}
+
+// ============================================================================
+// COINGECKO — optional COINGECKO_API_KEY (demo tier, ~30 req/min)
+// ============================================================================
+
+function geckoHeaders(): Record<string, string> {
+  const key = process.env.COINGECKO_API_KEY;
+  return key ? { 'x-cg-demo-api-key': key } : {};
+}
+
+export interface CoinGeckoGlobal {
+  activeCryptocurrencies: number;
+  totalMarketCapUsd: number;
+  totalVolumeUsd: number;
+  btcDominance: number;
+  ethDominance: number;
+  marketCapChangePercent24h: number;
+  defiTotalMarketCapUsd?: number;
+}
+
+/**
+ * GET /global — overall crypto market summary.
+ */
+export async function getCoinGeckoGlobal(): Promise<CoinGeckoGlobal | null> {
+  return cachedFetch('coingecko:global', async () => {
+    const r = await geckoHttp.get('/global', { headers: geckoHeaders() });
+    const d = r.data?.data;
+    return {
+      activeCryptocurrencies: d.active_cryptocurrencies,
+      totalMarketCapUsd: d.total_market_cap?.usd ?? 0,
+      totalVolumeUsd: d.total_volume?.usd ?? 0,
+      btcDominance: d.market_cap_percentage?.btc ?? 0,
+      ethDominance: d.market_cap_percentage?.eth ?? 0,
+      marketCapChangePercent24h: d.market_cap_change_percentage_24h_usd ?? 0,
+      defiTotalMarketCapUsd: d.defi_market_cap ? Number(d.defi_market_cap) : undefined,
+    };
+  }, 120); // 2 min cache
+}
+
+export interface CoinGeckoPrice {
+  usd: number;
+  usd_market_cap?: number;
+  usd_24h_change?: number;
+  usd_24h_vol?: number;
+}
+
+/**
+ * GET /simple/price — real-time prices for multiple assets.
+ */
+export async function getCoinGeckoPrices(assets: string[]): Promise<Record<string, CoinGeckoPrice> | null> {
+  const ids = assets.map(a => toCoinGeckoId(a)).join(',');
+  return cachedFetch(`coingecko:prices:${ids}`, async () => {
+    const r = await geckoHttp.get('/simple/price', {
+      headers: geckoHeaders(),
+      params: { ids, vs_currencies: 'usd', include_market_cap: true, include_24hr_change: true, include_24hr_vol: true },
+    });
+    const result: Record<string, CoinGeckoPrice> = {};
+    for (const asset of assets) {
+      const id = toCoinGeckoId(asset);
+      if (r.data[id]) result[asset.toUpperCase()] = r.data[id];
+    }
+    return result;
+  }, 20); // 20s cache
+}
+
+/**
+ * GET /trending — trending coins (top 15 searched coins in 24h).
+ */
+export async function getCoinGeckoTrending(): Promise<{ id: string; name: string; symbol: string; score: number }[] | null> {
+  return cachedFetch('coingecko:trending', async () => {
+    const r = await geckoHttp.get('/search/trending', { headers: geckoHeaders() });
+    return (r.data?.coins || []).map((c: any) => ({
+      id: c.item.id, name: c.item.name, symbol: c.item.symbol, score: c.item.score,
+    }));
+  }, 300); // 5 min cache
+}
+
+// ============================================================================
+// CRYPTOPANIC — optional CRYPTOPANIC_API_KEY (free dev tier ~1000 req/month)
+// ============================================================================
+
+export interface CryptoPanicPost {
+  id: number;
+  title: string;
+  url: string;
+  publishedAt: string;
+  domain: string;
+  currencies: string[];
+  votes: { positive: number; negative: number; important: number };
+  kind: string;
+}
+
+/**
+ * GET /posts/ — curated crypto news, optionally filtered by asset.
+ * Requires CRYPTOPANIC_API_KEY env var (free registration at cryptopanic.com).
+ */
+export async function getCryptoPanicNews(asset?: string, filter: 'hot' | 'rising' | 'bullish' | 'bearish' | 'important' = 'hot', limit = 10): Promise<CryptoPanicPost[] | null> {
+  const token = process.env.CRYPTOPANIC_API_KEY;
+  if (!token) return null; // skip gracefully if no key
+
+  const cacheKey = `cryptopanic:news:${asset ?? 'all'}:${filter}`;
+  return cachedFetch(cacheKey, async () => {
+    const params: any = { auth_token: token, filter, regions: 'en', public: 'true' };
+    if (asset) params.currencies = asset.toUpperCase().replace(/^V/, '');
+    const r = await panicHttp.get('/posts/', { params });
+    const posts: any[] = r.data?.results || [];
+    return posts.slice(0, limit).map(p => ({
+      id: p.id, title: p.title, url: p.url, publishedAt: p.published_at,
+      domain: p.domain || p.source?.domain || '',
+      currencies: (p.currencies || []).map((c: any) => c.code),
+      votes: { positive: p.votes?.positive ?? 0, negative: p.votes?.negative ?? 0, important: p.votes?.important ?? 0 },
+      kind: p.kind,
+    }));
+  }, 120); // 2 min cache
+}
+
+// ============================================================================
+// Unified price resolver — tries all sources in priority order
+// ============================================================================
+
+/**
+ * Get best available spot price for an asset.
+ * Priority: Binance (no key) → CoinGecko (key optional) → null
+ */
+export async function getSpotPrice(asset: string): Promise<number | null> {
+  // 1. Binance (fastest, no key)
+  const binPrice = await safe(getBinancePrice(asset));
+  if (binPrice && binPrice > 0) return binPrice;
+
+  // 2. CoinGecko fallback
+  const cgPrices = await safe(getCoinGeckoPrices([asset]));
+  const cgPrice = cgPrices?.[asset.toUpperCase()]?.usd;
+  if (cgPrice && cgPrice > 0) return cgPrice;
+
+  return null;
+}
+
+/**
+ * Aggregate market context for a given asset — used by research agent.
+ * Returns all data in a structured object; null fields mean source unavailable.
+ */
+export async function getMarketContext(asset: string) {
+  const [ticker, klines, global, defiChains, trending, news] = await Promise.all([
+    safe(getBinanceTicker(asset)),
+    safe(getBinanceKlines(asset, '1h', 24)),
+    safe(getCoinGeckoGlobal()),
+    safe(getDefiChains()),
+    safe(getCoinGeckoTrending()),
+    safe(getCryptoPanicNews(asset, 'hot', 8)),
+  ]);
+
+  return { ticker, klines, global, defiChains, trending, news };
+}
