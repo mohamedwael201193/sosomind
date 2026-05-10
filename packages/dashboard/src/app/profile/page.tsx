@@ -1,11 +1,13 @@
 "use client";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
 import { useWallet } from "@/context/WalletContext";
 import { GlassCard } from "@/components/GlassCard";
+import { fetcher } from "@/lib/api";
 import {
   Wallet, Copy, Check, LogOut, Link, User, Shield,
-  TrendingUp, Zap, Clock, FileText, Download,
+  Clock, FileText, Download, BarChart2, RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +19,59 @@ export default function ProfilePage() {
   const [taxYear, setTaxYear] = useState(new Date().getFullYear() - 1);
   const [taxLoading, setTaxLoading] = useState(false);
   const [taxError, setTaxError] = useState<string | null>(null);
+
+  // ── Real data from SoDEX ───────────────────────────────────────────────
+  const balanceQuery = useQuery<any>({
+    queryKey: ['profile', 'balance', address],
+    enabled: Boolean(address),
+    refetchInterval: 30_000,
+    queryFn: () => fetcher(`/api/sodex/user/${address}/balances`),
+  });
+
+  const tickersQuery = useQuery<any[]>({
+    queryKey: ['sodex', 'spot', 'tickers'],
+    refetchInterval: 15_000,
+    queryFn: () => fetcher('/api/sodex/spot/tickers'),
+  });
+
+  const orderHistoryQuery = useQuery<any[]>({
+    queryKey: ['profile', 'orders', address],
+    enabled: Boolean(address),
+    refetchInterval: 30_000,
+    queryFn: () => fetcher(`/api/sodex/user/${address}/orders/history?limit=20`),
+  });
+
+  const orders: any[] = Array.isArray(orderHistoryQuery.data) ? orderHistoryQuery.data : [];
+  const filled = orders.filter(o => o.status === 'FILLED');
+  const winRate = orders.length > 0 ? Math.round((filled.length / orders.length) * 100) : null;
+
+  const priceMap = useMemo(() => {
+    const map = new Map<string, number>();
+    map.set('vUSDC', 1); map.set('USDC', 1);
+    for (const t of tickersQuery.data ?? []) {
+      const [base] = (t.symbol as string).split('_');
+      const price = parseFloat(t.lastPx);
+      if (base && !isNaN(price)) map.set(base, price);
+    }
+    return map;
+  }, [tickersQuery.data]);
+
+  const totalUsd = useMemo(() => {
+    const raw: any[] = (balanceQuery.data as any)?.balances ?? [];
+    return raw.reduce((sum, b) => {
+      const total = parseFloat(b.total);
+      const locked = parseFloat(b.locked || '0');
+      const avail = Math.max(0, total - locked);
+      const price = priceMap.get(b.coin) ?? 0;
+      return sum + avail * price;
+    }, 0);
+  }, [balanceQuery.data, priceMap]);
+
+  const usdcBal = useMemo(() => {
+    const raw: any[] = (balanceQuery.data as any)?.balances ?? [];
+    const b = raw.find(x => x.coin === 'vUSDC');
+    return b ? Math.max(0, parseFloat(b.total) - parseFloat(b.locked || '0')) : 0;
+  }, [balanceQuery.data]);
 
   async function copyAddress() {
     if (!address) return;
@@ -130,9 +185,24 @@ export default function ProfilePage() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { icon: TrendingUp, label: "Win Rate", value: "—", color: "var(--green)" },
-          { icon: Zap, label: "Total Signals", value: "—", color: "var(--blue)" },
-          { icon: Clock, label: "Member Since", value: profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : "—", color: "var(--purple)" },
+          {
+            icon: Wallet,
+            label: "Portfolio Value",
+            value: balanceQuery.isLoading ? "…" : totalUsd > 0 ? `$${totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "$0.00",
+            color: "var(--green)",
+          },
+          {
+            icon: BarChart2,
+            label: "Filled Orders",
+            value: orderHistoryQuery.isLoading ? "…" : winRate !== null ? `${winRate}% (${filled.length}/${orders.length})` : "—",
+            color: "var(--blue)",
+          },
+          {
+            icon: Clock,
+            label: "Member Since",
+            value: profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : "—",
+            color: "var(--purple)",
+          },
         ].map((stat) => {
           const Icon = stat.icon;
           return (
@@ -146,6 +216,105 @@ export default function ProfilePage() {
           );
         })}
       </div>
+
+      {/* Balance summary */}
+      {address && (
+        <GlassCard animate padding="md">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-[var(--text-primary)]">Wallet Balance</h3>
+            <button onClick={() => { balanceQuery.refetch(); tickersQuery.refetch(); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
+          {balanceQuery.isLoading ? (
+            <div className="text-sm text-[var(--text-muted)]">Loading…</div>
+          ) : (
+            <div className="flex flex-wrap gap-4">
+              {((balanceQuery.data as any)?.balances ?? [])
+                .filter((b: any) => parseFloat(b.total) > 0)
+                .map((b: any) => {
+                  const name = b.coin === 'WSOSO' ? 'SOSO' : b.coin.startsWith('v') ? b.coin.slice(1) : b.coin;
+                  const avail = Math.max(0, parseFloat(b.total) - parseFloat(b.locked || '0'));
+                  const usd = avail * (priceMap.get(b.coin) ?? 0);
+                  return (
+                    <div key={b.coin} className="flex flex-col">
+                      <span className="text-xs text-[var(--text-muted)]">{name}</span>
+                      <span className="font-mono font-bold text-[var(--text-primary)]">
+                        {avail.toLocaleString('en-US', { maximumFractionDigits: 6 })}
+                      </span>
+                      {usd > 0 && (
+                        <span className="text-xs text-[var(--text-muted)]">
+                          ${usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              {((balanceQuery.data as any)?.balances ?? []).filter((b: any) => parseFloat(b.total) > 0).length === 0 && (
+                <div className="text-sm text-[var(--text-muted)]">No balance — get testnet tokens from the SoDEX faucet.</div>
+              )}
+            </div>
+          )}
+        </GlassCard>
+      )}
+
+      {/* Recent Trades */}
+      {address && (
+        <GlassCard animate padding="md">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-[var(--text-primary)]">Recent Trades</h3>
+            <button onClick={() => orderHistoryQuery.refetch()} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
+          {orderHistoryQuery.isLoading ? (
+            <div className="text-sm text-[var(--text-muted)]">Loading…</div>
+          ) : orders.length === 0 ? (
+            <div className="text-sm text-[var(--text-muted)]">No trades yet. Go to Trade to place your first order.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    {['Time', 'Market', 'Side', 'Price', 'Qty', 'Status'].map(h => (
+                      <th key={h} style={{ textAlign: h === 'Side' || h === 'Time' || h === 'Market' ? 'left' : 'right', padding: '0 8px 8px', color: 'var(--text-muted)', fontSize: 10, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map((o, i) => {
+                    const sym = (o.symbol as string).replace(/_vUSDC$/, '/USDC').replace(/^v/, '');
+                    return (
+                      <tr key={o.orderID ?? i} style={{ borderTop: '1px solid var(--border)' }}>
+                        <td style={{ padding: '8px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                          {new Date(o.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td style={{ padding: '8px', fontWeight: 700 }}>{sym}</td>
+                        <td style={{ padding: '8px' }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: o.side === 'BUY' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)', color: o.side === 'BUY' ? '#10b981' : '#ef4444' }}>
+                            {o.side}
+                          </span>
+                        </td>
+                        <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace' }}>{o.price}</td>
+                        <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{o.origQty}</td>
+                        <td style={{ padding: '8px', textAlign: 'right' }}>
+                          <span style={{
+                            fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
+                            background: o.status === 'FILLED' ? 'rgba(16,185,129,0.15)' : o.status === 'CANCELED' ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)',
+                            color: o.status === 'FILLED' ? '#10b981' : o.status === 'CANCELED' ? '#ef4444' : '#f59e0b',
+                          }}>
+                            {o.status}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </GlassCard>
+      )}
 
       {/* Telegram Link */}
       <GlassCard animate padding="md">

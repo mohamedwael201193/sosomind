@@ -66,6 +66,36 @@ async function signTypedDataV4(address: string, typedData: unknown): Promise<str
   return eth.request({ method: 'eth_signTypedData_v4', params: [address, json] });
 }
 
+/** Switch MetaMask to the SoDEX chain, adding it if not yet known. */
+async function ensureSoDEXChain(eth: any, targetChainId: number): Promise<void> {
+  const currentHex: string = await eth.request({ method: 'eth_chainId' });
+  const current = parseInt(currentHex, 16);
+  if (current === targetChainId) return; // already on the right chain
+
+  const targetHex = `0x${targetChainId.toString(16)}`;
+  try {
+    await eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: targetHex }] });
+  } catch (switchErr: any) {
+    // 4902 = chain not registered in MetaMask yet → add it
+    if (switchErr.code === 4902 || switchErr.code === -32603) {
+      await eth.request({
+        method: 'wallet_addEthereumChain',
+        params: [{
+          chainId: targetHex,
+          chainName: `SoDEX ${targetChainId === 138565 ? 'Testnet' : 'Mainnet'}`,
+          nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+          rpcUrls: [targetChainId === 138565 ? 'https://testnet-rpc.sodex.dev' : 'https://rpc.sodex.dev'],
+          blockExplorerUrls: [targetChainId === 138565 ? 'https://testnet-explorer.sodex.dev' : 'https://explorer.sodex.dev'],
+        }],
+      });
+    } else {
+      throw new Error(
+        `Please switch your MetaMask network to SoDEX ${targetChainId === 138565 ? 'Testnet' : 'Mainnet'} (chainId ${targetChainId}) and retry.`
+      );
+    }
+  }
+}
+
 export async function signAndSubmit(args: SignAndSubmitArgs): Promise<RelayResult> {
   if (typeof window === 'undefined') throw new Error('signAndSubmit must run in the browser');
   const eth = (window as any).ethereum;
@@ -80,6 +110,9 @@ export async function signAndSubmit(args: SignAndSubmitArgs): Promise<RelayResul
   if (!address) throw new Error('No wallet account available');
 
   const info = await getRelayInfo();
+
+  // Switch to SoDEX chain BEFORE building typed data (MetaMask validates domain.chainId === active chain)
+  await ensureSoDEXChain(eth, info.chainId);
 
   const signable = buildSignable({
     scope: args.scope,
