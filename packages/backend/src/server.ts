@@ -13,6 +13,7 @@ import fundraising from './routes/fundraising.js';
 import macro from './routes/macro.js';
 import charts from './routes/charts.js';
 import sodex from './routes/sodex.js';
+import sodexRelay from './routes/sodex-relay.js';
 import agents from './routes/agents.js';
 import portfolio from './routes/portfolio.js';
 import alerts from './routes/alerts.js';
@@ -66,6 +67,7 @@ export async function startServer() {
   app.use('/api/fundraising', fundraising);
   app.use('/api/macro', macro);
   app.use('/api/analyses', charts);
+  app.use('/api/sodex/relay', sodexRelay);
   app.use('/api/sodex', sodex);
   app.use('/api', agents);
   app.use('/api/portfolio', portfolio);

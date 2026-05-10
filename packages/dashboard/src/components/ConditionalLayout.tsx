@@ -6,7 +6,7 @@ import { StatusBar } from './StatusBar';
 import { AnimatedBackground } from './AnimatedBackground';
 import { PageTransition } from './PageTransition';
 
-const STANDALONE_ROUTES = ['/landing'];
+const STANDALONE_ROUTES = ['/landing', '/trade/sign'];
 
 export function ConditionalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

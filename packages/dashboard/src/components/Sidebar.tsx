@@ -10,6 +10,7 @@ import {
   Grid3X3, BarChart3, Bell, Settings, ChevronLeft,
   ChevronRight, Sun, Moon, Zap, Wallet, LogOut, User,
   Waves, ArrowLeftRight, BookOpen, Trophy, Scale, UserCircle2,
+  CandlestickChart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,7 @@ const navSections: NavSection[] = [
     items: [
       { href: "/", label: "Dashboard", icon: LayoutDashboard, count: 1 },
       { href: "/signals", label: "Signals", icon: Zap, badge: true, count: 3 },
+      { href: "/trade", label: "Trade", icon: CandlestickChart, count: 1 },
       { href: "/portfolio", label: "Portfolio", icon: PieChart, count: 1 },
       { href: "/research", label: "Research", icon: Search, count: 1 },
       { href: "/sectors", label: "Sectors", icon: Grid3X3, count: 1 },

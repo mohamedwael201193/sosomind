@@ -3,6 +3,7 @@ import { getMarketContext } from '../clients/market';
 import { chatComplete, hasAI } from '../clients/ai';
 import { supabase, logAgent } from '../db/supabase';
 import { cachedFetch } from '../clients/redis';
+import { sha256 } from '../utils/provenance';
 
 export interface ResearchSignal {
   asset: string;
@@ -219,16 +220,36 @@ Rules:
 
   if (opts.saveToDb !== false) {
     try {
+      // Build provenance citations — every public claim must trace to a source
+      const citations: Array<{ source: string; endpoint: string; hash: string; timestamp: string; note?: string }> = [];
+      const ts = new Date().toISOString();
+      const cite = (source: string, endpoint: string, payload: unknown, note?: string) => {
+        if (!payload || (payload as any).__error) return;
+        citations.push({ source, endpoint, hash: sha256(JSON.stringify(payload)).slice(0, 16), timestamp: ts, note });
+      };
+      cite('sosovalue', `getMarketSnapshot:${symbol}`, snapshot, 'price + 24h stats');
+      cite('sosovalue', 'getSectorSpotlight', sectors, 'sector rotation');
+      cite('sosovalue', 'getETFList', etfList, 'spot ETF universe');
+      cite('sosovalue', 'getETFHistory', etfFlow, 'ETF net flow');
+      cite('sosovalue', 'getHotNews', hotNews, 'market headlines');
+      cite('sosovalue', `searchNews:${symbol}`, searchNews, 'asset-specific news');
+      cite('sosovalue', 'getMacroEvents', macro, 'macro calendar');
+      cite('binance', `ticker:${symbol}USDT`, (market as any)?.ticker, 'live price');
+      cite('binance', `klines:${symbol}USDT:1h`, (market as any)?.klines, 'recent candles');
+      cite('defillama', 'chains', (market as any)?.defiChains, 'DeFi TVL');
+      cite('coingecko', 'global', (market as any)?.global, 'total market cap');
+
       const { data } = await supabase.from('signals').insert({
         user_id: opts.userId ?? null, asset: symbol, symbol,
         direction: signal.direction.toLowerCase(),
         confidence: Math.round(signal.confidence),
         reasoning: signal.reasoning, entry: signal.entry,
         take_profit: signal.takeProfit, stop_loss: signal.stopLoss,
-        sources: signal.sources, status: 'active',
+        sources: signal.sources, citations, status: 'active',
         expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       }).select('id').single();
       (signal as any).id = data?.id;
+      (signal as any).citations = citations;
     } catch (e) {
       console.warn('signal insert failed', (e as Error).message);
     }

@@ -321,24 +321,57 @@ export function createBot(): Bot | null {
     const estValue = (price * qty).toFixed(2);
     const market = `v${asset}_vUSDC`;
     const isDry = process.env.DRY_RUN === 'true';
+
+    // Check if this Telegram user has a linked wallet → prefer non-custodial signing
+    const chatId = String((ctx as any).chat?.id ?? '');
+    let linkedWallet: string | null = null;
+    if (chatId) {
+      try {
+        const { data } = await supabase.from('user_profiles')
+          .select('wallet_address').eq('telegram_chat_id', chatId).maybeSingle();
+        linkedWallet = (data as any)?.wallet_address ?? null;
+      } catch {}
+    }
+
+    const dashboardUrl = process.env.DASHBOARD_URL || 'http://localhost:3000';
+    const orderPayload = {
+      scope: 'spot' as const,
+      actionName: 'batchNewOrder' as const,
+      market,
+      side,
+      orderType: 'market' as const,
+      quantity: qty,
+      price: undefined as number | undefined,
+    };
+    const b64 = Buffer.from(JSON.stringify(orderPayload), 'utf8')
+      .toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const signUrl = `${dashboardUrl}/trade/sign?p=${b64}`;
+
     const text =
       `🔐 <b>Trade Confirmation</b>\n\n` +
-      `⛓️ Network: SoDEX Testnet (chainId ${process.env.SODEX_CHAIN_ID || '138565'})\n` +
+      `⛓️ Network: SoDEX ${process.env.SODEX_CHAIN_ID === '286623' ? 'Mainnet' : 'Testnet'} (chainId ${process.env.SODEX_CHAIN_ID || '138565'})\n` +
       `🪙 Asset: <b>${asset}</b>\n` +
       `${side === 'buy' ? '📈' : '📉'} Direction: <b>${side === 'buy' ? 'LONG (Buy)' : 'SHORT (Sell)'}</b>\n` +
       `📦 Quantity: <b>${qty}</b>\n` +
       `💰 Est. Price: $${price.toLocaleString()}\n` +
       `💵 Est. Value: $${estValue}\n` +
-      `🛡️ Mode: <b>${isDry ? '🟡 DRY-RUN (Simulated)' : '🟢 LIVE'}</b>\n\n` +
-      `<i>Signed with EIP-712 · Header auth X-API-Sign</i>`;
-    const kb = new InlineKeyboard()
-      .text('✅ Confirm Trade', `tx:${market}:${side}:${qty}`)
-      .text('❌ Cancel', 'tx:cancel').row()
-      .text('⬅️ Back', 'menu:signal');
+      (linkedWallet
+        ? `🛡️ <b>Non-custodial</b> — sign with your wallet <code>${linkedWallet.slice(0, 6)}…${linkedWallet.slice(-4)}</code>\n`
+        : `🛡️ Mode: <b>${isDry ? '🟡 DRY-RUN (Simulated)' : '🟢 LIVE (House account)'}</b>\n`) +
+      `\n<i>EIP-712 signed · per-user keys · server never holds your secret</i>`;
+
+    const kb = new InlineKeyboard();
+    kb.url('🔐 Sign in Browser (Non-custodial)', signUrl).row();
+    if (!linkedWallet) {
+      // Fall back to legacy house flow only when wallet not linked
+      kb.text('⚙️ Quick (House testnet)', `tx:${market}:${side}:${qty}`).row();
+    }
+    kb.text('❌ Cancel', 'tx:cancel').text('⬅️ Back', 'menu:signal');
+
     if ((ctx as any).callbackQuery) {
-      await (ctx as any).editMessageText(text, { parse_mode: 'HTML', reply_markup: kb });
+      await (ctx as any).editMessageText(text, { parse_mode: 'HTML', reply_markup: kb, link_preview_options: { is_disabled: true } });
     } else {
-      await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
+      await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb, link_preview_options: { is_disabled: true } });
     }
   }
 
