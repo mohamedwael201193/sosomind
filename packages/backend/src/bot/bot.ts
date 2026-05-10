@@ -27,7 +27,8 @@ const MAIN_KB = new Keyboard()
   .text('📊 Briefing').text('🔔 Alerts').text('⚙️ Settings').row()
   .text('📓 Journal').text('🤝 Subscribe').text('ℹ️ Help').row()
   .text('🐋 Whales').text('🔄 Arb').text('📡 Funding').row()
-  .text('🏆 Leaderboard').text('🎯 Persona').text('📄 Tax')
+  .text('🏆 Leaderboard').text('🎯 Persona').text('📄 Tax').row()
+  .text('✖ Hide Menu')
   .resized();
 
 // ─── Inline asset picker ─────────────────────────────────────────────────────
@@ -160,8 +161,17 @@ export function createBot(): Bot | null {
 
   bot.command('start', sendMainMenu);
   bot.command('help', sendMainMenu);
+  bot.command('menu', sendMainMenu);
   bot.hears('ℹ️ Help', sendMainMenu);
   bot.callbackQuery('menu:main', sendMainMenu);
+
+  // ── Hide / Show bottom keyboard ──────────────────────────────────────────
+  bot.hears('✖ Hide Menu', async (ctx) => {
+    await ctx.reply(
+      '⌨️ Menu hidden. Tap <b>/menu</b> or <b>/start</b> to show it again.',
+      { parse_mode: 'HTML', reply_markup: { remove_keyboard: true } }
+    );
+  });
 
   // ── Research ────────────────────────────────────────────────────────────────
   const sendResearchMenu = async (ctx: Context) => {
@@ -1529,6 +1539,7 @@ export function createBot(): Bot | null {
     '🔬 Research', '⚡ Signal', '💼 Portfolio', '📊 Briefing',
     '🔔 Alerts', '⚙️ Settings', '📓 Journal', '🤝 Subscribe', 'ℹ️ Help', '🎙️ Voice',
     '🐋 Whales', '🔄 Arb', '📡 Funding', '🏆 Leaderboard', '🎯 Persona', '📄 Tax',
+    '✖ Hide Menu',
   ]);
   bot.on('message:text', async (ctx, next) => {
     const text = ctx.message?.text ?? '';

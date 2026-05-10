@@ -292,9 +292,15 @@ export class SoDEXClient {
   }
 
   // ---------- READ (account) ----------
-  async getAccountBalances(_accountID?: number) {
+  async getAccountBalances(_accountID?: number): Promise<any[]> {
     if (!this.address) throw new Error("No address configured");
-    return this.read(this.spot, `/accounts/${this.address}/balances`);
+    const raw = await this.read(this.spot, `/accounts/${this.address}/balances`);
+    // Normalize: SoDEX may return a flat array, { balances:[] }, { data:[] }, { list:[] }, etc.
+    if (Array.isArray(raw)) return raw;
+    for (const key of ['balances', 'data', 'list', 'items', 'assets', 'accounts']) {
+      if (Array.isArray((raw as any)?.[key])) return (raw as any)[key];
+    }
+    return [];
   }
   // Per-user read endpoints (public — any wallet address)
   async getSpotBalancesForAddress(address: string) {
