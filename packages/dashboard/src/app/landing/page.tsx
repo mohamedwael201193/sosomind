@@ -11,6 +11,12 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import MCP from "@lobehub/icons/es/MCP";
+import Claude from "@lobehub/icons/es/Claude";
+import OpenAI from "@lobehub/icons/es/OpenAI";
+import Gemini from "@lobehub/icons/es/Gemini";
+import DeepSeek from "@lobehub/icons/es/DeepSeek";
+import Mistral from "@lobehub/icons/es/Mistral";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Theme = "dark" | "light";
@@ -19,7 +25,7 @@ type Theme = "dark" | "light";
 
 const HERO_TAGLINE = "The Agentic Finance OS";
 const HERO_SUB = "Multi-agent AI research, real-time signals, and DEX execution — built for serious crypto traders.";
-const NAV_LINKS = ["Features", "Agents", "Data", "FAQ"];
+const NAV_LINKS = ["Features", "Agents", "Data", "Bot", "FAQ"];
 
 const STATS = [
   { value: "2,400+", label: "Assets Tracked" },
@@ -315,6 +321,13 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <a href="https://t.me/sosomind_bot" target="_blank" rel="noopener noreferrer"
+            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all"
+            style={{ borderColor: "rgba(0,136,204,0.35)", color: "#0088cc", background: "rgba(0,136,204,0.08)" }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = "rgba(0,136,204,0.15)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = "rgba(0,136,204,0.08)"; }}>
+            <Send className="w-3.5 h-3.5" /> Telegram
+          </a>
           <button onClick={toggleTheme} className="w-9 h-9 flex items-center justify-center rounded-full border transition-colors"
             style={{ borderColor: "var(--glass-border)", color: "var(--text-secondary)", background: "transparent" }}>
             {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -408,6 +421,15 @@ export default function LandingPage() {
                 Explore Research <ArrowRight className="w-4 h-4" />
               </motion.button>
             </Link>
+            <a href="https://t.me/sosomind_bot" target="_blank" rel="noopener noreferrer">
+              <motion.button
+                whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                className="flex items-center gap-2 px-8 py-4 rounded-[20px] font-medium text-base border transition-colors"
+                style={{ borderColor: "rgba(0,136,204,0.35)", color: "#0088cc", background: "rgba(0,136,204,0.07)" }}
+              >
+                <Send className="w-4 h-4" /> Open Telegram Bot
+              </motion.button>
+            </a>
           </motion.div>
 
           {/* Mini dashboard mockup */}
@@ -843,7 +865,72 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── 10. LEADERBOARD + MARKETPLACE ────────────────────────────────── */}
+      {/* ── 10. TELEGRAM BOT + IDENTITY LINKING ──────────────────────────── */}
+      <section id="bot" className="py-24 px-6 border-t" style={{ borderColor: "var(--glass-border)" }}>
+        <div className="max-w-5xl mx-auto">
+          <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.6 }}>
+            <p className="text-xs font-bold uppercase tracking-widest mb-4 text-center" style={{ color: "#0088cc" }}>Telegram Bot</p>
+            <h2 className="text-[clamp(2rem,5vw,3.5rem)] font-black text-center mb-4 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
+              Trade from your phone
+            </h2>
+            <p className="text-center max-w-xl mx-auto mb-16 text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+              The SoSoMind Telegram bot delivers real-time signals, portfolio updates, and DEX execution — no browser needed. Link your bot wallet to your dashboard in three steps.
+            </p>
+          </motion.div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            {[
+              {
+                step: "01", title: "Start the Bot",
+                desc: "Open @sosomind_bot on Telegram. A secure EVM wallet is auto-generated — no seed phrases, no setup.",
+                icon: Send, color: "#0088cc",
+              },
+              {
+                step: "02", title: "Connect Dashboard",
+                desc: "Connect MetaMask on the web dashboard. Go to Profile and tap \"Generate Link Code\" to get a one-time code.",
+                icon: Wallet, color: "#f97316",
+              },
+              {
+                step: "03", title: "Run /link",
+                desc: "Send /link <code> in the bot. Your Telegram identity permanently merges with your dashboard wallet.",
+                icon: Check, color: "#22c55e",
+              },
+            ].map((s, i) => {
+              const Icon = s.icon;
+              return (
+                <motion.div key={i}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-60px" }}
+                  transition={{ delay: i * 0.15, duration: 0.5 }}>
+                  <SpotlightCard className="p-6 h-full">
+                    <div className="flex items-center gap-3 mb-4">
+                      <span className="text-xs font-black font-mono" style={{ color: s.color, fontFamily: "var(--font-mono)" }}>{s.step}</span>
+                      <div className="w-9 h-9 rounded-[8px] flex items-center justify-center"
+                        style={{ background: s.color + "15", border: `1px solid ${s.color}30` }}>
+                        <Icon className="w-4 h-4" style={{ color: s.color } as React.CSSProperties} />
+                      </div>
+                    </div>
+                    <div className="font-bold mb-2 text-sm" style={{ color: "var(--text-primary)" }}>{s.title}</div>
+                    <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>{s.desc}</p>
+                  </SpotlightCard>
+                </motion.div>
+              );
+            })}
+          </div>
+          <div className="text-center">
+            <a href="https://t.me/sosomind_bot" target="_blank" rel="noopener noreferrer">
+              <MagneticButton
+                className="inline-flex items-center gap-2 px-8 py-4 rounded-[20px] font-bold text-white text-base"
+                style={{ background: "linear-gradient(135deg,#0088cc 0%,#0066aa 100%)" }}
+              >
+                <Send className="w-5 h-5" /> Start SoSoMind Bot
+              </MagneticButton>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* ── 11. LEADERBOARD + MARKETPLACE ────────────────────────────────── */}
       <section className="py-24 px-6 border-t" style={{ borderColor: "var(--glass-border)" }}>
         <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12">
           <motion.div initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.6 }}>
@@ -930,6 +1017,7 @@ export default function LandingPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {DATA_SOURCES.map((ds, i) => {
               const Icon = ds.icon;
+              const isMCP = ds.type === "MCP";
               return (
                 <motion.div key={ds.name}
                   initial={{ opacity: 0, y: 16 }}
@@ -939,13 +1027,22 @@ export default function LandingPage() {
                 >
                   <SpotlightCard className="p-4 text-center h-full flex flex-col items-center justify-center gap-2">
                     <div className="w-9 h-9 rounded-[8px] flex items-center justify-center"
-                      style={{ background: "rgba(249,115,22,0.1)", border: "1px solid rgba(249,115,22,0.2)" }}>
-                      <Icon className="w-4 h-4" style={{ color: "#f97316" } as React.CSSProperties} />
+                      style={{
+                        background: isMCP ? "rgba(139,92,246,0.12)" : "rgba(249,115,22,0.1)",
+                        border: isMCP ? "1px solid rgba(139,92,246,0.3)" : "1px solid rgba(249,115,22,0.2)",
+                      }}>
+                      {isMCP
+                        ? <MCP size={16} style={{ color: "#8b5cf6" }} />
+                        : <Icon className="w-4 h-4" style={{ color: "#f97316" } as React.CSSProperties} />}
                     </div>
                     <div className="font-bold text-xs" style={{ color: "var(--text-primary)" }}>{ds.name}</div>
                     <div className="flex items-center gap-1">
                       <span className="text-[10px] px-1.5 py-0.5 rounded"
-                        style={{ background: "rgba(249,115,22,0.08)", color: "#f97316", fontFamily: "var(--font-mono)" }}>{ds.type}</span>
+                        style={{
+                          background: isMCP ? "rgba(139,92,246,0.1)" : "rgba(249,115,22,0.08)",
+                          color: isMCP ? "#8b5cf6" : "#f97316",
+                          fontFamily: "var(--font-mono)",
+                        }}>{ds.type}</span>
                       <span className="text-[10px]" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>{ds.tools}t</span>
                     </div>
                   </SpotlightCard>
@@ -953,6 +1050,29 @@ export default function LandingPage() {
               );
             })}
           </div>
+
+          {/* AI Models powering the agents */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-60px" }} transition={{ delay: 0.2, duration: 0.5 }}
+            className="mt-12 pt-10 border-t" style={{ borderColor: "var(--glass-border)" }}
+          >
+            <p className="text-xs font-bold uppercase tracking-widest mb-6 text-center" style={{ color: "var(--text-muted)" }}>AI Models Inside</p>
+            <div className="flex flex-wrap items-center justify-center gap-6">
+              {[
+                { label: "Claude", Icon: Claude,   color: "#d97706" },
+                { label: "GPT-4",  Icon: OpenAI,   color: "#10b981" },
+                { label: "Gemini", Icon: Gemini,   color: "#3b82f6" },
+                { label: "DeepSeek", Icon: DeepSeek, color: "#6366f1" },
+                { label: "Mistral", Icon: Mistral,  color: "#f59e0b" },
+              ].map(({ label, Icon: AiIcon, color }) => (
+                <div key={label} className="flex items-center gap-2 px-4 py-2.5 rounded-[10px] border transition-all"
+                  style={{ borderColor: "var(--glass-border)", background: "var(--bg-card)" }}>
+                  <AiIcon size={20} style={{ color }} />
+                  <span className="text-sm font-semibold" style={{ color: "var(--text-secondary)" }}>{label}</span>
+                </div>
+              ))}
+            </div>
+          </motion.div>
         </div>
       </section>
 
@@ -1048,10 +1168,18 @@ export default function LandingPage() {
               The agentic finance operating system for serious crypto traders.
             </p>
             <div className="flex gap-3 mt-5">
-              {[X, Code2, Send].map((Icon, i) => (
-                <a key={i} href="#" className="w-9 h-9 flex items-center justify-center rounded-full border transition-colors"
+              {[
+                { Icon: X,     href: "#",                              label: "X / Twitter"    },
+                { Icon: Code2, href: "#",                              label: "GitHub"          },
+                { Icon: Send,  href: "https://t.me/sosomind_bot",      label: "Telegram Bot"    },
+              ].map(({ Icon, href, label }) => (
+                <a key={label} href={href}
+                  target={href.startsWith("https") ? "_blank" : undefined}
+                  rel={href.startsWith("https") ? "noopener noreferrer" : undefined}
+                  aria-label={label}
+                  className="w-9 h-9 flex items-center justify-center rounded-full border transition-colors"
                   style={{ borderColor: "var(--glass-border)", color: "var(--text-muted)" }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "#f97316"; (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(249,115,22,0.4)"; }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = label === "Telegram Bot" ? "#0088cc" : "#f97316"; (e.currentTarget as HTMLAnchorElement).style.borderColor = label === "Telegram Bot" ? "rgba(0,136,204,0.4)" : "rgba(249,115,22,0.4)"; }}
                   onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "var(--text-muted)"; (e.currentTarget as HTMLAnchorElement).style.borderColor = "var(--glass-border)"; }}>
                   <Icon className="w-4 h-4" />
                 </a>

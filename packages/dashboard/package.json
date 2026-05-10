@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@iconify/react": "^6.0.2",
+    "@lobehub/icons": "^5.8.0",
     "@tanstack/react-query": "^5.100.9",
     "@web3icons/react": "^4.1.17",
     "axios": "^1.16.0",

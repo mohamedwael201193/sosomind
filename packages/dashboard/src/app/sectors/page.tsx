@@ -1,15 +1,31 @@
 'use client';
 
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetcher } from '@/lib/api';
 import { motion } from 'framer-motion';
-import { BarChart3, TrendingUp, TrendingDown, ArrowUp, ArrowDown } from 'lucide-react';
+import {
+  BarChart3, TrendingUp, TrendingDown,
+  FlaskConical, Layers, Zap, Brain, Gamepad2,
+  Building2, ImageIcon, Smile, DollarSign, Server, Lock,
+} from 'lucide-react';
 import { PageHeader } from '@/components/LoadingSkeleton';
 
-const SECTOR_ICONS: Record<string, string> = {
-  DeFi: '⚗️', 'Layer 1': '🔷', 'Layer 2': '⚡', AI: '🤖',
-  Gaming: '🎮', RWA: '🏦', NFT: '🖼️', Meme: '🐸',
-  Stablecoin: '💵', Exchange: '📊', Infrastructure: '🏗️', Privacy: '🔒',
+type LucideIcon = React.ComponentType<{ size?: number; style?: React.CSSProperties; className?: string }>;
+
+const SECTOR_ICON_MAP: Record<string, LucideIcon> = {
+  'DeFi':           FlaskConical,
+  'Layer 1':        Layers,
+  'Layer 2':        Zap,
+  'AI':             Brain,
+  'Gaming':         Gamepad2,
+  'RWA':            Building2,
+  'NFT':            ImageIcon,
+  'Meme':           Smile,
+  'Stablecoin':     DollarSign,
+  'Exchange':       BarChart3,
+  'Infrastructure': Server,
+  'Privacy':        Lock,
 };
 
 function colorForChange(pct: number) {
@@ -92,7 +108,7 @@ export default function SectorsPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
             {normalized.map((s: any, i: number) => {
               const { bg, border, text } = colorForChange(s.pct);
-              const icon = SECTOR_ICONS[s.name] ?? '📈';
+              const SectorIcon = SECTOR_ICON_MAP[s.name] ?? TrendingUp;
               return (
                 <motion.div
                   key={s.name ?? i}
@@ -110,7 +126,9 @@ export default function SectorsPage() {
                     overflow: 'hidden',
                   }}
                 >
-                  <div style={{ fontSize: 22, marginBottom: 6 }}>{icon}</div>
+                  <div style={{ marginBottom: 6 }}>
+                    <SectorIcon size={22} style={{ color: text }} />
+                  </div>
                   <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 4, lineHeight: 1.2 }}>
                     {s.name ?? `Sector ${i + 1}`}
                   </div>
@@ -148,7 +166,10 @@ export default function SectorsPage() {
                   <tr key={s.name ?? i} style={{ borderTop: '1px solid var(--border)' }}>
                     <td style={{ padding: '10px', color: 'var(--muted)', fontWeight: 700, width: 32 }}>{i + 1}</td>
                     <td style={{ padding: '10px', fontWeight: 600 }}>
-                      {SECTOR_ICONS[s.name] ?? '📈'} {s.name}
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        {React.createElement(SECTOR_ICON_MAP[s.name] ?? TrendingUp, { size: 14, style: { color: 'var(--muted2)' } })}
+                        {s.name}
+                      </span>
                     </td>
                     <td style={{ padding: '10px' }}>
                       <span className="mono" style={{ color: text, fontWeight: 700 }}>
