@@ -78,12 +78,12 @@ export function Sidebar() {
         style={{ borderColor: 'var(--glass-border)', flexShrink: 0 }}
       >
         <Link href="/landing" className="flex items-center min-w-0 flex-1">
-          <div className="flex-shrink-0" style={{ filter: 'drop-shadow(0 2px 8px rgba(249,115,22,0.4))' }}>
+          <div className="flex-shrink-0" style={{ filter: 'drop-shadow(0 2px 12px rgba(249,115,22,0.5))' }}>
             <Image
-              src="/logo.png"
+              src="/logo-mark.png"
               alt="SoSoMind"
-              width={collapsed ? 36 : 36}
-              height={collapsed ? 36 : 36}
+              width={36}
+              height={36}
               className="rounded-xl object-contain"
               priority
             />

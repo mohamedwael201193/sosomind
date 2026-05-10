@@ -310,11 +310,10 @@ export default function LandingPage() {
             <Image
               src="/logo.png"
               alt="SoSoMind"
-              width={120}
-              height={32}
+              width={160}
+              height={40}
               className="h-8 w-auto object-contain"
               priority
-              style={{ filter: theme === "light" ? "brightness(0.1) saturate(0)" : "none" }}
             />
           </Link>
           <div className="hidden md:flex items-center gap-6">
@@ -1171,10 +1170,9 @@ export default function LandingPage() {
             <Image
               src="/logo.png"
               alt="SoSoMind"
-              width={130}
-              height={36}
+              width={160}
+              height={40}
               className="h-9 w-auto object-contain mb-3"
-              style={{ filter: theme === "light" ? "brightness(0.1) saturate(0)" : "none" }}
             />
             <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
               The agentic finance operating system for serious crypto traders.
