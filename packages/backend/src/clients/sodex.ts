@@ -455,6 +455,56 @@ export class SoDEXClient {
     const { nonce, sig } = await this.signBody(body, "futures", "cancelOrder");
     return this.unwrap(await this.perps.delete("/trade/orders", { data: body, headers: this.signedHeaders(nonce, sig) }));
   }
+
+  // ---------- ACCOUNT SETUP — "Enable Gas-free Trading" equivalent ----------
+  // Signs UserSignedAddAPIKeyAction with the master wallet.
+  // This is what the SoDEX website does when you click "Enable Trading".
+  // Calling it programmatically means users never need to visit the SoDEX UI at all.
+  async registerApiKey(opts?: { name?: string; expiresInDays?: number }): Promise<{ accountID: number; apiKeyName: string }> {
+    if (!this.wallet) throw new Error("Wallet not configured");
+
+    const name = opts?.name ?? `bot-${Date.now()}`;
+    const nonce = Date.now();
+    const expiresAt = nonce + (opts?.expiresInDays ?? 365) * 24 * 60 * 60 * 1000;
+
+    // Derive a sub-keypair (the "API key" that SoDEX stores on its side)
+    const subKey = ethers.Wallet.createRandom();
+
+    const types = {
+      UserSignedAddAPIKeyAction: [
+        { name: "accountID", type: "uint64" },
+        { name: "name", type: "string" },
+        { name: "keyType", type: "uint8" },
+        { name: "publicKey", type: "string" },
+        { name: "expiresAt", type: "uint64" },
+        { name: "nonce", type: "uint64" },
+      ],
+    };
+    // Try to get existing accountID (0 for brand-new wallets — SoDEX creates the account on registration)
+    const existingID = await this.resolveAccountID().catch(() => 0);
+    const message = {
+      accountID: existingID,
+      name,
+      keyType: 1,
+      publicKey: subKey.address.toLowerCase(),
+      expiresAt,
+      nonce,
+    };
+    const sig = await this.wallet.signTypedData(
+      { name: "spot", version: "1", chainId: this.chainId, verifyingContract: "0x0000000000000000000000000000000000000000" },
+      types,
+      message,
+    );
+    const body = { ...message, signature: sig };
+    const result: any = await this.spot.post("/accounts/api-keys", body).catch(async (err) => {
+      // Try alternate endpoint
+      return this.spot.post("/accounts/keys", body).catch(() => { throw err; });
+    });
+    const newAccountID = result?.data?.data?.accountID ?? result?.data?.accountID ?? existingID;
+    if (newAccountID > 0) this.defaultAccountID = newAccountID;
+    console.log(`[SoDEX] registerApiKey → accountID=${newAccountID} name="${name}"`);
+    return { accountID: newAccountID || existingID, apiKeyName: name };
+  }
 }
 
 export const sodex = new SoDEXClient({

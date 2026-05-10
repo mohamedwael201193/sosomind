@@ -243,18 +243,30 @@ export async function getOrCreateTelegramWallet(
 
   const { data, error } = await supabase
     .from('telegram_wallets')
-    .insert({
-      telegram_chat_id: chatId,
-      telegram_username: username ?? null,
-      telegram_first_name: firstName ?? null,
-      wallet_address: wallet.address,
-      encrypted_key,
-    })
+    .upsert(
+      {
+        telegram_chat_id: chatId,
+        telegram_username: username ?? null,
+        telegram_first_name: firstName ?? null,
+        wallet_address: wallet.address,
+        encrypted_key,
+      },
+      { onConflict: 'telegram_chat_id', ignoreDuplicates: false }
+    )
     .select('telegram_chat_id, telegram_username, telegram_first_name, wallet_address, encrypted_key')
     .single();
 
   if (error) {
-    console.error('getOrCreateTelegramWallet insert error:', error.message);
+    // On conflict just re-fetch — another request already created it
+    if (error.code === '23505') {
+      const { data: race } = await supabase
+        .from('telegram_wallets')
+        .select('telegram_chat_id, telegram_username, telegram_first_name, wallet_address, encrypted_key')
+        .eq('telegram_chat_id', chatId)
+        .single();
+      return race as TelegramWallet ?? null;
+    }
+    console.error('getOrCreateTelegramWallet upsert error:', error.message);
     return null;
   }
   return data as TelegramWallet;

@@ -113,13 +113,42 @@ export function createBot(): Bot | null {
       if (chatId) {
         const embWallet = await getOrCreateTelegramWallet(chatId, ctx.from?.username, ctx.from?.first_name).catch(() => null);
         if (embWallet) {
+          const short = `${embWallet.wallet_address.slice(0, 6)}…${embWallet.wallet_address.slice(-4)}`;
           await ctx.reply(
             `👛 <b>Your SosoMind Wallet</b>\n\n` +
             `<code>${embWallet.wallet_address}</code>\n\n` +
-            `<i>This wallet is auto-generated for you on SoDEX Testnet.\n` +
-            `Fund it with testnet tokens to start trading — no MetaMask needed!</i>`,
-            { parse_mode: 'HTML' }
+            `🚀 <b>3 Steps to start trading:</b>\n` +
+            `① Export your key → import to MetaMask\n` +
+            `② Visit faucet → claim 100 USDC/day\n` +
+            `③ Enable Trading on SoDEX (one-time)\n\n` +
+            `<i>Then just say "buy $10 of BTC" in this chat!</i>\n\n` +
+            `👉 Use <b>/setup</b> for the full step-by-step guide.`,
+            {
+              parse_mode: 'HTML',
+              reply_markup: new InlineKeyboard()
+                .text('📋 Full Setup Guide', 'setup:start').text('👛 My Wallet', 'menu:wallet'),
+            }
           );
+          // Fire-and-forget: try to auto-register this wallet on SoDEX
+          // so the user may not need to click "Enable Trading" manually
+          setImmediate(async () => {
+            try {
+              const { SoDEXClient } = await import('../clients/sodex');
+              const { decryptPrivateKey } = await import('../utils/walletCrypto');
+              const userClient = new SoDEXClient({
+                chainId: parseInt(process.env.SODEX_CHAIN_ID || '138565', 10),
+                privateKey: decryptPrivateKey(embWallet.encrypted_key),
+                isTestnet: true,
+              });
+              const accID = await userClient.resolveAccountID().catch(() => 0);
+              if (!accID) {
+                await userClient.registerApiKey({ name: `tg-${chatId}` });
+                console.log(`[Bot] Auto-registered SoDEX account for chatId=${chatId} addr=${embWallet.wallet_address}`);
+              }
+            } catch (e) {
+              console.warn(`[Bot] SoDEX auto-register skipped for chatId=${chatId}:`, (e as Error).message);
+            }
+          });
         }
       }
       // Also send the persistent keyboard
@@ -481,7 +510,15 @@ export function createBot(): Bot | null {
       }
 
       // Embedded wallet execution result
-      const orderId = sodexResult?.data?.orders?.[0]?.orderID ?? sodexResult?.orderID ?? 'n/a';
+      // placeSpotOrder → placeSpotOrderBatch → unwrap() → batch response
+      // Batch response shape: { orders: [{ orderID, clOrdID, status, ... }] }
+      // or direct array of order objects
+      let orderId = 'pending';
+      try {
+        const orders = sodexResult?.orders ?? (Array.isArray(sodexResult) ? sodexResult : []);
+        const first = orders[0] ?? sodexResult ?? {};
+        orderId = String(first.orderID ?? first.clOrdID ?? first.id ?? 'pending');
+      } catch { /* keep 'pending' */ }
       const text =
         `✅ <b>Order Submitted</b>\n\n` +
         `🪙 Market: <b>${market}</b>\n` +
@@ -1617,6 +1654,85 @@ export function createBot(): Bot | null {
       await ctx.reply(`❌ Error: ${(e as Error).message}`);
     }
   });
+
+  // ── Setup Onboarding (/setup) ────────────────────────────────────────────────
+  const sendSetupGuide = async (ctx: Context) => {
+    const chatId = String(ctx.chat?.id ?? '');
+    const wallet = chatId ? await getOrCreateTelegramWallet(chatId, ctx.from?.username, ctx.from?.first_name).catch(() => null) : null;
+
+    // Check SoDEX account registration status
+    let sodexStatus = '⏳ Unknown';
+    let balance = '⏳ Unknown';
+    if (wallet) {
+      try {
+        const { SoDEXClient } = await import('../clients/sodex');
+        const { decryptPrivateKey } = await import('../utils/walletCrypto');
+        const userClient = new SoDEXClient({
+          chainId: parseInt(process.env.SODEX_CHAIN_ID || '138565', 10),
+          privateKey: decryptPrivateKey(wallet.encrypted_key),
+          isTestnet: true,
+        });
+        const accID = await userClient.resolveAccountID().catch(() => 0);
+        if (accID > 0) {
+          sodexStatus = `✅ Registered (ID: ${accID})`;
+          const bals: any[] = await userClient.getAccountBalances().catch(() => []);
+          const usdc = Array.isArray(bals) ? bals.find((b: any) => String(b.coin || b.asset || '').includes('USDC')) : null;
+          const usdcAmt = usdc ? Number(usdc.available ?? usdc.free ?? usdc.amount ?? 0) : 0;
+          balance = usdcAmt > 0 ? `✅ ${usdcAmt.toFixed(2)} USDC` : '❌ 0 USDC — needs funding';
+        } else {
+          sodexStatus = '❌ Not registered yet';
+          balance = '❌ Not registered yet';
+        }
+      } catch {
+        sodexStatus = '⏳ Checking…';
+      }
+    }
+
+    const walletAddr = wallet?.wallet_address ?? 'Not created';
+    const short = wallet ? `${walletAddr.slice(0, 6)}…${walletAddr.slice(-4)}` : '?';
+
+    const text =
+      `📋 <b>SosoMind Setup Guide</b>\n\n` +
+      `<b>Your Wallet:</b> <code>${walletAddr}</code>\n` +
+      `<b>SoDEX Account:</b> ${sodexStatus}\n` +
+      `<b>Spot Balance:</b> ${balance}\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `<b>Step ① — Export wallet key to MetaMask</b>\n` +
+      `Use /wallet → <i>Export Key</i>\n` +
+      `Copy the key → MetaMask → Import Account\n` +
+      `Add network: ValueChain Testnet\n` +
+      `  • RPC: <code>https://testnet-rpc.sosovalue.org</code>\n` +
+      `  • Chain ID: <code>138565</code>\n` +
+      `  • Symbol: <code>SOSO</code>\n\n` +
+      `<b>Step ② — Get free testnet USDC</b>\n` +
+      `Connect MetaMask to:\n` +
+      `<a href="https://testnet.sodex.com/faucet">testnet.sodex.com/faucet</a>\n` +
+      `Claim <b>100 USDC + SOSO</b> per day (free)\n\n` +
+      `<b>Step ③ — Enable Trading on SoDEX (one-time)</b>\n` +
+      `Go to <a href="https://testnet.sodex.com">testnet.sodex.com</a>\n` +
+      `Connect wallet → click <b>"Enable Trading"</b>\n` +
+      `Sign the MetaMask popup → done!\n` +
+      `Then: Portfolio → <b>Transfer Funding → Spot</b>\n\n` +
+      `<b>Step ④ — Trade from this bot!</b>\n` +
+      `Just say: <i>"buy $10 of BTC"</i> or\n` +
+      `tap any signal → hit Execute\n\n` +
+      `⚡ <i>The bot signs all trades automatically with your wallet. No MetaMask popup needed after setup!</i>`;
+
+    const kb = new InlineKeyboard()
+      .url('🚰 Faucet', 'https://testnet.sodex.com/faucet').url('🌐 SoDEX', 'https://testnet.sodex.com').row()
+      .text('👛 Export My Key', 'wallet:export').text('💰 Check Balance', 'wallet:balance').row()
+      .text('🔄 Refresh Status', 'setup:start').text('🏠 Main Menu', 'menu:main');
+
+    if ((ctx as any).callbackQuery) {
+      await (ctx as any).editMessageText(text, { parse_mode: 'HTML', reply_markup: kb, disable_web_page_preview: true });
+      await (ctx as any).answerCallbackQuery();
+    } else {
+      await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb } as any);
+    }
+  };
+
+  bot.command('setup', sendSetupGuide);
+  bot.callbackQuery('setup:start', sendSetupGuide);
 
   // ── Wallet Management (/wallet) ─────────────────────────────────────────────
   // Map of chatId → what we're awaiting from that user (conversation state)
