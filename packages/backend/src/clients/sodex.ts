@@ -296,6 +296,16 @@ export class SoDEXClient {
     if (!this.address) throw new Error("No address configured");
     return this.read(this.spot, `/accounts/${this.address}/balances`);
   }
+  // Per-user read endpoints (public — any wallet address)
+  async getSpotBalancesForAddress(address: string) {
+    return this.read(this.spot, `/accounts/${address}/balances`);
+  }
+  async getSpotOrdersForAddress(address: string, symbol?: string) {
+    return this.read(this.spot, `/accounts/${address}/orders`, { params: symbol ? { symbol } : undefined });
+  }
+  async getSpotOrderHistoryForAddress(address: string, symbol?: string, limit = 50) {
+    return this.read(this.spot, `/accounts/${address}/orders/history`, { params: { ...(symbol ? { symbol } : {}), limit } });
+  }
   async getSpotOrders(symbol?: string) {
     return this.read(this.spot, `/accounts/${this.address}/orders`, { params: symbol ? { symbol } : undefined });
   }

@@ -4,13 +4,14 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 interface GlassCardProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   className?: string;
   hover?: boolean;
   glow?: 'green' | 'red' | 'blue' | 'purple' | 'orange' | 'none';
   padding?: 'sm' | 'md' | 'lg';
   animate?: boolean;
   spotlight?: boolean;
+  style?: React.CSSProperties;
 }
 
 export function GlassCard({
@@ -21,6 +22,7 @@ export function GlassCard({
   padding = 'md',
   animate = true,
   spotlight = true,
+  style,
 }: GlassCardProps) {
   const [pos, setPos] = useState({ x: 0, y: 0, opacity: 0 });
 
@@ -40,6 +42,7 @@ export function GlassCard({
       initial={animate ? { opacity: 0, y: 20 } : false}
       animate={animate ? { opacity: 1, y: 0 } : false}
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      style={style}
       className={cn(
         'relative overflow-hidden rounded-[var(--radius-lg)] border border-[var(--glass-border)]',
         'bg-[var(--bg-card)] backdrop-blur-xl',
