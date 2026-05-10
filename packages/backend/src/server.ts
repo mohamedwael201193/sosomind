@@ -40,7 +40,12 @@ export async function startServer() {
   const PORT = Number(process.env.PORT || 10000);
 
   app.use(helmet());
-  app.use(cors({ origin: process.env.FRONTEND_URL || true, credentials: true }));
+  const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || process.env.FRONTEND_URL || '')
+    .split(',').map(o => o.trim()).filter(Boolean);
+  app.use(cors({
+    origin: allowedOrigins.length ? (o, cb) => cb(null, !o || allowedOrigins.includes(o)) : true,
+    credentials: true,
+  }));
   app.use(express.json({ limit: '5mb' }));
 
   const limiter = rateLimit({
