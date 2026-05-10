@@ -24,17 +24,35 @@ export function LiveTicker() {
   const prevPrices = useRef<Record<string, number>>({});
   const { lastMessage } = useWebSocket("prices");
 
-  // Fetch initial prices from REST API so ticker shows real values immediately
+  // Fetch initial prices: try backend first, fall back to Binance API directly
   useEffect(() => {
     const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:10000";
     const symbols = DEFAULT_ITEMS.map((i) => i.symbol);
-    Promise.allSettled(
-      symbols.map((sym) =>
-        fetch(`${API_URL}/api/market/price/${sym}USDT`)
-          .then((r) => r.json())
-          .then((data) => ({ symbol: sym, price: Number(data.price ?? 0), change24h: Number(data.change24h ?? 0) }))
-      )
-    ).then((results) => {
+
+    async function fetchPrice(sym: string): Promise<TickerItem> {
+      // 1. Try our backend
+      try {
+        const r = await fetch(`${API_URL}/api/market/price/${sym}USDT`, { signal: AbortSignal.timeout(4000) });
+        if (r.ok) {
+          const d = await r.json();
+          const price = Number(d.price ?? 0);
+          if (price > 0) return { symbol: sym, price, change24h: Number(d.change24h ?? d.priceChangePercent ?? 0) };
+        }
+      } catch { /* fall through to Binance */ }
+
+      // 2. Direct Binance 24hr ticker (no API key needed, CORS open)
+      const b = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${sym}USDT`, {
+        signal: AbortSignal.timeout(6000),
+      });
+      const bd = await b.json();
+      return {
+        symbol: sym,
+        price: Number(bd.lastPrice ?? 0),
+        change24h: Number(bd.priceChangePercent ?? 0),
+      };
+    }
+
+    Promise.allSettled(symbols.map(fetchPrice)).then((results) => {
       const updates: Record<string, TickerItem> = {};
       for (const r of results) {
         if (r.status === "fulfilled" && r.value.price > 0) {

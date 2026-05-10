@@ -17,7 +17,15 @@ interface Signal {
   direction?: string;
   confidence?: number;
   reason?: string;
+  reasoning?: string;
+  entry?: number | null;
+  entry_price?: number | null;
+  takeProfit?: number | null;
+  take_profit?: number | null;
+  stopLoss?: number | null;
+  stop_loss?: number | null;
   timestamp?: string | number;
+  created_at?: string;
   status?: string;
   [key: string]: unknown;
 }
@@ -51,8 +59,9 @@ export default function SignalsPage() {
   ];
 
   const filteredSignals = allSignals.filter((s) => {
-    if (filter === "long") return s.direction === "long";
-    if (filter === "short") return s.direction === "short";
+    const dir = (s.direction ?? "").toLowerCase();
+    if (filter === "long") return dir === "long";
+    if (filter === "short") return dir === "short";
     if (filter === "high-conf") return Number(s.confidence ?? 0) >= 75;
     return true;
   });
@@ -126,9 +135,16 @@ export default function SignalsPage() {
             </motion.div>
           ) : (
             filteredSignals.map((signal, i) => {
-              const dir = signal.direction ?? "neutral";
+              const dir = (signal.direction ?? "neutral").toLowerCase();
               const sym = signal.symbol ?? signal.asset ?? "?";
-              const conf = Number(signal.confidence ?? 0);
+              const rawConf = Number(signal.confidence ?? 0);
+              // Supabase may store 0-1 decimal; normalise to 0-100
+              const conf = rawConf > 0 && rawConf <= 1 ? Math.round(rawConf * 100) : Math.round(rawConf);
+              const entryPx = signal.entry ?? signal.entry_price ?? null;
+              const tp = signal.takeProfit ?? signal.take_profit ?? null;
+              const sl = signal.stopLoss ?? signal.stop_loss ?? null;
+              const rationale = signal.reasoning ?? signal.reason ?? null;
+              const ts = signal.timestamp ?? signal.created_at ?? null;
               const isLive = liveSignals.some((ls) => ls.id === signal.id);
               return (
                 <motion.div
@@ -186,8 +202,8 @@ export default function SignalsPage() {
                           )}
                         </div>
 
-                        {signal.reason && (
-                          <p className="text-sm text-[var(--text-secondary)] mb-3">{String(signal.reason)}</p>
+                        {rationale && (
+                          <p className="text-sm text-[var(--text-secondary)] mb-3 line-clamp-3">{String(rationale)}</p>
                         )}
 
                         {conf > 0 && (
@@ -209,11 +225,37 @@ export default function SignalsPage() {
                             </div>
                           </div>
                         )}
+
+                        {/* Entry / TP / SL price levels */}
+                        {(entryPx || tp || sl) && (
+                          <div className="flex gap-4 mt-3 pt-3 border-t border-[var(--border-subtle)] text-xs">
+                            {entryPx && (
+                              <div>
+                                <span className="text-[var(--text-muted)] block mb-0.5">Entry</span>
+                                <span className="font-mono font-semibold text-[var(--text-secondary)]">${Number(entryPx).toLocaleString()}</span>
+                              </div>
+                            )}
+                            {tp && (
+                              <div>
+                                <span className="text-[var(--text-muted)] block mb-0.5">Take Profit</span>
+                                <span className="font-mono font-semibold text-[var(--green)]">${Number(tp).toLocaleString()}</span>
+                              </div>
+                            )}
+                            {sl && (
+                              <div>
+                                <span className="text-[var(--text-muted)] block mb-0.5">Stop Loss</span>
+                                <span className="font-mono font-semibold text-[var(--red)]">${Number(sl).toLocaleString()}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
-                      {signal.timestamp && (
+                      {ts && (
                         <div className="text-xs text-[var(--text-muted)] flex-shrink-0">
-                          {new Date(Number(signal.timestamp) * (String(signal.timestamp).length === 10 ? 1000 : 1)).toLocaleTimeString()}
+                          {new Date(
+                            typeof ts === "string" ? ts : Number(ts) * (String(ts).length === 10 ? 1000 : 1)
+                          ).toLocaleTimeString()}
                         </div>
                       )}
                     </div>
