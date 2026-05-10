@@ -3,7 +3,7 @@ import { runResearchAgent } from '../agents/research';
 import { runExecutionAgent } from '../agents/execution';
 import { sosovalue } from '../clients/sosovalue';
 import { supabase } from '../db/supabase';
-import { upsertSubscriber, getSignals, getUserPreference, setUserPreference, getOrCreateTelegramWallet } from '../db/supabase';
+import { upsertSubscriber, getSignals, getUserPreference, setUserPreference, getOrCreateTelegramWallet, replaceTelegramWallet } from '../db/supabase';
 import { formatResearchReport, formatBriefing } from './format';
 import { parseTradeIntent } from './nlp';
 import { generateVoiceBrief, briefingScript, hasVoice } from '../agents/voice';
@@ -99,7 +99,8 @@ export function createBot(): Bot | null {
       .text('📚 Playbook', 'playbook:cmd').text('⚖️ Rebalance', 'rebalance:cmd').row()
       .text('🎯 Persona', 'persona:view').text('📄 Tax Report', 'tax:cmd').row()
       .text('🔔 Alerts', 'menu:alerts').text('📓 Journal', 'journal:view').row()
-      .text('🤝 Subscribe', 'subscribe:btc,macro,etf').text('⚙️ Settings', 'settings:view');
+      .text('🤝 Subscribe', 'subscribe:btc,macro,etf').text('⚙️ Settings', 'settings:view').row()
+      .text('👛 My Wallet', 'menu:wallet');
 
     const text = mainMenuMsg();
     if ((ctx as any).callbackQuery) {
@@ -1497,6 +1498,49 @@ export function createBot(): Bot | null {
     const text = ctx.message?.text ?? '';
     if (!text || text.startsWith('/') || KEYBOARD_LABELS.has(text)) return;
 
+    // ── Private key import conversation handler ──────────────────────────────
+    const chatId = String(ctx.chat?.id ?? '');
+    if (chatId && awaitingInput.get(chatId) === 'import_key') {
+      awaitingInput.delete(chatId);
+      // Try to delete user's message for security
+      await ctx.deleteMessage().catch(() => {});
+
+      const rawKey = text.trim();
+      const normalized = rawKey.startsWith('0x') ? rawKey : `0x${rawKey}`;
+      if (!/^0x[0-9a-fA-F]{64}$/.test(normalized)) {
+        await ctx.reply(
+          '❌ <b>Invalid private key</b>\n\nMust be 64 hex characters (with or without 0x prefix).\n\nTry <b>Import Key</b> again from /wallet.',
+          { parse_mode: 'HTML' }
+        );
+        return;
+      }
+      try {
+        const { ethers } = await import('ethers');
+        const { encryptPrivateKey } = await import('../utils/walletCrypto');
+        const newWallet = new ethers.Wallet(normalized);
+        const encryptedKey = encryptPrivateKey(normalized);
+        const updated = await replaceTelegramWallet(chatId, newWallet.address, encryptedKey);
+        if (!updated) throw new Error('DB update failed');
+        await ctx.reply(
+          `✅ <b>Wallet Imported Successfully</b>\n\n` +
+          `📍 New Address:\n<code>${newWallet.address}</code>\n\n` +
+          `<i>The bot will now trade using this wallet. If this is your MetaMask wallet, it's already connected to SoDEX — just fund it via the 🚰 faucet.</i>`,
+          {
+            parse_mode: 'HTML',
+            reply_markup: new InlineKeyboard()
+              .text('🚰 Faucet Guide', 'wallet:faucet').text('💰 Check Balance', 'wallet:balance').row()
+              .text('👛 My Wallet', 'menu:wallet'),
+          }
+        );
+      } catch (e) {
+        await ctx.reply(
+          `❌ <b>Import Failed</b>\n<code>${(e as Error).message}</code>\n\nTry again via /wallet.`,
+          { parse_mode: 'HTML' }
+        );
+      }
+      return;
+    }
+
     const intent = parseTradeIntent(text);
     try {
       switch (intent.kind) {
@@ -1571,6 +1615,229 @@ export function createBot(): Bot | null {
       }
     } catch (e) {
       await ctx.reply(`❌ Error: ${(e as Error).message}`);
+    }
+  });
+
+  // ── Wallet Management (/wallet) ─────────────────────────────────────────────
+  // Map of chatId → what we're awaiting from that user (conversation state)
+  const awaitingInput = new Map<string, 'import_key'>();
+
+  const VALUECHAIN_TESTNET = {
+    chainId: '0x21D85', // 138565 decimal
+    chainName: 'ValueChain Testnet',
+    rpcUrls: ['https://testnet-rpc.sosovalue.org'],
+    nativeCurrency: { name: 'SOSO', symbol: 'SOSO', decimals: 18 },
+    blockExplorerUrls: ['https://testnet.sodex.com/explorer'],
+  };
+
+  const showWalletMenu = async (ctx: Context) => {
+    const chatId = String(ctx.chat?.id ?? '');
+    if (!chatId) return;
+
+    const wallet = await getOrCreateTelegramWallet(chatId, ctx.from?.username, ctx.from?.first_name).catch(() => null);
+
+    // Check if linked MetaMask wallet exists
+    let linkedMetaMask: string | null = null;
+    try {
+      const { data } = await supabase.from('user_profiles')
+        .select('wallet_address').eq('telegram_chat_id', chatId).maybeSingle();
+      linkedMetaMask = (data as any)?.wallet_address ?? null;
+    } catch {}
+
+    const addr = wallet?.wallet_address ?? '—';
+    const short = addr !== '—' ? `${addr.slice(0, 10)}…${addr.slice(-6)}` : '—';
+    const dashboardUrl = process.env.DASHBOARD_URL || '';
+    const isPublicDashboard = dashboardUrl.startsWith('https://') && !dashboardUrl.includes('localhost');
+
+    const text =
+      `👛 <b>Your SosoMind Wallet</b>\n\n` +
+      `📍 Address:\n<code>${addr}</code>\n\n` +
+      (linkedMetaMask
+        ? `🦊 <b>MetaMask Linked:</b> <code>${linkedMetaMask.slice(0, 10)}…${linkedMetaMask.slice(-6)}</code>\n<i>Trades via dashboard will use your MetaMask wallet.</i>\n\n`
+        : '') +
+      `🌐 Network: ValueChain Testnet (chainId 138565)\n` +
+      `🔗 Explorer: <a href="https://testnet.sodex.com/explorer">testnet.sodex.com/explorer</a>\n\n` +
+      `<b>Options:</b>\n` +
+      `• <b>Export Key</b> — view private key (import to MetaMask)\n` +
+      `• <b>Import Key</b> — replace bot wallet with your MetaMask wallet\n` +
+      `• <b>Faucet Guide</b> — get free 100 USDC testnet tokens\n` +
+      (isPublicDashboard ? `• <b>Link MetaMask</b> — connect via ${dashboardUrl}\n` : '');
+
+    const kb = new InlineKeyboard()
+      .text('🔑 Export Key', 'wallet:export').text('📥 Import Key', 'wallet:import').row()
+      .text('🚰 Faucet Guide', 'wallet:faucet').text('🔄 Refresh Balance', 'wallet:balance').row();
+    if (isPublicDashboard) {
+      kb.url('🦊 Link MetaMask', `${dashboardUrl}/profile`).row();
+    }
+    kb.text('🏠 Main Menu', 'menu:main');
+
+    if ((ctx as any).callbackQuery) {
+      await (ctx as any).editMessageText(text, { parse_mode: 'HTML', reply_markup: kb, link_preview_options: { is_disabled: true } });
+      await (ctx as any).answerCallbackQuery();
+    } else {
+      await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb, link_preview_options: { is_disabled: true } });
+    }
+  };
+
+  bot.command('wallet', showWalletMenu);
+  bot.callbackQuery('menu:wallet', showWalletMenu);
+
+  // Export private key — step 1: confirm
+  bot.callbackQuery('wallet:export', async (ctx) => {
+    await ctx.answerCallbackQuery();
+    const chatId = String(ctx.chat?.id ?? '');
+    const wallet = await getOrCreateTelegramWallet(chatId).catch(() => null);
+    if (!wallet) {
+      await ctx.reply('❌ No wallet found. Send /start to create one.'); return;
+    }
+    const text =
+      `⚠️ <b>Security Warning — Private Key Export</b>\n\n` +
+      `Your private key grants <b>full control</b> of your wallet.\n\n` +
+      `✅ <b>Safe uses:</b>\n` +
+      `  • Import into MetaMask to fund via faucet\n` +
+      `  • Back up offline (paper/hardware wallet)\n\n` +
+      `❌ <b>Never:</b>\n` +
+      `  • Share with anyone\n` +
+      `  • Screenshot or paste in public chats\n` +
+      `  • Use on untrusted sites\n\n` +
+      `Wallet: <code>${wallet.wallet_address.slice(0, 10)}…${wallet.wallet_address.slice(-6)}</code>\n\n` +
+      `Tap <b>Show Key</b> to reveal your private key in the next message.\n` +
+      `<i>⚠️ Delete that message immediately after copying!</i>`;
+    const kb = new InlineKeyboard()
+      .text('🔑 Show Key Now', 'wallet:confirm_export').row()
+      .text('❌ Cancel', 'menu:wallet');
+    await (ctx as any).editMessageText(text, { parse_mode: 'HTML', reply_markup: kb });
+  });
+
+  // Export private key — step 2: reveal
+  bot.callbackQuery('wallet:confirm_export', async (ctx) => {
+    await ctx.answerCallbackQuery({ text: '🔑 Revealing key…' });
+    const chatId = String(ctx.chat?.id ?? '');
+    const wallet = await getOrCreateTelegramWallet(chatId).catch(() => null);
+    if (!wallet) {
+      await (ctx as any).editMessageText('❌ Wallet not found.', { parse_mode: 'HTML' }); return;
+    }
+    try {
+      const { decryptPrivateKey } = await import('../utils/walletCrypto');
+      const pk = decryptPrivateKey(wallet.encrypted_key);
+      // Delete the warning message first
+      await (ctx as any).editMessageText(
+        `🔑 <b>Your Private Key</b>\n\n` +
+        `<code>${pk}</code>\n\n` +
+        `📋 Copy it now, then:\n` +
+        `1. Open MetaMask → Import Account → Paste key\n` +
+        `2. <b>Delete this message immediately!</b>\n\n` +
+        `⚠️ <i>SosoMind will never ask for your key again.</i>`,
+        { parse_mode: 'HTML', reply_markup: new InlineKeyboard().text('✅ Done — Go to Wallet', 'menu:wallet') }
+      );
+    } catch (e) {
+      await (ctx as any).editMessageText(`❌ Decrypt error: ${(e as Error).message}`, { parse_mode: 'HTML' });
+    }
+  });
+
+  // Import private key — prompt
+  bot.callbackQuery('wallet:import', async (ctx) => {
+    await ctx.answerCallbackQuery();
+    const chatId = String(ctx.chat?.id ?? '');
+    const current = await getOrCreateTelegramWallet(chatId).catch(() => null);
+    awaitingInput.set(chatId, 'import_key');
+    const text =
+      `📥 <b>Import Wallet</b>\n\n` +
+      `Reply with your private key (64-char hex or 0x-prefixed).\n\n` +
+      `<b>Current wallet:</b> <code>${current?.wallet_address ?? '—'}</code>\n` +
+      `<i>It will be replaced with your imported wallet.</i>\n\n` +
+      `⚠️ Only do this in a private chat. Delete the message after sending.\n` +
+      `✅ Tip: Export your MetaMask key via MetaMask → Account → Export Private Key`;
+    await (ctx as any).editMessageText(text, {
+      parse_mode: 'HTML',
+      reply_markup: new InlineKeyboard().text('❌ Cancel', 'wallet:import_cancel'),
+    });
+  });
+
+  bot.callbackQuery('wallet:import_cancel', async (ctx) => {
+    const chatId = String(ctx.chat?.id ?? '');
+    awaitingInput.delete(chatId);
+    await ctx.answerCallbackQuery({ text: 'Import cancelled' });
+    await showWalletMenu(ctx);
+  });
+
+  // Faucet guide
+  bot.callbackQuery('wallet:faucet', async (ctx) => {
+    await ctx.answerCallbackQuery();
+    const chatId = String(ctx.chat?.id ?? '');
+    const wallet = await getOrCreateTelegramWallet(chatId).catch(() => null);
+    const addr = wallet?.wallet_address ?? '(run /wallet to get yours)';
+    const text =
+      `🚰 <b>Get Free Testnet USDC — Step by Step</b>\n\n` +
+      `<b>Step 1</b> — Get your bot wallet address:\n` +
+      `<code>${addr}</code>\n\n` +
+      `<b>Step 2</b> — Add ValueChain Testnet to MetaMask:\n` +
+      `  • Network Name: <code>ValueChain Testnet</code>\n` +
+      `  • RPC URL: <code>https://testnet-rpc.sosovalue.org</code>\n` +
+      `  • Chain ID: <code>138565</code>\n` +
+      `  • Symbol: <code>SOSO</code>\n` +
+      `  • Explorer: <code>https://testnet.sodex.com/explorer</code>\n\n` +
+      `<b>Step 3</b> — Import your bot wallet into MetaMask:\n` +
+      `  Use <b>Export Key</b> button → paste key in MetaMask → Import Account\n` +
+      `  <i>(Or import your existing MetaMask key into the bot via Import Key)</i>\n\n` +
+      `<b>Step 4</b> — Claim free tokens:\n` +
+      `  🔗 <a href="https://testnet.sodex.com/faucet">testnet.sodex.com/faucet</a>\n` +
+      `  → Connect wallet → Claim <b>100 USDC</b> + SOSO daily\n\n` +
+      `<b>Step 5</b> — Transfer to Spot Account:\n` +
+      `  On SoDEX → Funding Account → Transfer to Spot\n` +
+      `  (SoDEX separates funding ↔ trading accounts)\n\n` +
+      `<b>Step 6</b> — Trade on SosoMind:\n` +
+      `  Go to ⚡ Signal → pick asset → set qty → Execute!\n\n` +
+      `<i>💡 The bot uses your wallet directly — no MetaMask needed for trades after funding!</i>`;
+    const kb = new InlineKeyboard()
+      .url('🚰 Open Faucet', 'https://testnet.sodex.com/faucet').row()
+      .text('🔑 Export My Key', 'wallet:export').text('📥 Import My Key', 'wallet:import').row()
+      .text('⬅️ Back to Wallet', 'menu:wallet');
+    await (ctx as any).editMessageText(text, { parse_mode: 'HTML', reply_markup: kb, link_preview_options: { is_disabled: true } });
+  });
+
+  // Wallet balance from SoDEX
+  bot.callbackQuery('wallet:balance', async (ctx) => {
+    await ctx.answerCallbackQuery({ text: '🔄 Fetching balance…' });
+    const chatId = String(ctx.chat?.id ?? '');
+    const wallet = await getOrCreateTelegramWallet(chatId).catch(() => null);
+    if (!wallet) {
+      await ctx.reply('❌ No wallet found.'); return;
+    }
+    try {
+      const { SoDEXClient } = await import('../clients/sodex');
+      const { decryptPrivateKey } = await import('../utils/walletCrypto');
+      const userClient = new SoDEXClient({
+        chainId: parseInt(process.env.SODEX_CHAIN_ID || '138565', 10),
+        privateKey: decryptPrivateKey(wallet.encrypted_key),
+        isTestnet: true,
+      });
+      const balances: any[] = await userClient.getAccountBalances().catch(() => []);
+      const lines: string[] = [
+        `💰 <b>SoDEX Testnet Balance</b>`,
+        `👛 <code>${wallet.wallet_address.slice(0, 10)}…${wallet.wallet_address.slice(-6)}</code>`,
+        '',
+      ];
+      if (!balances?.length) {
+        lines.push('<i>No balance found. Fund your wallet via 🚰 Faucet Guide.</i>');
+      } else {
+        for (const b of balances) {
+          const total = Number(b.total ?? b.available ?? 0);
+          if (total > 0) {
+            lines.push(`  <b>${b.coin || b.asset}</b>: ${total.toFixed(4)} (avail: ${Number(b.available ?? 0).toFixed(4)})`);
+          }
+        }
+        if (lines.length === 3) lines.push('<i>All balances are zero. Fund via faucet.</i>');
+      }
+      const kb = new InlineKeyboard()
+        .text('🚰 Get Testnet USDC', 'wallet:faucet').text('🔄 Refresh', 'wallet:balance').row()
+        .text('⬅️ Back', 'menu:wallet');
+      await (ctx as any).editMessageText(lines.join('\n'), { parse_mode: 'HTML', reply_markup: kb });
+    } catch (e) {
+      await (ctx as any).editMessageText(
+        `❌ Balance error: <code>${(e as Error).message}</code>`,
+        { parse_mode: 'HTML', reply_markup: new InlineKeyboard().text('⬅️ Back', 'menu:wallet') }
+      );
     }
   });
 

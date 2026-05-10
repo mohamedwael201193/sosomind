@@ -260,6 +260,25 @@ export async function getOrCreateTelegramWallet(
   return data as TelegramWallet;
 }
 
+/** Replace the wallet for a Telegram user (import flow — user provides their own private key) */
+export async function replaceTelegramWallet(
+  chatId: string,
+  newAddress: string,
+  newEncryptedKey: string,
+): Promise<TelegramWallet | null> {
+  const { data, error } = await supabase
+    .from('telegram_wallets')
+    .update({ wallet_address: newAddress, encrypted_key: newEncryptedKey, last_used_at: new Date().toISOString() })
+    .eq('telegram_chat_id', chatId)
+    .select()
+    .single();
+  if (error) {
+    console.error('replaceTelegramWallet error:', error.message);
+    return null;
+  }
+  return data as TelegramWallet;
+}
+
 // Realtime: subscribe to new signal inserts -----------------------------
 export function subscribeToSignals(onInsert: (signal: Signal) => void): () => void {
   const channel = supabase
