@@ -3,7 +3,7 @@ import { runResearchAgent } from '../agents/research';
 import { runExecutionAgent } from '../agents/execution';
 import { sosovalue } from '../clients/sosovalue';
 import { supabase } from '../db/supabase';
-import { upsertSubscriber, getSignals, getUserPreference, setUserPreference } from '../db/supabase';
+import { upsertSubscriber, getSignals, getUserPreference, setUserPreference, getOrCreateTelegramWallet } from '../db/supabase';
 import { formatResearchReport, formatBriefing } from './format';
 import { parseTradeIntent } from './nlp';
 import { generateVoiceBrief, briefingScript, hasVoice } from '../agents/voice';
@@ -75,14 +75,16 @@ export function createBot(): Bot | null {
 
   const bot = new Bot(TOKEN);
 
-  // ── Auto-register new users ────────────────────────────────────────────────
-  // Track every user in the subscribers table so they receive broadcasts
+  // ── Auto-register: create an embedded wallet for every new user ────────────
+  // Every Telegram user gets a dedicated EVM wallet on first contact.
+  // This enables instant trading without MetaMask or any external setup.
   bot.use(async (ctx, next) => {
     const chatId = String(ctx.chat?.id ?? '');
-    const userId = String(ctx.from?.id ?? chatId);
     if (chatId) {
-      upsertSubscriber({ user_id: userId, chat_id: chatId, segments: ['general'], active: true, preferences: null })
-        .catch(() => {}); // fire-and-forget, never block the handler
+      const username = ctx.from?.username ?? null;
+      const firstName = ctx.from?.first_name ?? null;
+      // Fire-and-forget: don't block handler if DB is slow
+      getOrCreateTelegramWallet(chatId, username, firstName).catch(() => {});
     }
     return next();
   });
@@ -105,6 +107,20 @@ export function createBot(): Bot | null {
       await (ctx as any).answerCallbackQuery();
     } else {
       await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
+      // Show embedded wallet address on first start
+      const chatId = String(ctx.chat?.id ?? '');
+      if (chatId) {
+        const embWallet = await getOrCreateTelegramWallet(chatId, ctx.from?.username, ctx.from?.first_name).catch(() => null);
+        if (embWallet) {
+          await ctx.reply(
+            `👛 <b>Your SosoMind Wallet</b>\n\n` +
+            `<code>${embWallet.wallet_address}</code>\n\n` +
+            `<i>This wallet is auto-generated for you on SoDEX Testnet.\n` +
+            `Fund it with testnet tokens to start trading — no MetaMask needed!</i>`,
+            { parse_mode: 'HTML' }
+          );
+        }
+      }
       // Also send the persistent keyboard
       await ctx.reply(
         `🔑 <b>Quick keyboard activated</b> — tap any button below or use inline buttons above.`,
@@ -319,8 +335,15 @@ export function createBot(): Bot | null {
     } catch {}
     const estValue = (price * qty).toFixed(2);
     const market = `v${asset}_vUSDC`;
-    // Check if this Telegram user has a linked wallet → prefer non-custodial signing
     const chatId = String((ctx as any).chat?.id ?? '');
+
+    // Resolve user's embedded wallet (always available — created on first contact)
+    let embeddedWallet: { wallet_address: string; encrypted_key: string } | null = null;
+    if (chatId) {
+      embeddedWallet = await getOrCreateTelegramWallet(chatId, ctx.from?.username, ctx.from?.first_name).catch(() => null);
+    }
+
+    // Check if user has a linked external wallet (MetaMask via dashboard)
     let linkedWallet: string | null = null;
     if (chatId) {
       try {
@@ -330,19 +353,12 @@ export function createBot(): Bot | null {
       } catch {}
     }
 
-    const dashboardUrl = process.env.DASHBOARD_URL || 'http://localhost:3000';
-    const orderPayload = {
-      scope: 'spot' as const,
-      actionName: 'batchNewOrder' as const,
-      market,
-      side,
-      orderType: 'market' as const,
-      quantity: qty,
-      price: undefined as number | undefined,
-    };
-    const b64 = Buffer.from(JSON.stringify(orderPayload), 'utf8')
-      .toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    const signUrl = `${dashboardUrl}/trade/sign?p=${b64}`;
+    // Only show the browser-sign button if DASHBOARD_URL is a real public https URL
+    const dashboardUrl = process.env.DASHBOARD_URL || '';
+    const isPublicUrl = dashboardUrl.startsWith('https://') && !dashboardUrl.includes('localhost');
+
+    const activeWallet = linkedWallet ?? embeddedWallet?.wallet_address ?? null;
+    const isEmbedded = !linkedWallet && !!embeddedWallet;
 
     const text =
       `🔐 <b>Trade Confirmation</b>\n\n` +
@@ -352,17 +368,33 @@ export function createBot(): Bot | null {
       `📦 Quantity: <b>${qty}</b>\n` +
       `💰 Est. Price: $${price.toLocaleString()}\n` +
       `💵 Est. Value: $${estValue}\n` +
-      (linkedWallet
-        ? `🛡️ <b>Non-custodial</b> — sign with your wallet <code>${linkedWallet.slice(0, 6)}…${linkedWallet.slice(-4)}</code>\n`
-        : `🛡️ Mode: <b>🟢 LIVE (House account on SoDEX)</b>\n`) +
-      `\n<i>EIP-712 signed · per-user keys · server never holds your secret</i>`;
+      (activeWallet
+        ? `👛 Wallet: <code>${activeWallet.slice(0, 6)}…${activeWallet.slice(-4)}</code>${isEmbedded ? ' <i>(auto)</i>' : ' <i>(MetaMask)</i>'}\n`
+        : '') +
+      `\n<i>EIP-712 signed · SoDEX Testnet</i>`;
 
     const kb = new InlineKeyboard();
-    kb.url('🔐 Sign in Browser (Non-custodial)', signUrl).row();
-    if (!linkedWallet) {
-      // Fall back to legacy house flow only when wallet not linked
-      kb.text('⚙️ Quick (House testnet)', `tx:${market}:${side}:${qty}`).row();
+
+    // Browser sign button — only if dashboard is deployed publicly AND user has MetaMask linked
+    if (isPublicUrl && linkedWallet) {
+      const orderPayload = {
+        scope: 'spot' as const,
+        actionName: 'batchNewOrder' as const,
+        market,
+        side,
+        orderType: 'market' as const,
+        quantity: qty,
+      };
+      const b64 = Buffer.from(JSON.stringify(orderPayload), 'utf8')
+        .toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      kb.url('🦊 Sign with MetaMask', `${dashboardUrl}/trade/sign?p=${b64}`).row();
     }
+
+    // Execute button — always available (uses embedded wallet or house account)
+    const execLabel = embeddedWallet
+      ? `⚡ Execute (Your Wallet)`
+      : `⚙️ Execute (House Account)`;
+    kb.text(execLabel, `tx:${market}:${side}:${qty}`).row();
     kb.text('❌ Cancel', 'tx:cancel').text('⬅️ Back', 'menu:signal');
 
     if ((ctx as any).callbackQuery) {
@@ -388,23 +420,75 @@ export function createBot(): Bot | null {
       { parse_mode: 'HTML' }
     );
     try {
-      const result = await runExecutionAgent({
-        market,
-        side: side as 'buy' | 'sell',
-        amount: Number(qtyStr),
-        orderType: 'market',
-      });
-      const statusIcon = result.status === 'submitted' ? '✅' : '⚠️';
+      // Use embedded wallet if available — per-user non-custodial execution
+      const chatId = String((ctx as any).chat?.id ?? '');
+      let sodexResult: any = null;
+      let walletUsed = 'house';
+
+      if (chatId) {
+        const embWallet = await getOrCreateTelegramWallet(chatId, ctx.from?.username, ctx.from?.first_name).catch(() => null);
+        if (embWallet) {
+          const { decryptPrivateKey } = await import('../utils/walletCrypto');
+          const { SoDEXClient } = await import('../clients/sodex');
+          const userClient = new SoDEXClient({
+            chainId: parseInt(process.env.SODEX_CHAIN_ID || '138565', 10),
+            privateKey: decryptPrivateKey(embWallet.encrypted_key),
+            isTestnet: true,
+          });
+          // Resolve symbolID and accountID from SoDEX
+          const symbolID = await userClient.resolveSymbolID(market, 'spot').catch(() => 0);
+          const accountID = await userClient.resolveAccountID().catch(() => 0);
+          if (symbolID > 0) {
+            sodexResult = await userClient.placeSpotOrder({
+              accountID,
+              symbolID,
+              clOrdID: `bot-${Date.now()}`,
+              side: (side === 'buy' ? 1 : 2) as 1 | 2,
+              type: 2 as 1 | 2, // market
+              timeInForce: 3 as 1 | 2 | 3,
+              quantity: String(qtyStr),
+            });
+            walletUsed = `${embWallet.wallet_address.slice(0, 6)}…${embWallet.wallet_address.slice(-4)}`;
+          }
+        }
+      }
+
+      // Fallback: house execution agent
+      if (!sodexResult) {
+        const result = await runExecutionAgent({
+          market,
+          side: side as 'buy' | 'sell',
+          amount: Number(qtyStr),
+          orderType: 'market',
+        });
+        const statusIcon = result.status === 'submitted' ? '✅' : '⚠️';
+        const text =
+          `${statusIcon} <b>Execution Result</b>\n\n` +
+          `📊 Status: <b>${result.status}</b>\n` +
+          `🛡️ Risk: <b>${result.risk?.verdict}</b>\n` +
+          `📋 ${(result.risk?.reasons || []).join(' · ')}\n` +
+          `🪙 Trade ID: <code>${result.trade?.id || 'n/a'}</code>\n` +
+          (result.status === 'failed' && (result as any).error
+            ? `\n❌ Error: <code>${String((result as any).error).slice(0, 200)}</code>\n`
+            : '') +
+          `\n<i>⛓️ House account · SoDEX Testnet</i>`;
+        const kb = new InlineKeyboard()
+          .text('💼 View Portfolio', 'menu:portfolio')
+          .text('🔄 Trade Again', `trade_quick:${market.split('_')[0]}:${side}:${qtyStr}`).row()
+          .text('🏠 Main Menu', 'menu:main');
+        return await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: kb });
+      }
+
+      // Embedded wallet execution result
+      const orderId = sodexResult?.data?.orders?.[0]?.orderID ?? sodexResult?.orderID ?? 'n/a';
       const text =
-        `${statusIcon} <b>Execution Result [LIVE]</b>\n\n` +
-        `📊 Status: <b>${result.status}</b>\n` +
-        `🛡️ Risk Verdict: <b>${result.risk?.verdict}</b>\n` +
-        `📋 Reasons: ${(result.risk?.reasons || []).join(' · ')}\n` +
-        `🪙 Trade ID: <code>${result.trade?.id || 'n/a'}</code>\n` +
-        (result.status === 'failed' && (result as any).error
-          ? `\n❌ Error: <code>${String((result as any).error).slice(0, 300)}</code>\n`
-          : '') +
-        `\n<i>⛓️ Live order sent to SoDEX</i>`;
+        `✅ <b>Order Submitted</b>\n\n` +
+        `🪙 Market: <b>${market}</b>\n` +
+        `📊 Side: <b>${side.toUpperCase()}</b>\n` +
+        `📦 Qty: <b>${qtyStr}</b>\n` +
+        `🔖 Order ID: <code>${orderId}</code>\n` +
+        `👛 Wallet: <code>${walletUsed}</code>\n` +
+        `\n<i>⛓️ Your wallet · EIP-712 signed · SoDEX Testnet</i>`;
       const kb = new InlineKeyboard()
         .text('💼 View Portfolio', 'menu:portfolio')
         .text('🔄 Trade Again', `trade_quick:${market.split('_')[0]}:${side}:${qtyStr}`).row()

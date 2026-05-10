@@ -201,6 +201,65 @@ export async function setUserPreference(userId: string, key: string, value: any)
   await supabase.from('user_preferences').upsert({ user_id: userId, key, value, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' });
 }
 
+// ── Telegram embedded wallets ───────────────────────────────────────────────
+// Each Telegram user gets a unique EVM wallet generated on first contact.
+// Private keys are encrypted server-side with AES-256-GCM (walletCrypto.ts).
+
+export interface TelegramWallet {
+  telegram_chat_id: string;
+  telegram_username?: string | null;
+  telegram_first_name?: string | null;
+  wallet_address: string;
+  encrypted_key: string;
+}
+
+export async function getOrCreateTelegramWallet(
+  chatId: string,
+  username?: string | null,
+  firstName?: string | null,
+): Promise<TelegramWallet | null> {
+  // Try to fetch existing wallet
+  const { data: existing } = await supabase
+    .from('telegram_wallets')
+    .select('telegram_chat_id, telegram_username, telegram_first_name, wallet_address, encrypted_key')
+    .eq('telegram_chat_id', chatId)
+    .maybeSingle();
+
+  if (existing) {
+    // Bump last_used_at asynchronously — don't block the response
+    supabase
+      .from('telegram_wallets')
+      .update({ last_used_at: new Date().toISOString() })
+      .eq('telegram_chat_id', chatId)
+      .then(() => {});
+    return existing as TelegramWallet;
+  }
+
+  // Create a fresh ethers wallet for this user
+  const { ethers } = await import('ethers');
+  const wallet = ethers.Wallet.createRandom();
+  const { encryptPrivateKey } = await import('../utils/walletCrypto');
+  const encrypted_key = encryptPrivateKey(wallet.privateKey);
+
+  const { data, error } = await supabase
+    .from('telegram_wallets')
+    .insert({
+      telegram_chat_id: chatId,
+      telegram_username: username ?? null,
+      telegram_first_name: firstName ?? null,
+      wallet_address: wallet.address,
+      encrypted_key,
+    })
+    .select('telegram_chat_id, telegram_username, telegram_first_name, wallet_address, encrypted_key')
+    .single();
+
+  if (error) {
+    console.error('getOrCreateTelegramWallet insert error:', error.message);
+    return null;
+  }
+  return data as TelegramWallet;
+}
+
 // Realtime: subscribe to new signal inserts -----------------------------
 export function subscribeToSignals(onInsert: (signal: Signal) => void): () => void {
   const channel = supabase
