@@ -24,6 +24,29 @@ export function LiveTicker() {
   const prevPrices = useRef<Record<string, number>>({});
   const { lastMessage } = useWebSocket("prices");
 
+  // Fetch initial prices from REST API so ticker shows real values immediately
+  useEffect(() => {
+    const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:10000";
+    const symbols = DEFAULT_ITEMS.map((i) => i.symbol);
+    Promise.allSettled(
+      symbols.map((sym) =>
+        fetch(`${API_URL}/api/market/price/${sym}USDT`)
+          .then((r) => r.json())
+          .then((data) => ({ symbol: sym, price: Number(data.price ?? 0), change24h: Number(data.change24h ?? 0) }))
+      )
+    ).then((results) => {
+      const updates: Record<string, TickerItem> = {};
+      for (const r of results) {
+        if (r.status === "fulfilled" && r.value.price > 0) {
+          updates[r.value.symbol] = r.value;
+        }
+      }
+      if (Object.keys(updates).length > 0) {
+        setItems((prev) => prev.map((item) => (updates[item.symbol] ? { ...item, ...updates[item.symbol] } : item)));
+      }
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!lastMessage) return;
     try {
