@@ -17,7 +17,8 @@ import { getStrategies, PRESET_STRATEGIES } from '../strategies/playbook';
 import { formatMevWarning } from '../utils/mev';
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const ALLOWED = (process.env.TELEGRAM_ALLOWED_CHAT_IDS || process.env.TELEGRAM_ALLOWED_CHAT_ID || '')
+// Admin chat IDs — used only for privileged commands, not to block regular users
+const ADMIN_IDS = (process.env.TELEGRAM_ALLOWED_CHAT_IDS || process.env.TELEGRAM_ALLOWED_CHAT_ID || '')
   .split(',').map((s) => s.trim()).filter(Boolean);
 
 // ─── Persistent bottom menu keyboard ────────────────────────────────────────
@@ -74,16 +75,14 @@ export function createBot(): Bot | null {
 
   const bot = new Bot(TOKEN);
 
-  // ── Whitelist middleware ────────────────────────────────────────────────────
+  // ── Auto-register new users ────────────────────────────────────────────────
+  // Track every user in the subscribers table so they receive broadcasts
   bot.use(async (ctx, next) => {
     const chatId = String(ctx.chat?.id ?? '');
-    if (ALLOWED.length && !ALLOWED.includes(chatId)) {
-      await ctx.reply(
-        `🔒 <b>SosoMind is private.</b>\n\nYour chat ID: <code>${chatId}</code>\n` +
-        `Ask the admin to whitelist you.`,
-        { parse_mode: 'HTML' }
-      );
-      return;
+    const userId = String(ctx.from?.id ?? chatId);
+    if (chatId) {
+      upsertSubscriber({ user_id: userId, chat_id: chatId, segments: ['general'], active: true, preferences: null })
+        .catch(() => {}); // fire-and-forget, never block the handler
     }
     return next();
   });
