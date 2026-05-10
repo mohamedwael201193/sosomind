@@ -1,7 +1,7 @@
 "use client";
 import { motion, useMotionValue, useSpring, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import Image from "next/image";
+import { LogoMark } from "@/components/Logo";
 import { useWallet } from "@/context/WalletContext";
 import {
   Zap, BarChart3, Shield, TrendingUp, Brain, Globe2, ArrowRight, Wallet,
@@ -306,15 +306,18 @@ export default function LandingPage() {
         }}
       >
         <div className="flex items-center gap-8">
-          <Link href="/landing" className="flex items-center gap-2.5">
-            <Image
-              src="/logo.png"
-              alt="SoSoMind"
-              width={160}
-              height={40}
-              className="h-8 w-auto object-contain"
-              priority
-            />
+          <Link href="/landing" className="flex items-center gap-3">
+            <LogoMark size={46} />
+            <span
+              className="font-black text-xl tracking-tight hidden sm:block"
+              style={{
+                fontFamily: 'var(--font-display)',
+                letterSpacing: '-0.04em',
+                color: theme === 'dark' ? '#f1f1f5' : '#111111',
+              }}
+            >
+              SoSo<span style={{ color: '#f97316' }}>Mind</span>
+            </span>
           </Link>
           <div className="hidden md:flex items-center gap-6">
             {NAV_LINKS.map((link) => (
@@ -1167,13 +1170,19 @@ export default function LandingPage() {
       <footer className="border-t py-16 px-6" style={{ borderColor: "var(--glass-border)" }}>
         <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-10">
           <div>
-            <Image
-              src="/logo.png"
-              alt="SoSoMind"
-              width={160}
-              height={40}
-              className="h-9 w-auto object-contain mb-3"
-            />
+            <div className="flex items-center gap-3 mb-4">
+              <LogoMark size={46} />
+              <span
+                className="font-black text-xl tracking-tight"
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  letterSpacing: '-0.04em',
+                  color: theme === 'dark' ? '#f1f1f5' : '#111111',
+                }}
+              >
+                SoSo<span style={{ color: '#f97316' }}>Mind</span>
+              </span>
+            </div>
             <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
               The agentic finance operating system for serious crypto traders.
             </p>

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
+import { LogoMark } from "@/components/Logo";
 import { useTheme } from "@/context/ThemeContext";
 import { useWallet } from "@/context/WalletContext";
 import {
@@ -77,33 +77,33 @@ export function Sidebar() {
         className="h-16 flex items-center px-4 border-b"
         style={{ borderColor: 'var(--glass-border)', flexShrink: 0 }}
       >
-        <Link href="/landing" className="flex items-center min-w-0 flex-1">
-          <div className="flex-shrink-0" style={{ filter: 'drop-shadow(0 2px 12px rgba(249,115,22,0.5))' }}>
-            <Image
-              src="/logo-mark.png"
-              alt="SoSoMind"
-              width={36}
-              height={36}
-              className="rounded-xl object-contain"
-              priority
-            />
-          </div>
+        <Link href="/landing" className="flex items-center min-w-0 flex-1 gap-0">
+          {/* SVG mark — always visible, scales with collapsed state */}
+          <LogoMark size={collapsed ? 38 : 42} />
           <AnimatePresence>
             {!collapsed && (
               <motion.div
-                initial={{ opacity: 0, x: -10 }}
+                initial={{ opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -10 }}
+                exit={{ opacity: 0, x: -8 }}
                 transition={{ duration: 0.2 }}
-                className="ml-3 flex flex-col min-w-0"
+                className="ml-2.5 flex flex-col min-w-0 overflow-hidden"
               >
                 <span
-                  className="font-black text-base whitespace-nowrap leading-tight"
-                  style={{ fontFamily: 'var(--font-display)', letterSpacing: '-0.04em', color: 'var(--text-primary)' }}
+                  className="font-black whitespace-nowrap leading-none"
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: 18,
+                    letterSpacing: '-0.04em',
+                    color: theme === 'dark' ? '#f1f1f5' : '#111111',
+                  }}
                 >
                   SoSo<span style={{ color: '#f97316' }}>Mind</span>
                 </span>
-                <span className="text-[10px]" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                <span
+                  className="text-[10px] mt-0.5 whitespace-nowrap"
+                  style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', letterSpacing: '0.02em' }}
+                >
                   Agentic Finance OS
                 </span>
               </motion.div>
