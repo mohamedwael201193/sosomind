@@ -3,6 +3,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { useTheme } from "@/context/ThemeContext";
 import { useWallet } from "@/context/WalletContext";
 import {
@@ -77,14 +78,15 @@ export function Sidebar() {
         style={{ borderColor: 'var(--glass-border)', flexShrink: 0 }}
       >
         <Link href="/landing" className="flex items-center min-w-0 flex-1">
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{
-              background: 'var(--grad-orange)',
-              boxShadow: '0 4px 16px rgba(249,115,22,0.35)',
-            }}
-          >
-            <Zap className="w-5 h-5 text-white" />
+          <div className="flex-shrink-0" style={{ filter: 'drop-shadow(0 2px 8px rgba(249,115,22,0.4))' }}>
+            <Image
+              src="/logo.png"
+              alt="SoSoMind"
+              width={collapsed ? 36 : 36}
+              height={collapsed ? 36 : 36}
+              className="rounded-xl object-contain"
+              priority
+            />
           </div>
           <AnimatePresence>
             {!collapsed && (
@@ -99,10 +101,10 @@ export function Sidebar() {
                   className="font-black text-base whitespace-nowrap leading-tight"
                   style={{ fontFamily: 'var(--font-display)', letterSpacing: '-0.04em', color: 'var(--text-primary)' }}
                 >
-                  SosoMind
+                  SoSo<span style={{ color: '#f97316' }}>Mind</span>
                 </span>
                 <span className="text-[10px]" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                  AI Trading OS
+                  Agentic Finance OS
                 </span>
               </motion.div>
             )}

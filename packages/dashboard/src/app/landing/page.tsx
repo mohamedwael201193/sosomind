@@ -1,6 +1,7 @@
 "use client";
 import { motion, useMotionValue, useSpring, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import Image from "next/image";
 import { useWallet } from "@/context/WalletContext";
 import {
   Zap, BarChart3, Shield, TrendingUp, Brain, Globe2, ArrowRight, Wallet,
@@ -305,10 +306,16 @@ export default function LandingPage() {
         }}
       >
         <div className="flex items-center gap-8">
-          <Link href="/landing">
-            <span className="font-black text-xl tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
-              Soso<span style={{ color: "#f97316" }}>Mind</span>
-            </span>
+          <Link href="/landing" className="flex items-center gap-2.5">
+            <Image
+              src="/logo.png"
+              alt="SoSoMind"
+              width={120}
+              height={32}
+              className="h-8 w-auto object-contain"
+              priority
+              style={{ filter: theme === "light" ? "brightness(0.1) saturate(0)" : "none" }}
+            />
           </Link>
           <div className="hidden md:flex items-center gap-6">
             {NAV_LINKS.map((link) => (
@@ -1161,9 +1168,14 @@ export default function LandingPage() {
       <footer className="border-t py-16 px-6" style={{ borderColor: "var(--glass-border)" }}>
         <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-10">
           <div>
-            <span className="font-black text-xl tracking-tight block mb-3" style={{ fontFamily: "var(--font-display)" }}>
-              Soso<span style={{ color: "#f97316" }}>Mind</span>
-            </span>
+            <Image
+              src="/logo.png"
+              alt="SoSoMind"
+              width={130}
+              height={36}
+              className="h-9 w-auto object-contain mb-3"
+              style={{ filter: theme === "light" ? "brightness(0.1) saturate(0)" : "none" }}
+            />
             <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
               The agentic finance operating system for serious crypto traders.
             </p>

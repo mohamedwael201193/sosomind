@@ -4,8 +4,25 @@ import { Providers } from "./providers";
 import { ConditionalLayout } from "@/components/ConditionalLayout";
 
 export const metadata: Metadata = {
-  title: "SosoMind — Agentic Finance OS",
-  description: "Multi-agent crypto research, signals & execution, powered by SoSoValue + SoDEX.",
+  title: "SoSoMind — The Agentic Finance OS",
+  description: "Multi-agent AI-powered crypto trading intelligence. Real-time signals, DEX execution, and macro research — powered by SoSoValue + SoDEX.",
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo.png",
+    shortcut: "/logo.png",
+  },
+  openGraph: {
+    title: "SoSoMind — The Agentic Finance OS",
+    description: "Multi-agent AI-powered crypto trading intelligence. Real-time signals, DEX execution, and macro research.",
+    images: [{ url: "/logo.png", width: 1200, height: 630, alt: "SoSoMind" }],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "SoSoMind — The Agentic Finance OS",
+    description: "Multi-agent AI-powered crypto trading intelligence.",
+    images: ["/logo.png"],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
