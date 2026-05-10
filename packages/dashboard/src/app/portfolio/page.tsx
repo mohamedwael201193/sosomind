@@ -11,6 +11,7 @@ import { Wallet, TrendingUp, TrendingDown, ShieldCheck, BarChart2, RefreshCw, Lo
 import { StatCard } from '@/components/AnimatedNumber';
 import { PageHeader } from '@/components/LoadingSkeleton';
 import { useWallet } from '@/context/WalletContext';
+import { CryptoIcon } from '@/components/CryptoIcon';
 
 const CHART_COLORS = ['#10b981','#3b82f6','#8b5cf6','#f59e0b','#ef4444','#06b6d4','#84cc16'];
 
@@ -171,7 +172,12 @@ export default function PortfolioPage() {
                         transition={{ delay: 0.25 + i * 0.05 }}
                         style={{ borderTop: '1px solid var(--border)' }}
                       >
-                        <td style={{ padding: '10px 8px', fontWeight: 700 }}>{dc(b.coin)}</td>
+                        <td style={{ padding: '10px 8px', fontWeight: 700 }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <CryptoIcon symbol={b.coin} size={20} />
+                            {dc(b.coin)}
+                          </span>
+                        </td>
                         <td className="mono" style={{ textAlign: 'right', padding: '10px 8px' }}>{fmt(b.totalNum, b.coin === 'vUSDC' ? 2 : 6)}</td>
                         <td className="mono" style={{ textAlign: 'right', padding: '10px 8px', color: 'var(--green)' }}>{fmt(b.avail, b.coin === 'vUSDC' ? 2 : 6)}</td>
                         <td className="mono" style={{ textAlign: 'right', padding: '10px 8px', color: b.lockedNum > 0 ? 'var(--orange, #f59e0b)' : 'var(--muted)' }}>

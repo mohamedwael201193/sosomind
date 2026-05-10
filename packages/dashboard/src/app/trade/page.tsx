@@ -12,6 +12,7 @@
  * ✅ EIP-712 non-custodial signing (unchanged)
  */
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fetcher } from '@/lib/api';
@@ -22,6 +23,7 @@ import {
   ArrowUpRight, ArrowDownRight, Loader2, ShieldCheck,
   ExternalLink, RefreshCw, TrendingUp, TrendingDown, Wallet,
 } from 'lucide-react';
+import { CryptoIcon } from '@/components/CryptoIcon';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -191,11 +193,17 @@ function CandlestickChart({ klines, symbol }: { klines: any[]; symbol: string })
 
 export default function TradePage() {
   const { address, token } = useWallet();
-  const [side, setSide] = useState<'buy' | 'sell'>('buy');
-  const [orderType, setOrderType] = useState<'limit' | 'market'>('limit');
+  const searchParams = useSearchParams();
+  const initSide = (searchParams.get('side') ?? 'buy') as 'buy' | 'sell';
+  const initType = (searchParams.get('type') === 'market' ? 'market' : 'limit') as 'limit' | 'market';
+  const initQty = searchParams.get('qty') ?? '';
+  const initPrice = searchParams.get('price') ?? '';
+  const initAsset = searchParams.get('asset') ?? '';
+  const [side, setSide] = useState<'buy' | 'sell'>(initSide);
+  const [orderType, setOrderType] = useState<'limit' | 'market'>(initType);
   const [symbolId, setSymbolId] = useState<number | null>(null);
-  const [quantity, setQuantity] = useState('');
-  const [price, setPrice] = useState('');
+  const [quantity, setQuantity] = useState(initQty);
+  const [price, setPrice] = useState(initPrice);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [chartInterval, setChartInterval] = useState('1h');
@@ -291,12 +299,16 @@ export default function TradePage() {
 
   useEffect(() => {
     if (symbolId == null && symbols.data?.length) {
+      // Pre-select asset from NLP query param (e.g. asset=ETH → vETH_vUSDC)
+      const fromParam = initAsset
+        ? symbols.data.find((s) => s.baseCoin === `v${initAsset}` || s.baseCoin === initAsset || s.name.startsWith(`v${initAsset}_`) || s.name.startsWith(`${initAsset}_`))
+        : null;
       const eth = symbols.data.find((s) => s.name === 'vETH_vUSDC');
       const btc = symbols.data.find((s) => s.name === 'vBTC_vUSDC');
-      const first = eth ?? btc ?? symbols.data.find((s) => /TRADING/i.test(s.status)) ?? symbols.data[0];
+      const first = fromParam ?? eth ?? btc ?? symbols.data.find((s) => /TRADING/i.test(s.status)) ?? symbols.data[0];
       if (first) setSymbolId(first.id);
     }
-  }, [symbols.data, symbolId]);
+  }, [symbols.data, symbolId, initAsset]);
 
   const handlePct = useCallback(
     (pct: number) => {
@@ -360,16 +372,21 @@ export default function TradePage() {
       {/* Top bar */}
       <div className="flex flex-wrap gap-4 items-start justify-between">
         <div className="flex items-center gap-4">
-          <select
-            value={symbolId ?? ''}
-            onChange={(e) => { setSymbolId(Number(e.target.value)); setQuantity(''); setPrice(''); }}
-            className="bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-lg px-3 py-2 text-sm font-semibold focus:outline-none focus:border-emerald-500/60 min-w-[140px]"
-          >
-            {symbols.isLoading && <option>Loading…</option>}
-            {(symbols.data ?? []).map((s) => (
-              <option key={s.id} value={s.id}>{s.displayName}</option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2">
+            {activeSymbol && (
+              <CryptoIcon symbol={activeSymbol.baseCoin} size={28} />
+            )}
+            <select
+              value={symbolId ?? ''}
+              onChange={(e) => { setSymbolId(Number(e.target.value)); setQuantity(''); setPrice(''); }}
+              className="bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-lg px-3 py-2 text-sm font-semibold focus:outline-none focus:border-emerald-500/60 min-w-[140px]"
+            >
+              {symbols.isLoading && <option>Loading…</option>}
+              {(symbols.data ?? []).map((s) => (
+                <option key={s.id} value={s.id}>{s.displayName}</option>
+              ))}
+            </select>
+          </div>
 
           <div>
             <div className="text-2xl font-bold font-mono tabular-nums leading-tight">

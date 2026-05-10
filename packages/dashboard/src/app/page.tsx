@@ -532,20 +532,41 @@ export default function DashboardPage() {
               {(nlpResult as { error?: string }).error ? (
                 <span style={{ color: "var(--red)" }}>{(nlpResult as { error: string }).error}</span>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {Object.entries(nlpResult as Record<string, unknown>)
-                    .filter(([, v]) => v != null && v !== "")
-                    .map(([k, v]) => (
-                      <div key={k}>
-                        <div className="font-semibold capitalize mb-0.5" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: 10 }}>
-                          {k.replace(/_/g, " ")}
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                    {Object.entries(nlpResult as Record<string, unknown>)
+                      .filter(([, v]) => v != null && v !== "")
+                      .map(([k, v]) => (
+                        <div key={k}>
+                          <div className="font-semibold capitalize mb-0.5" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: 10 }}>
+                            {k.replace(/_/g, " ")}
+                          </div>
+                          <div className="font-bold" style={{ color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>
+                            {typeof v === "object" ? JSON.stringify(v) : String(v)}
+                          </div>
                         </div>
-                        <div className="font-bold" style={{ color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>
-                          {typeof v === "object" ? JSON.stringify(v) : String(v)}
-                        </div>
-                      </div>
-                    ))}
-                </div>
+                      ))}
+                  </div>
+                  {(nlpResult as any)?.intent?.kind === "trade" && (
+                    <button
+                      onClick={() => {
+                        const r = (nlpResult as any).intent;
+                        const params = new URLSearchParams();
+                        if (r.asset) params.set("asset", String(r.asset).toUpperCase());
+                        if (r.action) params.set("side", r.action);
+                        if (r.amount) params.set("qty", String(r.amount));
+                        if (r.orderType) params.set("type", r.orderType);
+                        if (r.price) params.set("price", String(r.price));
+                        router.push(`/trade?${params.toString()}`);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold w-full justify-center transition-all hover:opacity-90 active:scale-95"
+                      style={{ background: "var(--grad-orange)", color: "#fff", boxShadow: "0 4px 16px rgba(249,115,22,0.3)" }}
+                    >
+                      <ArrowUpDown className="w-3.5 h-3.5" />
+                      Execute Trade on SoDEX
+                    </button>
+                  )}
+                </>
               )}
             </div>
           )}

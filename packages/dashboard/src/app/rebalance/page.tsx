@@ -7,6 +7,7 @@ import { GlassCard } from "@/components/GlassCard";
 import { cn } from "@/lib/utils";
 import { PieChart, RefreshCw, TrendingUp, TrendingDown, Minus, Target, Activity } from "lucide-react";
 import { useWallet } from "@/context/WalletContext";
+import { CryptoIcon } from "@/components/CryptoIcon";
 
 const REGIME_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   risk_on:      { label: "Risk-On",      color: "#10b981", bg: "rgba(16,185,129,0.1)"  },
@@ -25,7 +26,10 @@ function AllocationBar({ label, pct, target, color }: { label: string; pct: numb
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between text-xs">
-        <span className="font-bold text-[var(--text-primary)]">{label}</span>
+        <span className="font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+          <CryptoIcon symbol={label} size={16} />
+          {label}
+        </span>
         <div className="flex items-center gap-2">
           <span className="text-[var(--text-muted)]">Target {target.toFixed(1)}%</span>
           <span className="font-mono font-black" style={{ color }}>{pct.toFixed(1)}%</span>
@@ -166,7 +170,10 @@ export default function RebalancePage() {
                       <span className={cn("text-xs font-black px-2 py-0.5 rounded-full", isBuy ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400")}>
                         {isBuy ? "BUY" : "SELL"}
                       </span>
-                      <span className="font-bold text-sm text-[var(--text-primary)]">{a.symbol ?? a.asset}</span>
+                      <span className="font-bold text-sm text-[var(--text-primary)] flex items-center gap-1.5">
+                        <CryptoIcon symbol={a.symbol ?? a.asset} size={16} />
+                        {a.symbol ?? a.asset}
+                      </span>
                     </div>
                     <div className="text-right text-xs font-mono flex-shrink-0">
                       {usd !== 0 && <span className={cn("font-black", isBuy ? "text-green-400" : "text-red-400")}>{isBuy ? "+" : "-"}${Math.abs(usd).toFixed(0)}</span>}

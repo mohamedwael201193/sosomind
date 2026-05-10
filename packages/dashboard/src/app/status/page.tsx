@@ -181,7 +181,10 @@ export default function StatusPage() {
                 {key === "websocket" && (
                   <>
                     <div className="flex justify-between"><span>Connections</span><span className="font-mono text-[var(--text-primary)]">{svc.connections ?? 0}</span></div>
-                    <div className="flex justify-between"><span>Channels</span><span className="font-mono text-[var(--text-primary)]">{svc.channels ?? 0}</span></div>
+                    <div className="flex justify-between"><span>Channels</span><span className="font-mono text-[var(--text-primary)]">{svc.channels && typeof svc.channels === "object" ? Object.keys(svc.channels).length : (svc.channels ?? 0)}</span></div>
+                    {svc.channels && typeof svc.channels === "object" && (
+                      <div className="flex justify-between"><span>Subscribers</span><span className="font-mono text-[var(--text-primary)]">{Object.values(svc.channels as Record<string, number>).reduce((a, b) => a + b, 0)}</span></div>
+                    )}
                   </>
                 )}
                 {svc.lastSuccess && (

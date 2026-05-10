@@ -6,6 +6,7 @@ import { fetcher } from "@/lib/api";
 import { GlassCard } from "@/components/GlassCard";
 import { useWebSocket } from "@/lib/websocket";
 import { TrendingUp, TrendingDown, Minus, Zap, Filter } from "lucide-react";
+import { CryptoIcon } from "@/components/CryptoIcon";
 import { cn } from "@/lib/utils";
 
 type Filter = "all" | "long" | "short" | "high-conf";
@@ -181,6 +182,7 @@ export default function SignalsPage() {
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center flex-wrap gap-2 mb-2">
+                          <CryptoIcon symbol={sym} size={22} />
                           <span className="text-base font-black text-[var(--text-primary)]">{sym}</span>
                           <span
                             className={cn(

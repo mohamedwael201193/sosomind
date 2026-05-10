@@ -7,6 +7,7 @@ import { GlassCard } from "@/components/GlassCard";
 import { cn } from "@/lib/utils";
 import { Bell, BellOff, Plus, Trash2, RefreshCw, TrendingUp, TrendingDown, CheckCircle, XCircle } from "lucide-react";
 import { useWallet } from "@/context/WalletContext";
+import { CryptoIcon } from "@/components/CryptoIcon";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:10000";
 
@@ -199,7 +200,10 @@ export default function AlertsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                      <span className="font-bold text-sm text-[var(--text-primary)]">{a.asset ?? "Asset"}</span>
+                      <span className="font-bold text-sm text-[var(--text-primary)] flex items-center gap-1.5">
+                        <CryptoIcon symbol={a.asset ?? ""} size={18} />
+                        {a.asset ?? "Asset"}
+                      </span>
                       <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: tc.color + "15", color: tc.color }}>{tc.label}</span>
                       <span className="text-sm font-black font-mono" style={{ color: tc.color }}>
                         ${Number(a.threshold ?? 0).toLocaleString()}

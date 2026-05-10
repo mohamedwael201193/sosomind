@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useWebSocket } from "@/lib/websocket";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CryptoIcon } from "@/components/CryptoIcon";
 
 interface TickerItem {
   symbol: string;
@@ -99,6 +100,7 @@ export function LiveTicker() {
             flashMap[item.symbol] === "red" && "animate-flash-red"
           )}
         >
+          <CryptoIcon symbol={item.symbol} size={18} />
           <span className="text-sm font-bold text-[var(--text-primary)]">{item.symbol}</span>
           <span className="text-sm font-mono text-[var(--text-secondary)]">
             {item.price > 0 ? `$${item.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : "—"}

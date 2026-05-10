@@ -8,6 +8,7 @@ import {
   AlertTriangle, TrendingUp, TrendingDown, RefreshCw, Waves,
   Building2, BarChart2, Landmark, DollarSign, Filter,
 } from "lucide-react";
+import { CryptoIcon } from "@/components/CryptoIcon";
 import { cn } from "@/lib/utils";
 
 type Category = "all" | "etf_inflow" | "etf_outflow" | "treasury_buy" | "vc_funding" | "large_move";
@@ -278,7 +279,10 @@ export default function WhalesPage() {
                     <div className="flex-1 min-w-0">
                       {/* Top row */}
                       <div className="flex items-center flex-wrap gap-2 mb-1.5">
-                        <span className="font-black text-[var(--text-primary)] text-base">{a.asset}</span>
+                        <span className="font-black text-[var(--text-primary)] text-base flex items-center gap-1.5">
+                          <CryptoIcon symbol={a.asset} size={20} />
+                          {a.asset}
+                        </span>
                         <span
                           className="text-xs font-semibold px-2 py-0.5 rounded-full"
                           style={{ background: `${meta.color}18`, color: meta.color }}

@@ -5,6 +5,7 @@ import { fetcher } from "@/lib/api";
 import { GlassCard } from "@/components/GlassCard";
 import { ArrowLeftRight, RefreshCw, TrendingUp, Zap, AlertCircle, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CryptoIcon } from "@/components/CryptoIcon";
 
 const STRENGTH: Record<string, { label: string; color: string; bg: string }> = {
   high:   { label: "High",   color: "#10b981", bg: "rgba(16,185,129,0.12)" },
@@ -121,9 +122,9 @@ export default function ArbitragePage() {
               <GlassCard animate={false} padding="md" glow={pct >= 0.8 ? "green" : pct >= 0.5 ? "none" : "none"}>
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                   <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl flex items-center justify-center font-black text-sm"
-                      style={{ background: profitColor + "18", color: profitColor }}>
-                      {o.asset ?? o.symbol ?? "?"}
+                    <div className="w-11 h-11 rounded-xl flex items-center justify-center"
+                      style={{ background: profitColor + "18" }}>
+                      <CryptoIcon symbol={o.asset ?? o.symbol ?? "?"} size={28} />
                     </div>
                     <div>
                       <div className="flex items-center gap-2 mb-1">
