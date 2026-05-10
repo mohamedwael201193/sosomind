@@ -28,8 +28,7 @@ const MAIN_KB = new Keyboard()
   .text('📓 Journal').text('🤝 Subscribe').text('ℹ️ Help').row()
   .text('🐋 Whales').text('🔄 Arb').text('📡 Funding').row()
   .text('🏆 Leaderboard').text('🎯 Persona').text('📄 Tax')
-  .resized()
-  .persistent();
+  .resized();
 
 // ─── Inline asset picker ─────────────────────────────────────────────────────
 function assetMenu(prefix: string) {
@@ -1531,9 +1530,10 @@ export function createBot(): Bot | null {
     '🔔 Alerts', '⚙️ Settings', '📓 Journal', '🤝 Subscribe', 'ℹ️ Help', '🎙️ Voice',
     '🐋 Whales', '🔄 Arb', '📡 Funding', '🏆 Leaderboard', '🎯 Persona', '📄 Tax',
   ]);
-  bot.on('message:text', async (ctx) => {
+  bot.on('message:text', async (ctx, next) => {
     const text = ctx.message?.text ?? '';
-    if (!text || text.startsWith('/') || KEYBOARD_LABELS.has(text)) return;
+    // Pass commands and keyboard shortcuts to their registered handlers
+    if (!text || text.startsWith('/') || KEYBOARD_LABELS.has(text)) return next();
 
     // ── Private key import conversation handler ──────────────────────────────
     const chatId = String(ctx.chat?.id ?? '');
@@ -1675,10 +1675,30 @@ export function createBot(): Bot | null {
         const accID = await userClient.resolveAccountID().catch(() => 0);
         if (accID > 0) {
           sodexStatus = `✅ Registered (ID: ${accID})`;
-          const bals: any[] = await userClient.getAccountBalances().catch(() => []);
-          const usdc = Array.isArray(bals) ? bals.find((b: any) => String(b.coin || b.asset || '').includes('USDC')) : null;
-          const usdcAmt = usdc ? Number(usdc.available ?? usdc.free ?? usdc.amount ?? 0) : 0;
-          balance = usdcAmt > 0 ? `✅ ${usdcAmt.toFixed(2)} USDC` : '❌ 0 USDC — needs funding';
+          const rawBals: any = await userClient.getAccountBalances().catch(() => null);
+          // SoDEX returns { balances: [...] } or a flat array
+          const bals: any[] = Array.isArray(rawBals)
+            ? rawBals
+            : Array.isArray(rawBals?.balances)
+              ? rawBals.balances
+              : Array.isArray(rawBals?.data)
+                ? rawBals.data
+                : [];
+          const usdc = bals.find((b: any) =>
+            String(b.coin ?? b.asset ?? b.currency ?? '').toUpperCase().includes('USDC')
+          );
+          const usdcAmt = usdc
+            ? Number(usdc.available ?? usdc.free ?? usdc.total ?? usdc.amount ?? 0)
+            : 0;
+          const totalUsd = bals.reduce((sum: number, b: any) => {
+            const amt = Number(b.available ?? b.free ?? b.total ?? b.amount ?? 0);
+            return sum + (String(b.coin ?? '').toUpperCase().includes('USDC') ? amt : 0);
+          }, 0);
+          balance = usdcAmt > 0
+            ? `✅ ${usdcAmt.toFixed(2)} USDC (${bals.length} asset${bals.length !== 1 ? 's' : ''})`
+            : bals.length > 0
+              ? `⚠️ ${bals.length} assets (0 USDC — transfer from Funding)`
+              : '❌ Empty — claim faucet & transfer to Spot';
         } else {
           sodexStatus = '❌ Not registered yet';
           balance = '❌ Not registered yet';
@@ -1928,22 +1948,36 @@ export function createBot(): Bot | null {
         privateKey: decryptPrivateKey(wallet.encrypted_key),
         isTestnet: true,
       });
-      const balances: any[] = await userClient.getAccountBalances().catch(() => []);
+      const rawBals: any = await userClient.getAccountBalances().catch(() => null);
+      // SoDEX returns { balances: [...] } or a flat array after unwrap()
+      const balances: any[] = Array.isArray(rawBals)
+        ? rawBals
+        : Array.isArray(rawBals?.balances)
+          ? rawBals.balances
+          : Array.isArray(rawBals?.data)
+            ? rawBals.data
+            : [];
       const lines: string[] = [
         `💰 <b>SoDEX Testnet Balance</b>`,
         `👛 <code>${wallet.wallet_address.slice(0, 10)}…${wallet.wallet_address.slice(-6)}</code>`,
         '',
       ];
-      if (!balances?.length) {
-        lines.push('<i>No balance found. Fund your wallet via 🚰 Faucet Guide.</i>');
+      if (!balances.length) {
+        lines.push('<i>No assets found. Claim faucet → transfer Funding → Spot.</i>');
+        lines.push('');
+        lines.push('Use /setup for the full guide.');
       } else {
         for (const b of balances) {
-          const total = Number(b.total ?? b.available ?? 0);
+          const coin = String(b.coin ?? b.asset ?? b.currency ?? '?');
+          const avail = Number(b.available ?? b.free ?? 0);
+          const locked = Number(b.locked ?? b.frozen ?? b.hold ?? 0);
+          const total = avail + locked;
           if (total > 0) {
-            lines.push(`  <b>${b.coin || b.asset}</b>: ${total.toFixed(4)} (avail: ${Number(b.available ?? 0).toFixed(4)})`);
+            const lockStr = locked > 0 ? ` | 🔒 ${locked.toFixed(4)}` : '';
+            lines.push(`  <b>${coin}</b>: ${avail.toFixed(4)} avail${lockStr}`);
           }
         }
-        if (lines.length === 3) lines.push('<i>All balances are zero. Fund via faucet.</i>');
+        if (lines.length === 3) lines.push('<i>All balances are zero.</i> Use /setup → 🚰 Faucet.');
       }
       const kb = new InlineKeyboard()
         .text('🚰 Get Testnet USDC', 'wallet:faucet').text('🔄 Refresh', 'wallet:balance').row()
