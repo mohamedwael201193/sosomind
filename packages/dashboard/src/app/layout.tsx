@@ -1,11 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
-import { Sidebar } from "@/components/Sidebar";
-import { StatusBar } from "@/components/StatusBar";
-import { AnimatedBackground } from "@/components/AnimatedBackground";
-import { MobileNav } from "@/components/MobileNav";
-import { PageTransition } from "@/components/PageTransition";
+import { ConditionalLayout } from "@/components/ConditionalLayout";
 
 export const metadata: Metadata = {
   title: "SosoMind — Agentic Finance OS",
@@ -25,13 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-screen" style={{ fontFamily: 'var(--font-body)' }}>
         <Providers>
-          <AnimatedBackground />
-          <Sidebar />
-          <MobileNav />
-          <main className="md:ml-[240px] min-h-screen p-6 pb-20 md:pb-6 relative z-10">
-            <PageTransition>{children}</PageTransition>
-          </main>
-          <StatusBar />
+          <ConditionalLayout>{children}</ConditionalLayout>
         </Providers>
       </body>
     </html>
