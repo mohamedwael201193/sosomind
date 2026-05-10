@@ -5,6 +5,7 @@ import { runStressTest, listPresetScenarios } from '../simulation/stress';
 import { getMacroOutlook } from '../agents/macroOverlay';
 import { generateVoiceBrief, briefingScript, hasVoice } from '../agents/voice';
 import { asyncHandler } from '../utils/http';
+import { getBinanceKlines } from '../clients/market';
 
 const router = Router();
 
@@ -40,6 +41,31 @@ router.post('/simulation/run', asyncHandler(async (req, res) => {
 router.get('/agents/macro', asyncHandler(async (_req, res) => {
   const outlook = await getMacroOutlook();
   res.json({ data: outlook });
+}));
+
+// ─── Real asset correlation (30-day Pearson from Binance klines) ──────────────
+router.get('/market/correlation', asyncHandler(async (_req, res) => {
+  function pearson(x: number[], y: number[]): number {
+    const n = Math.min(x.length, y.length);
+    if (n < 3) return 0;
+    const xs = x.slice(0, n), ys = y.slice(0, n);
+    const mx = xs.reduce((s, v) => s + v, 0) / n;
+    const my = ys.reduce((s, v) => s + v, 0) / n;
+    const num = xs.reduce((s, v, i) => s + (v - mx) * (ys[i] - my), 0);
+    const d1 = Math.sqrt(xs.reduce((s, v) => s + (v - mx) ** 2, 0));
+    const d2 = Math.sqrt(ys.reduce((s, v) => s + (v - my) ** 2, 0));
+    return d1 && d2 ? num / (d1 * d2) : 0;
+  }
+  const [btcK, ethK, solK] = await Promise.all([
+    getBinanceKlines('BTC', '1d', 30).catch(() => null),
+    getBinanceKlines('ETH', '1d', 30).catch(() => null),
+    getBinanceKlines('SOL', '1d', 30).catch(() => null),
+  ]);
+  const c = (k: typeof btcK) => (k ?? []).map(kl => kl.close);
+  const BTC_ETH = +pearson(c(btcK), c(ethK)).toFixed(2);
+  const BTC_SOL = +pearson(c(btcK), c(solK)).toFixed(2);
+  const ETH_SOL = +pearson(c(ethK), c(solK)).toFixed(2);
+  res.json({ data: { BTC_ETH, BTC_SOL, ETH_SOL, period: '30d', updated_at: new Date().toISOString() } });
 }));
 
 // ─── Voice brief ─────────────────────────────────────────────────────────────

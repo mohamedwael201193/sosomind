@@ -5,6 +5,7 @@ export interface MacroOutlook {
   score: number; // 0 (risk-off) to 100 (risk-on)
   drivers: string[];
   upcomingEvents: Array<{ name: string; date: string; importance: string }>;
+  breakdown: Record<string, number>; // component scores 0-100
 }
 
 export async function getMacroOutlook(): Promise<MacroOutlook> {
@@ -56,10 +57,22 @@ export async function getMacroOutlook(): Promise<MacroOutlook> {
   riskScore = Math.max(0, Math.min(100, riskScore));
   const regime: MacroOutlook['regime'] = riskScore >= 60 ? 'risk-on' : riskScore <= 40 ? 'risk-off' : 'neutral';
 
+  // Component scores (0-100) so the frontend can render breakdown bars
+  const etfScore = Math.max(0, Math.min(100, 50 + (etfNetFlow / 2e8) * 50));
+  const momentumScore = Math.max(0, Math.min(100, 50 + btcChange * 5));
+  const macroRiskScore = Math.max(0, Math.min(100, 100 - upcoming.length * 8));
+  const sentimentScore = riskScore; // proxy until fear/greed integrated
+
   return {
     regime,
     score: riskScore,
     drivers,
+    breakdown: {
+      etf_flow: Math.round(etfScore),
+      btc_momentum: Math.round(momentumScore),
+      macro_risk: Math.round(macroRiskScore),
+      sentiment: Math.round(sentimentScore),
+    },
     upcomingEvents: upcoming.slice(0, 5).map((e) => ({
       name: e.events?.[0] ?? e.event_name ?? e.name ?? 'Unknown',
       date: e.event_time ?? e.date ?? '',
