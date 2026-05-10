@@ -393,8 +393,6 @@ export class SoDEXClient {
     return headers;
   }
 
-  private isDryRun(): boolean { return process.env.DRY_RUN === "true"; }
-
   // ---------- WRITE (spot) ----------
   async placeSpotOrderBatch(accountID: number, orders: SpotOrderRequest[]) {
     // Build items in Go struct field order (symbolID, clOrdID, side, type, timeInForce, price?, quantity?)
@@ -406,10 +404,6 @@ export class SoDEXClient {
       return item;
     });
     const body = { accountID, orders: items };
-    if (this.isDryRun()) {
-      console.log("[DRY_RUN] placeSpotOrderBatch payload:", JSON.stringify(body));
-      return { dryRun: true, body };
-    }
     const { nonce, sig } = await this.signBody(body, "spot", "batchNewOrder");
     return this.unwrap(await this.spot.post("/trade/orders/batch", body, { headers: this.signedHeaders(nonce, sig) }));
   }
@@ -425,7 +419,6 @@ export class SoDEXClient {
       return item;
     });
     const body = { accountID, cancels };
-    if (this.isDryRun()) { console.log("[DRY_RUN] cancelSpotOrders:", JSON.stringify(body)); return { dryRun: true, body }; }
     const { nonce, sig } = await this.signBody(body, "spot", "batchCancelOrder");
     return this.unwrap(await this.spot.delete("/trade/orders/batch", { data: body, headers: this.signedHeaders(nonce, sig) }));
   }
@@ -435,7 +428,6 @@ export class SoDEXClient {
 
   // ---------- WRITE (perps) ----------
   async placePerpsOrder(order: PerpsOrderRequest) {
-    if (this.isDryRun()) { console.log("[DRY_RUN] placePerpsOrder:", JSON.stringify(order)); return { dryRun: true, order }; }
     // Perps NewOrderRequest: {accountID, symbolID, orders:[{clOrdID, modifier, side, type, timeInForce, ..., reduceOnly, positionSide}]}
     // modifier, reduceOnly, positionSide are required (no omitempty)
     const { accountID, symbolID, clOrdID, side, type, timeInForce, price, quantity, positionSide = 1 } = order;
@@ -449,7 +441,6 @@ export class SoDEXClient {
     return this.unwrap(await this.perps.post("/trade/orders", body, { headers: this.signedHeaders(nonce, sig) }));
   }
   async cancelPerpsOrder(p: { accountID: number; symbolID: number; orderID?: string; clOrdID?: string }) {
-    if (this.isDryRun()) { console.log("[DRY_RUN] cancelPerpsOrder:", JSON.stringify(p)); return { dryRun: true, p }; }
     const body = { accountID: p.accountID, symbolID: p.symbolID, cancels: [{ clOrdID: p.clOrdID ?? '', ...(p.orderID ? { orderID: p.orderID } : {}) }] };
     const { nonce, sig } = await this.signBody(body, "futures", "cancelOrder");
     return this.unwrap(await this.perps.delete("/trade/orders", { data: body, headers: this.signedHeaders(nonce, sig) }));

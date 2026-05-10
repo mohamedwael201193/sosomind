@@ -5,11 +5,13 @@ import { motion } from "framer-motion";
 import { fetcher } from "@/lib/api";
 import { GlassCard } from "@/components/GlassCard";
 import { Trophy, TrendingUp, TrendingDown, Award, Users } from "lucide-react";
+import { useWallet } from "@/context/WalletContext";
 
 const ASSETS = ["BTC", "ETH", "SOL", "AVAX", "BNB"];
 
 export default function LeaderboardPage() {
   const qc = useQueryClient();
+  const { address } = useWallet();
   const [activeTab, setActiveTab] = useState<"paper" | "marketplace">("paper");
   const [selectedAsset, setSelectedAsset] = useState("BTC");
   const [paperSide, setPaperSide] = useState<"buy" | "sell">("buy");
@@ -73,7 +75,7 @@ export default function LeaderboardPage() {
             {[100, 250, 500, 1000].map(v => <option key={v} value={v}>${v}</option>)}
           </select>
           <button
-            onClick={() => createPaperTrade.mutate({ user_id: "demo_user", symbol: selectedAsset, side: paperSide, amount_usd: paperAmount })}
+            onClick={() => createPaperTrade.mutate({ user_id: address ?? "anonymous", symbol: selectedAsset, side: paperSide, amount_usd: paperAmount })}
             disabled={createPaperTrade.isPending}
             className="px-4 py-2 rounded-xl bg-[var(--blue)] text-white text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
           >

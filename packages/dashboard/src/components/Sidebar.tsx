@@ -10,7 +10,7 @@ import {
   Grid3X3, BarChart3, Bell, Settings, ChevronLeft,
   ChevronRight, Sun, Moon, Zap, Wallet, LogOut, User,
   Waves, ArrowLeftRight, BookOpen, Trophy, Scale, UserCircle2,
-  CandlestickChart,
+  CandlestickChart, Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +48,7 @@ const navSections: NavSection[] = [
     label: "ACCOUNT",
     items: [
       { href: "/profile", label: "Profile", icon: User, count: 1 },
+      { href: "/status", label: "System Status", icon: Activity, count: 1 },
       { href: "/settings", label: "Settings", icon: Settings, count: 1 },
     ],
   },

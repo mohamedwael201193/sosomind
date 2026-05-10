@@ -63,11 +63,10 @@ router.post('/spot/order',
     price: z.coerce.number().optional(),
     amount: z.coerce.number().positive(),
     orderType: z.enum(['limit', 'market']).optional(),
-    dryRun: z.boolean().optional(),
   }), 'body'),
   asyncHandler(async (req, res) => {
-    const { market, side, amount, price, orderType, dryRun } = (req as any).validated;
-    const result = await runExecutionAgent({ market, side, amount, price, orderType, dryRun });
+    const { market, side, amount, price, orderType } = (req as any).validated;
+    const result = await runExecutionAgent({ market, side, amount, price, orderType });
     res.json(result);
   })
 );

@@ -25,7 +25,6 @@ router.post('/', validate(z.object({
   amount: z.number().positive(),
   price: z.number().optional(),
   orderType: z.enum(['market', 'limit']).default('market'),
-  dryRun: z.boolean().default(true),
   userId: z.string().optional(),
 }), 'body'), asyncHandler(async (req, res) => {
   const v = (req as any).validated;
@@ -36,7 +35,6 @@ router.post('/', validate(z.object({
     amount: v.amount,
     price: v.price,
     orderType: v.orderType,
-    dryRun: v.dryRun ?? true,
     userId: v.userId,
   });
   res.json(result);

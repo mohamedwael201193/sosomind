@@ -320,8 +320,6 @@ export function createBot(): Bot | null {
     } catch {}
     const estValue = (price * qty).toFixed(2);
     const market = `v${asset}_vUSDC`;
-    const isDry = process.env.DRY_RUN === 'true';
-
     // Check if this Telegram user has a linked wallet → prefer non-custodial signing
     const chatId = String((ctx as any).chat?.id ?? '');
     let linkedWallet: string | null = null;
@@ -357,7 +355,7 @@ export function createBot(): Bot | null {
       `💵 Est. Value: $${estValue}\n` +
       (linkedWallet
         ? `🛡️ <b>Non-custodial</b> — sign with your wallet <code>${linkedWallet.slice(0, 6)}…${linkedWallet.slice(-4)}</code>\n`
-        : `🛡️ Mode: <b>${isDry ? '🟡 DRY-RUN (Simulated)' : '🟢 LIVE (House account)'}</b>\n`) +
+        : `🛡️ Mode: <b>🟢 LIVE (House account on SoDEX)</b>\n`) +
       `\n<i>EIP-712 signed · per-user keys · server never holds your secret</i>`;
 
     const kb = new InlineKeyboard();
@@ -396,12 +394,10 @@ export function createBot(): Bot | null {
         side: side as 'buy' | 'sell',
         amount: Number(qtyStr),
         orderType: 'market',
-        dryRun: process.env.DRY_RUN === 'true',
       });
-      const isDry = process.env.DRY_RUN === 'true';
-      const statusIcon = result.status === 'submitted' ? '✅' : result.status === 'dry_run' ? '🟡' : '⚠️';
+      const statusIcon = result.status === 'submitted' ? '✅' : '⚠️';
       const text =
-        `${statusIcon} <b>Execution Result ${isDry ? '[SIMULATED]' : '[LIVE]'}</b>\n\n` +
+        `${statusIcon} <b>Execution Result [LIVE]</b>\n\n` +
         `📊 Status: <b>${result.status}</b>\n` +
         `🛡️ Risk Verdict: <b>${result.risk?.verdict}</b>\n` +
         `📋 Reasons: ${(result.risk?.reasons || []).join(' · ')}\n` +
@@ -409,7 +405,7 @@ export function createBot(): Bot | null {
         (result.status === 'failed' && (result as any).error
           ? `\n❌ Error: <code>${String((result as any).error).slice(0, 300)}</code>\n`
           : '') +
-        `\n<i>⛓️ ${isDry ? 'Simulated — DRY_RUN=true in .env' : 'Live order sent to SoDEX'}</i>`;
+        `\n<i>⛓️ Live order sent to SoDEX</i>`;
       const kb = new InlineKeyboard()
         .text('💼 View Portfolio', 'menu:portfolio')
         .text('🔄 Trade Again', `trade_quick:${market.split('_')[0]}:${side}:${qtyStr}`).row()
@@ -1337,20 +1333,18 @@ export function createBot(): Bot | null {
                 side,
                 amount: qty,
                 orderType: 'market',
-                dryRun: process.env.DRY_RUN === 'true',
               });
-              const isDry = process.env.DRY_RUN === 'true';
-              const statusIcon = result.status === 'submitted' ? '✅' : result.status === 'dry_run' ? '🟡' : result.status === 'rejected' ? '🚫' : '⚠️';
+              const statusIcon = result.status === 'submitted' ? '✅' : result.status === 'rejected' ? '🚫' : '⚠️';
               const execPrice = (result as any).trade?.price ?? price;
               await ctx.reply(
-                `${statusIcon} <b>Voice Trade ${isDry ? '(Simulated)' : 'Executed'}</b>\n\n` +
+                `${statusIcon} <b>Voice Trade Executed</b>\n\n` +
                 `🎙️ "${transcript}"\n` +
                 `${side === 'buy' ? '📈' : '📉'} ${side.toUpperCase()} $${usd} ${asset} @ $${Number(execPrice).toLocaleString()}\n` +
                 `📊 Status: <b>${result.status}</b>\n` +
                 `🛡️ Risk: <b>${result.risk?.verdict ?? 'n/a'}</b>\n` +
                 (result.status === 'rejected' ? `\n⚠️ ${(result.risk?.reasons || []).join(', ')}\n` : '') +
                 ((result as any).error ? `\n❌ <code>${String((result as any).error).slice(0, 200)}</code>\n` : '') +
-                `\n<i>⛓️ ${isDry ? 'DRY_RUN mode — no real order sent' : 'Live order sent to SoDEX'}</i>`,
+                `\n<i>⛓️ Live order sent to SoDEX</i>`,
                 { parse_mode: 'HTML' }
               );
               return true;

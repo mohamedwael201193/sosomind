@@ -72,7 +72,6 @@ export async function orchestrate(task: AgentTask): Promise<OrchestrationResult>
         market: task.market,
         side: task.side,
         amount: task.amount,
-        dryRun: process.env.DRY_RUN === 'true',
       });
 
       await logAgent({

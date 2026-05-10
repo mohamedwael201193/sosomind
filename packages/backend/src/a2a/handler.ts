@@ -63,7 +63,6 @@ export async function handleA2ARequest(req: A2ARequest): Promise<A2AResponse> {
           data: {
             maxTradeSizePct: Number(process.env.MAX_TRADE_SIZE_PCT || 25),
             maxTradesPerDay: Number(process.env.MAX_TRADES_PER_DAY || 100),
-            dryRun: process.env.DRY_RUN === 'true',
           },
           ...base,
         };

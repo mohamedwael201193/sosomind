@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { fetcher } from "@/lib/api";
 import { GlassCard } from "@/components/GlassCard";
 import { Scale, RefreshCw, TrendingUp, Info } from "lucide-react";
+import { useWallet } from "@/context/WalletContext";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
 const COLORS = ["var(--blue)", "var(--purple)", "var(--orange)", "var(--green)", "var(--red)", "#14b8a6", "#f472b6"];
@@ -17,9 +18,10 @@ const REGIME_COLORS: Record<string, string> = {
 
 export default function RebalancePage() {
   const qc = useQueryClient();
+  const { address } = useWallet();
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ["rebalance"],
-    queryFn: () => fetcher("/api/rebalance?user_id=demo_user"),
+    queryKey: ["rebalance", address],
+    queryFn: () => fetcher(`/api/rebalance?user_id=${address ?? 'anonymous'}`),
     refetchInterval: 120000,
   });
 

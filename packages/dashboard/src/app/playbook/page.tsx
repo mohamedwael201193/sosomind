@@ -5,14 +5,16 @@ import { motion } from "framer-motion";
 import { fetcher } from "@/lib/api";
 import { GlassCard } from "@/components/GlassCard";
 import { BookOpen, Plus, Trash2, Play, CheckCircle, AlertTriangle, Edit3 } from "lucide-react";
+import { useWallet } from "@/context/WalletContext";
 
 const PRESET_EVENTS = ["CPI", "FOMC", "NFP", "ETF_INFLOW", "ETF_OUTFLOW", "GDP"];
 
 export default function PlaybookPage() {
   const qc = useQueryClient();
+  const { address } = useWallet();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
-    user_id: "demo_user",
+    user_id: address ?? "anonymous",
     name: "",
     trigger_event: "CPI",
     trigger_condition: "above" as const,
@@ -28,13 +30,13 @@ export default function PlaybookPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["playbook"],
-    queryFn: () => fetcher("/api/playbook?user_id=demo_user"),
+    queryFn: () => fetcher(`/api/playbook?user_id=${address ?? 'anonymous'}`),
     refetchInterval: 60000,
   });
 
   const { data: checkData, refetch: runCheck, isFetching: isChecking } = useQuery({
     queryKey: ["playbook-check"],
-    queryFn: () => fetcher("/api/playbook/check?user_id=demo_user"),
+    queryFn: () => fetcher(`/api/playbook/check?user_id=${address ?? 'anonymous'}`),
     enabled: false,
   });
 

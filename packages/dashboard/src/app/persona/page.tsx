@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { fetcher } from "@/lib/api";
 import { GlassCard } from "@/components/GlassCard";
 import { User, Zap, Shield, Brain, TrendingUp, BarChart3, CheckCircle, ChevronRight } from "lucide-react";
+import { useWallet } from "@/context/WalletContext";
 
 const PERSONA_CONFIG: Record<string, { icon: React.ReactNode; color: string; title: string; desc: string }> = {
   aggressive: { icon: <Zap className="w-5 h-5" />, color: "var(--red)", title: "Aggressive", desc: "High risk, high reward. Max leverage, early entries, focus on momentum." },
@@ -23,7 +24,8 @@ const QUIZ_QUESTIONS = [
 
 export default function PersonaPage() {
   const qc = useQueryClient();
-  const USER_ID = "demo_user";
+  const { address } = useWallet();
+  const USER_ID = address ?? "anonymous";
   const [quizActive, setQuizActive] = useState(false);
   const [quizStep, setQuizStep] = useState(0);
   const [quizAnswers, setQuizAnswers] = useState<number[]>([]);

@@ -15,7 +15,6 @@ export interface ExecutionParams {
   amount: number;
   price?: number;          // omit for market order
   orderType?: 'limit' | 'market';
-  dryRun?: boolean;
 }
 
 export async function runExecutionAgent(params: ExecutionParams) {
@@ -87,8 +86,8 @@ export async function runExecutionAgent(params: ExecutionParams) {
         portfolioValue: portfolioValueEst,
         confidence: params.signal?.confidence ?? 70,
       });
-      // If Kelly recommends smaller position, respect it unless dryRun
-      if (kellySizing.positionPct > 0 && !params.dryRun) {
+      // If Kelly recommends smaller position, respect it
+      if (kellySizing.positionPct > 0) {
         const kellyAmount = (portfolioValueEst * kellySizing.adjustedFraction) / (priceUsed || 1);
         if (kellyAmount < finalAmount) {
           finalAmount = kellyAmount;
@@ -104,7 +103,7 @@ export async function runExecutionAgent(params: ExecutionParams) {
     const sodexMarket = market.includes('_') ? market : `v${baseAsset}_vUSDC`;
     const orderValueUsd = finalAmount * (priceUsed || 0);
     mevRisk = await checkMevRisk(sodexMarket, side, orderValueUsd);
-    if (mevRisk.risk_level === 'high' && !params.dryRun) {
+    if (mevRisk.risk_level === 'high') {
       console.warn(`[execution] High MEV risk detected for ${market}:`, mevRisk.warnings);
       // Still proceed but log the warning
     }
@@ -122,18 +121,13 @@ export async function runExecutionAgent(params: ExecutionParams) {
         amount: finalAmount,
         total: (priceUsed || 0) * finalAmount,
         order_type: orderType,
-        status: params.dryRun ? 'dry_run' : 'pending',
+        status: 'pending',
         confirmed_by: 'system',
       })
       .select('id').single();
     tradeId = data?.id;
   } catch (e) {
     console.warn('trade insert failed', (e as Error).message);
-  }
-
-  if (params.dryRun) {
-    await logAgent({ agent: 'execution', action: 'execution:dry_run', output: { market, side, amount: finalAmount, price: priceUsed, tradeId }, user_id: userId, duration_ms: Date.now() - startedAt });
-    return { status: 'dry_run', risk, kellySizing, mevRisk, trade: { id: tradeId, market, side, amount: finalAmount, price: priceUsed } };
   }
 
   // Live signed submit
