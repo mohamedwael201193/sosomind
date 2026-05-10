@@ -1,192 +1,299 @@
 'use client';
 
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetcher } from '@/lib/api';
 import { motion } from 'framer-motion';
 import {
-  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell,
+  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { Wallet, TrendingUp, TrendingDown, ShieldCheck, Activity, BarChart2 } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, ShieldCheck, BarChart2, RefreshCw, Loader2, ExternalLink } from 'lucide-react';
 import { StatCard } from '@/components/AnimatedNumber';
-import { PageHeader, LoadingSkeleton } from '@/components/LoadingSkeleton';
+import { PageHeader } from '@/components/LoadingSkeleton';
+import { useWallet } from '@/context/WalletContext';
 
 const CHART_COLORS = ['#10b981','#3b82f6','#8b5cf6','#f59e0b','#ef4444','#06b6d4','#84cc16'];
 
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px', fontSize: 12 }}>
-      <div style={{ color: 'var(--muted)', marginBottom: 4 }}>{label}</div>
-      {payload.map((p: any, i: number) => (
-        <div key={i} style={{ color: p.color, fontWeight: 600, fontFamily: "'JetBrains Mono'" }}>
-          ${Number(p.value).toLocaleString(undefined, { maximumFractionDigits: 2 })}
-        </div>
-      ))}
-    </div>
-  );
-};
+/** Strip testnet `v` prefix: vUSDC→USDC, vETH→ETH, WSOSO→SOSO */
+function dc(coin: string): string {
+  if (!coin) return '';
+  if (coin === 'WSOSO') return 'SOSO';
+  return coin.startsWith('v') ? coin.slice(1) : coin;
+}
+
+function fmt(n: number, dec = 2) {
+  return n.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
 
 export default function PortfolioPage() {
-  const portfolio = useQuery({ queryKey: ['portfolio'], queryFn: () => fetcher('/api/portfolio'), refetchInterval: 60000 });
-  const allocations = useQuery({ queryKey: ['allocations'], queryFn: () => fetcher('/api/portfolio/allocations'), refetchInterval: 60000 });
-  const trades = useQuery({ queryKey: ['trades'], queryFn: () => fetcher('/api/portfolio/trades?limit=20'), refetchInterval: 60000 });
-  const history = useQuery({ queryKey: ['portfolio-history'], queryFn: () => fetcher('/api/portfolio/history?limit=30'), refetchInterval: 120000 });
+  const { address } = useWallet();
 
-  const summary = (portfolio.data as any)?.summary || {};
-  const positions: any[] = Array.isArray((portfolio.data as any)?.data) ? (portfolio.data as any).data : Array.isArray(portfolio.data) ? portfolio.data as any[] : [];
-  const allocList: any[] = Array.isArray(allocations.data) ? allocations.data as any[] : [];
-  const tradesList: any[] = Array.isArray(trades.data) ? trades.data as any[] : [];
-  const histList: any[] = Array.isArray(history.data) ? (history.data as any[]).map((h: any) => ({
-    date: new Date(h.snapshot_at || h.created_at).toLocaleDateString('en', { month: 'short', day: 'numeric' }),
-    value: Number(h.total_value_usd),
-  })) : [];
+  const balanceQuery = useQuery<any>({
+    queryKey: ['sodex', 'user-balance', address],
+    enabled: Boolean(address),
+    refetchInterval: 15_000,
+    queryFn: () => fetcher(`/api/sodex/user/${address}/balances`),
+  });
 
-  const totalVal = Number(summary.totalValueUsd ?? 0);
-  const totalPnl = Number(summary.totalPnlUsd ?? 0);
-  const totalPnlPct = Number(summary.totalPnlPct ?? 0);
-  const available = Number(summary.availableBalance ?? 0);
+  const tickers = useQuery<any[]>({
+    queryKey: ['sodex', 'spot', 'tickers'],
+    refetchInterval: 10_000,
+    queryFn: () => fetcher('/api/sodex/spot/tickers'),
+  });
+
+  const orderHistory = useQuery<any[]>({
+    queryKey: ['sodex', 'user-orders-history', address],
+    enabled: Boolean(address),
+    refetchInterval: 15_000,
+    queryFn: () => fetcher(`/api/sodex/user/${address}/orders/history?limit=50`),
+  });
+
+  const symbols = useQuery<any[]>({
+    queryKey: ['sodex', 'spot', 'symbols'],
+    staleTime: 60_000,
+    queryFn: () => fetcher('/api/sodex/spot/symbols'),
+  });
+
+  // Build a coin → USD price map from tickers
+  // ticker.symbol is like "vETH_vUSDC", lastPx is price in vUSDC (≈ USD)
+  const priceMap = useMemo(() => {
+    const map = new Map<string, number>();
+    map.set('vUSDC', 1); map.set('USDC', 1);
+    for (const t of tickers.data ?? []) {
+      const [base] = (t.symbol as string).split('_');
+      const price = parseFloat(t.lastPx);
+      if (base && !isNaN(price)) map.set(base, price);
+    }
+    return map;
+  }, [tickers.data]);
+
+  // Enrich balances with USD value
+  const balances = useMemo(() => {
+    const raw: any[] = (balanceQuery.data as any)?.balances ?? [];
+    return raw.map((b) => {
+      const total = parseFloat(b.total);
+      const locked = parseFloat(b.locked || '0');
+      const avail = Math.max(0, total - locked);
+      const price = priceMap.get(b.coin) ?? 0;
+      return { ...b, avail, totalNum: total, lockedNum: locked, usdValue: avail * price, price };
+    }).filter((b) => b.totalNum > 0);
+  }, [balanceQuery.data, priceMap]);
+
+  const totalUsd = useMemo(() => balances.reduce((s, b) => s + b.usdValue, 0), [balances]);
+  const usdcBal = useMemo(() => balances.find((b) => b.coin === 'vUSDC')?.avail ?? 0, [balances]);
+  const nonStable = useMemo(() => balances.filter((b) => b.coin !== 'vUSDC'), [balances]);
+
+  const allocList = useMemo(() =>
+    balances.map((b, i) => ({
+      name: dc(b.coin),
+      value: b.usdValue,
+      pct: totalUsd > 0 ? (b.usdValue / totalUsd) * 100 : 0,
+      color: CHART_COLORS[i % CHART_COLORS.length],
+    })).filter((a) => a.value > 0),
+  [balances, totalUsd]);
+
+  const orders: any[] = Array.isArray(orderHistory.data) ? orderHistory.data : [];
+  const filledOrders = orders.filter((o) => o.status === 'FILLED' || o.status === 'PARTIAL_FILL');
 
   return (
     <div>
-      <PageHeader title="Portfolio" subtitle="Real-time positions, P&L and allocation via SoDEX" />
+      <PageHeader title="Portfolio" subtitle="Real-time wallet balances and trade history from SoDEX" />
 
-      {/* KPI row */}
-      <div className="grid-4" style={{ marginBottom: 18 }}>
-        <StatCard label="Total Value" value={totalVal > 0 ? `$${totalVal.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'} icon={<Wallet size={15} />} color="var(--green)" delay={0} />
-        <StatCard label="24h P&L" value={totalPnl !== 0 ? `${totalPnl >= 0 ? '+' : ''}$${Math.abs(totalPnl).toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'} trend={totalPnlPct} icon={totalPnl >= 0 ? <TrendingUp size={15} /> : <TrendingDown size={15} />} color={totalPnl >= 0 ? 'var(--green)' : 'var(--red)'} delay={0.06} />
-        <StatCard label="Available" value={available > 0 ? `$${available.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'} sub="Cash balance" icon={<ShieldCheck size={15} />} color="var(--blue)" delay={0.12} />
-        <StatCard label="Positions" value={String(positions.length)} sub={`${tradesList.length} recent trades`} icon={<BarChart2 size={15} />} color="var(--purple)" delay={0.18} />
-      </div>
+      {!address ? (
+        <div className="card" style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--muted)' }}>
+          <Wallet size={32} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>Connect your wallet</div>
+          <div style={{ fontSize: 13 }}>Connect a wallet to see your real SoDEX balances and order history.</div>
+        </div>
+      ) : (
+        <>
+          {/* KPI row */}
+          <div className="grid-4" style={{ marginBottom: 18 }}>
+            <StatCard
+              label="Total Value (USD)" icon={<Wallet size={15} />} color="var(--green)" delay={0}
+              value={balanceQuery.isLoading ? '…' : totalUsd > 0 ? `$${fmt(totalUsd, 2)}` : '$0.00'}
+            />
+            <StatCard
+              label="USDC Available" icon={<ShieldCheck size={15} />} color="var(--blue)" delay={0.06}
+              value={balanceQuery.isLoading ? '…' : `$${fmt(usdcBal, 2)}`}
+              sub="Cash in wallet"
+            />
+            <StatCard
+              label="Token Holdings" icon={<BarChart2 size={15} />} color="var(--purple)" delay={0.12}
+              value={String(nonStable.length)}
+              sub={nonStable.map((b) => dc(b.coin)).join(', ') || 'none'}
+            />
+            <StatCard
+              label="Filled Orders" icon={<TrendingUp size={15} />} color="var(--green)" delay={0.18}
+              value={String(filledOrders.length)}
+              sub={`${orders.length} total`}
+            />
+          </div>
 
-      {/* PnL chart + allocation */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginBottom: 18 }}>
-        <motion.div className="card" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>Portfolio Value History</h3>
-          {history.isLoading ? (
-            <LoadingSkeleton rows={1} height={180} />
-          ) : histList.length === 0 ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 180, color: 'var(--muted)', fontSize: 13 }}>
-              No portfolio history yet. Make trades to track your value over time.
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height={180}>
-              <AreaChart data={histList}>
-                <defs>
-                  <linearGradient id="pgr" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--muted)' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: 'var(--muted)' }} axisLine={false} tickLine={false} tickFormatter={(v: any) => `$${(Number(v)/1000).toFixed(0)}k`} />
-                <Tooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2} fill="url(#pgr)" dot={false} />
-              </AreaChart>
-            </ResponsiveContainer>
-          )}
-        </motion.div>
+          {/* Holdings + Allocation */}
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginBottom: 18 }}>
 
-        <motion.div className="card" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>Allocation</h3>
-          {allocList.length === 0 ? (
-            <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 12, paddingTop: 40 }}>No positions to allocate</div>
-          ) : (
-            <>
-              <ResponsiveContainer width="100%" height={150}>
-                <PieChart>
-                  <Pie data={allocList} dataKey="value" nameKey="asset" outerRadius={60} innerRadius={35}>
-                    {allocList.map((_: any, i: number) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11 }} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {allocList.slice(0, 4).map((a: any, i: number) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <span style={{ width: 8, height: 8, borderRadius: 2, background: CHART_COLORS[i % CHART_COLORS.length], display: 'inline-block' }} />
-                      {a.asset}
-                    </span>
-                    <span className="mono" style={{ color: 'var(--muted2)' }}>{Number(a.pct ?? 0).toFixed(1)}%</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </motion.div>
-      </div>
-
-      {/* Positions table */}
-      <motion.div className="card" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} style={{ marginBottom: 16 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>Open Positions</h3>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead>
-            <tr>
-              {['Market', 'Side', 'Size', 'Entry', 'Mark', 'P&L', 'Risk'].map(h => (
-                <th key={h} style={{ textAlign: 'left', padding: '0 8px 8px', color: 'var(--muted)', fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {positions.map((p: any, i: number) => {
-              const pnl = Number(p.pnl_usd ?? 0);
-              return (
-                <motion.tr
-                  key={p.id ?? i}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.35 + i * 0.04 }}
-                  style={{ borderTop: '1px solid var(--border)' }}
+            {/* Holdings table */}
+            <motion.div className="card" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700 }}>Wallet Holdings</h3>
+                <button
+                  onClick={() => { balanceQuery.refetch(); tickers.refetch(); }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 4 }}
                 >
-                  <td style={{ padding: '10px 8px', fontWeight: 700 }}>{p.market}</td>
-                  <td><span className={`badge ${p.side === 'long' || p.side === 'buy' ? 'badge-long' : 'badge-short'}`} style={{ padding: '2px 8px', fontSize: 10 }}>{(p.side || '').toUpperCase()}</span></td>
-                  <td className="mono">{p.size}</td>
-                  <td className="mono">${Number(p.entry_price).toLocaleString()}</td>
-                  <td className="mono">${Number(p.mark_price ?? 0).toLocaleString()}</td>
-                  <td className="mono" style={{ color: pnl >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>
-                    {pnl >= 0 ? '+' : ''}${Math.abs(pnl).toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                  </td>
-                  <td><span style={{ fontSize: 11, color: 'var(--muted2)' }}>{p.risk_level || '—'}</span></td>
-                </motion.tr>
-              );
-            })}
-            {positions.length === 0 && (
-              <tr><td colSpan={7} style={{ padding: '24px 8px', color: 'var(--muted)', fontSize: 13, textAlign: 'center' }}>No open positions</td></tr>
-            )}
-          </tbody>
-        </table>
-      </motion.div>
+                  <RefreshCw size={13} />
+                </button>
+              </div>
 
-      {/* Trade history */}
-      <motion.div className="card" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.38 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>Recent Trades</h3>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead>
-            <tr>
-              {['Time', 'Market', 'Side', 'Amount', 'Price', 'Fee', 'Status'].map(h => (
-                <th key={h} style={{ textAlign: 'left', padding: '0 8px 8px', color: 'var(--muted)', fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {tradesList.map((t: any, i: number) => (
-              <tr key={t.id ?? i} style={{ borderTop: '1px solid var(--border)' }}>
-                <td style={{ padding: '9px 8px', color: 'var(--muted)', fontSize: 11 }}>{new Date(t.created_at).toLocaleString()}</td>
-                <td style={{ fontWeight: 600 }}>{t.market}</td>
-                <td><span className={`badge ${t.side === 'buy' || t.side === 'long' ? 'badge-long' : 'badge-short'}`} style={{ padding: '1px 6px', fontSize: 10 }}>{(t.side || '').toUpperCase()}</span></td>
-                <td className="mono">{t.amount}</td>
-                <td className="mono">${Number(t.price).toLocaleString()}</td>
-                <td className="mono" style={{ color: 'var(--muted2)' }}>${Number(t.fee_usd ?? 0).toFixed(4)}</td>
-                <td><span style={{ fontSize: 11, color: t.status === 'filled' ? 'var(--green)' : 'var(--muted2)' }}>{t.status}</span></td>
-              </tr>
-            ))}
-            {tradesList.length === 0 && (
-              <tr><td colSpan={7} style={{ padding: '24px 8px', color: 'var(--muted)', fontSize: 13, textAlign: 'center' }}>No trades recorded</td></tr>
+              {balanceQuery.isLoading ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--muted)', fontSize: 13 }}>
+                  <Loader2 size={14} className="animate-spin" /> Loading balances…
+                </div>
+              ) : balances.length === 0 ? (
+                <div style={{ color: 'var(--muted)', fontSize: 13, padding: '24px 0' }}>
+                  No balance found. Get testnet tokens from the SoDEX faucet.
+                </div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr>
+                      {['Asset', 'Total', 'Available', 'Locked', 'Price', 'USD Value'].map((h) => (
+                        <th key={h} style={{ textAlign: h === 'Asset' ? 'left' : 'right', padding: '0 8px 8px', color: 'var(--muted)', fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {balances.map((b, i) => (
+                      <motion.tr
+                        key={b.coin}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.25 + i * 0.05 }}
+                        style={{ borderTop: '1px solid var(--border)' }}
+                      >
+                        <td style={{ padding: '10px 8px', fontWeight: 700 }}>{dc(b.coin)}</td>
+                        <td className="mono" style={{ textAlign: 'right', padding: '10px 8px' }}>{fmt(b.totalNum, b.coin === 'vUSDC' ? 2 : 6)}</td>
+                        <td className="mono" style={{ textAlign: 'right', padding: '10px 8px', color: 'var(--green)' }}>{fmt(b.avail, b.coin === 'vUSDC' ? 2 : 6)}</td>
+                        <td className="mono" style={{ textAlign: 'right', padding: '10px 8px', color: b.lockedNum > 0 ? 'var(--orange, #f59e0b)' : 'var(--muted)' }}>
+                          {b.lockedNum > 0 ? fmt(b.lockedNum, 4) : '—'}
+                        </td>
+                        <td className="mono" style={{ textAlign: 'right', padding: '10px 8px', color: 'var(--muted)' }}>
+                          {b.price > 0 ? `$${fmt(b.price, b.coin === 'vUSDC' ? 2 : 0)}` : '—'}
+                        </td>
+                        <td className="mono" style={{ textAlign: 'right', padding: '10px 8px', fontWeight: 600 }}>
+                          {b.usdValue > 0 ? `$${fmt(b.usdValue, 2)}` : '—'}
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </motion.div>
+
+            {/* Allocation pie */}
+            <motion.div className="card" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>Allocation</h3>
+              {allocList.length === 0 ? (
+                <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 12, paddingTop: 40 }}>No holdings yet</div>
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height={150}>
+                    <PieChart>
+                      <Pie data={allocList} dataKey="value" nameKey="name" outerRadius={60} innerRadius={35}>
+                        {allocList.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                      </Pie>
+                      <Tooltip
+                        formatter={(v: any, name: any) => [`$${fmt(Number(v), 2)}`, name]}
+                        contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11 }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {allocList.map((a, i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: 2, background: a.color, display: 'inline-block' }} />
+                          {a.name}
+                        </span>
+                        <span className="mono" style={{ color: 'var(--muted2)' }}>{a.pct.toFixed(1)}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </motion.div>
+          </div>
+
+          {/* Order history */}
+          <motion.div className="card" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700 }}>Order History</h3>
+              <button onClick={() => orderHistory.refetch()} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 4 }}>
+                <RefreshCw size={13} />
+              </button>
+            </div>
+
+            {orderHistory.isLoading ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--muted)', fontSize: 13 }}>
+                <Loader2 size={14} className="animate-spin" /> Loading orders…
+              </div>
+            ) : orders.length === 0 ? (
+              <div style={{ color: 'var(--muted)', fontSize: 13, padding: '24px 0', textAlign: 'center' }}>
+                No orders yet — make a trade to see your history here.
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 580 }}>
+                  <thead>
+                    <tr>
+                      {['Time', 'Market', 'Side', 'Type', 'Price', 'Amount', 'Filled', 'Status'].map((h) => (
+                        <th key={h} style={{ textAlign: h === 'Side' || h === 'Time' || h === 'Market' || h === 'Type' ? 'left' : 'right', padding: '0 8px 8px', color: 'var(--muted)', fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orders.map((o, i) => {
+                      const sym = (symbols.data ?? []).find((s: any) => s.name === o.symbol);
+                      const disp = sym?.displayName ?? (o.symbol as string).replace(/_vUSDC$/, '/USDC').replace(/^v/, '');
+                      return (
+                        <tr key={o.orderID ?? i} style={{ borderTop: '1px solid var(--border)' }}>
+                          <td style={{ padding: '9px 8px', color: 'var(--muted)', fontSize: 11, whiteSpace: 'nowrap' }}>
+                            {new Date(o.createdAt).toLocaleString()}
+                          </td>
+                          <td style={{ fontWeight: 600, padding: '9px 8px' }}>{disp}</td>
+                          <td style={{ padding: '9px 8px' }}>
+                            <span className={`badge ${o.side === 'BUY' ? 'badge-long' : 'badge-short'}`} style={{ padding: '2px 8px', fontSize: 10 }}>
+                              {o.side}
+                            </span>
+                          </td>
+                          <td style={{ padding: '9px 8px', color: 'var(--muted)', fontSize: 11 }}>{o.type}</td>
+                          <td className="mono" style={{ textAlign: 'right', padding: '9px 8px' }}>{o.price}</td>
+                          <td className="mono" style={{ textAlign: 'right', padding: '9px 8px' }}>{o.origQty}</td>
+                          <td className="mono" style={{ textAlign: 'right', padding: '9px 8px', color: 'var(--muted)' }}>{o.executedQty || '0'}</td>
+                          <td style={{ textAlign: 'right', padding: '9px 8px' }}>
+                            <span style={{
+                              fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
+                              background: o.status === 'FILLED' ? 'rgba(16,185,129,0.15)' : o.status === 'CANCELED' ? 'rgba(239,68,68,0.15)' : o.status === 'PARTIAL_FILL' ? 'rgba(59,130,246,0.15)' : 'rgba(245,158,11,0.15)',
+                              color: o.status === 'FILLED' ? '#10b981' : o.status === 'CANCELED' ? '#ef4444' : o.status === 'PARTIAL_FILL' ? '#3b82f6' : '#f59e0b',
+                            }}>
+                              {o.status}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
-          </tbody>
-        </table>
-      </motion.div>
+
+            <div style={{ marginTop: 8, fontSize: 10, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <ExternalLink size={11} />
+              Live from SoDEX Testnet · {address?.slice(0, 10)}…
+            </div>
+          </motion.div>
+        </>
+      )}
     </div>
   );
 }
