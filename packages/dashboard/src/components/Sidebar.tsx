@@ -73,36 +73,38 @@ export function Sidebar() {
         className="h-16 flex items-center px-4 border-b"
         style={{ borderColor: 'var(--glass-border)', flexShrink: 0 }}
       >
-        <div
-          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{
-            background: 'var(--grad-orange)',
-            boxShadow: '0 4px 16px rgba(249,115,22,0.35)',
-          }}
-        >
-          <Zap className="w-5 h-5 text-white" />
-        </div>
-        <AnimatePresence>
-          {!collapsed && (
-            <motion.div
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
-              transition={{ duration: 0.2 }}
-              className="ml-3 flex flex-col"
-            >
-              <span
-                className="font-black text-base whitespace-nowrap leading-tight"
-                style={{ fontFamily: 'var(--font-display)', letterSpacing: '-0.04em', color: 'var(--text-primary)' }}
+        <Link href="/landing" className="flex items-center min-w-0 flex-1">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{
+              background: 'var(--grad-orange)',
+              boxShadow: '0 4px 16px rgba(249,115,22,0.35)',
+            }}
+          >
+            <Zap className="w-5 h-5 text-white" />
+          </div>
+          <AnimatePresence>
+            {!collapsed && (
+              <motion.div
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.2 }}
+                className="ml-3 flex flex-col min-w-0"
               >
-                SosoMind
-              </span>
-              <span className="text-[10px]" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                AI Trading OS
-              </span>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                <span
+                  className="font-black text-base whitespace-nowrap leading-tight"
+                  style={{ fontFamily: 'var(--font-display)', letterSpacing: '-0.04em', color: 'var(--text-primary)' }}
+                >
+                  SosoMind
+                </span>
+                <span className="text-[10px]" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                  AI Trading OS
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </Link>
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="ml-auto w-6 h-6 rounded-lg flex items-center justify-center transition-colors flex-shrink-0"
