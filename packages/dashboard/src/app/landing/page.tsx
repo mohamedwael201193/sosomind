@@ -3,6 +3,7 @@ import { motion, useMotionValue, useSpring, AnimatePresence } from "framer-motio
 import Link from "next/link";
 import { LogoMark } from "@/components/Logo";
 import { useWallet } from "@/context/WalletContext";
+import { useTheme } from "@/context/ThemeContext";
 import {
   Zap, BarChart3, Shield, TrendingUp, Brain, Globe2, ArrowRight, Wallet,
   Mic, RefreshCcw, Search, Eye, BookOpen, Scale, FileText, Swords, User, DollarSign,
@@ -18,9 +19,6 @@ import OpenAI from "@lobehub/icons/es/OpenAI";
 import Gemini from "@lobehub/icons/es/Gemini";
 import DeepSeek from "@lobehub/icons/es/DeepSeek";
 import Mistral from "@lobehub/icons/es/Mistral";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-type Theme = "dark" | "light";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -226,25 +224,12 @@ function ImpactBadge({ impact }: { impact: string }) {
 
 export default function LandingPage() {
   const { address, isConnecting, connect } = useWallet();
-  const [theme, setTheme] = useState<Theme>("dark");
+  const { theme, toggle: toggleTheme } = useTheme();
   const [activeAgent, setActiveAgent] = useState(0);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [navScrolled, setNavScrolled] = useState(false);
   const [execStep, setExecStep] = useState(-1);
   const execRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const saved = localStorage.getItem("soso-theme") as Theme | null;
-    if (saved) setTheme(saved);
-  }, []);
-
-  const toggleTheme = () => {
-    setTheme((t) => {
-      const next: Theme = t === "dark" ? "light" : "dark";
-      localStorage.setItem("soso-theme", next);
-      return next;
-    });
-  };
 
   useEffect(() => {
     const handler = () => setNavScrolled(window.scrollY > 40);
@@ -1230,7 +1215,6 @@ export default function LandingPage() {
           0%   { transform: translateX(0); }
           100% { transform: translateX(-50%); }
         }
-        [data-theme] * { cursor: none; }
       `}</style>
     </div>
   );
