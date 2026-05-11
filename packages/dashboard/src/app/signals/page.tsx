@@ -5,9 +5,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { fetcher, fetchWithMeta } from "@/lib/api";
 import { GlassCard } from "@/components/GlassCard";
 import { useWebSocket } from "@/lib/websocket";
-import { TrendingUp, TrendingDown, Minus, Zap, Filter, Target, CheckCircle2, XCircle } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Zap, Filter, Target, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
 import { CryptoIcon } from "@/components/CryptoIcon";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 type Filter = "all" | "long" | "short" | "high-conf";
 
@@ -319,13 +320,24 @@ export default function SignalsPage() {
                         )}
                       </div>
 
-                      {ts && (
-                        <div className="text-xs text-[var(--text-muted)] flex-shrink-0">
-                          {new Date(
-                            typeof ts === "string" ? ts : Number(ts) * (String(ts).length === 10 ? 1000 : 1)
-                          ).toLocaleTimeString()}
-                        </div>
-                      )}
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        {ts && (
+                          <div className="text-xs text-[var(--text-muted)]">
+                            {new Date(
+                              typeof ts === "string" ? ts : Number(ts) * (String(ts).length === 10 ? 1000 : 1)
+                            ).toLocaleTimeString()}
+                          </div>
+                        )}
+                        {signal.id && (
+                          <Link
+                            href={`/signals/${signal.id}`}
+                            className="flex items-center gap-1 text-[11px] font-semibold hover:opacity-70 transition-opacity"
+                            style={{ color: "var(--accent, #3b82f6)" }}
+                          >
+                            Detail <ExternalLink className="w-3 h-3" />
+                          </Link>
+                        )}
+                      </div>
                     </div>
                   </GlassCard>
                 </motion.div>

@@ -9,6 +9,7 @@ export interface ResearchSignal {
   asset: string;
   direction: 'LONG' | 'SHORT' | 'NEUTRAL';
   confidence: number;
+  confidence_explanation: string;
   reasoning: string;
   entry?: number | null;
   takeProfit?: number | null;
@@ -90,10 +91,17 @@ export async function runResearchAgent(asset: string, opts: { saveToDb?: boolean
         change24h > 2 ? 'LONG' : change24h < -2 ? 'SHORT' : 'NEUTRAL';
       const baseConfidence = Math.min(65, 45 + Math.abs(change24h) * 2);
 
+      const buildConfidenceExplanation = (conf: number, dir: string, srcs: Array<{ module: string; insight: string }>) => {
+        const tier = conf >= 80 ? 'High' : conf >= 60 ? 'Moderate' : conf >= 40 ? 'Low' : 'Very low';
+        const srcList = srcs.map(s => s.module).join(', ') || 'price data';
+        return `${tier} (${conf}/100) — ${dir} signal supported by: ${srcList}.`;
+      };
+
       let signal: ResearchSignal = {
         asset: symbol,
         direction: baseDirection,
         confidence: Math.round(baseConfidence),
+        confidence_explanation: buildConfidenceExplanation(Math.round(baseConfidence), baseDirection, [{ module: 'binance', insight: `24h change: ${change24h.toFixed(2)}%` }]),
         reasoning: `Price-based signal: ${change24h >= 0 ? '+' : ''}${change24h.toFixed(2)}% 24h move. AI synthesis pending.`,
         entry: livePrice,
         takeProfit: livePrice ? +(livePrice * (baseDirection === 'SHORT' ? 0.95 : 1.05)).toFixed(0) : null,
@@ -191,17 +199,21 @@ Rules:
             // Strip possible markdown code fences from response
             const cleaned = result.content.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
             const parsed = JSON.parse(cleaned || '{}');
+            const parsedSources: Array<{ module: string; insight: string }> = Array.isArray(parsed.sources) ? parsed.sources : signal.sources;
+            const parsedConf = Math.max(0, Math.min(100, Number(parsed.confidence) || Math.round(baseConfidence)));
+            const parsedDir = (['LONG', 'SHORT', 'NEUTRAL'].includes((parsed.direction || '').toUpperCase())
+              ? parsed.direction.toUpperCase()
+              : baseDirection) as 'LONG' | 'SHORT' | 'NEUTRAL';
             signal = {
               asset: symbol,
-              direction: (['LONG', 'SHORT', 'NEUTRAL'].includes((parsed.direction || '').toUpperCase())
-                ? parsed.direction.toUpperCase()
-                : baseDirection) as 'LONG' | 'SHORT' | 'NEUTRAL',
-              confidence: Math.max(0, Math.min(100, Number(parsed.confidence) || Math.round(baseConfidence))),
+              direction: parsedDir,
+              confidence: parsedConf,
+              confidence_explanation: buildConfidenceExplanation(parsedConf, parsedDir, parsedSources),
               reasoning: `[${result.provider}] ${String(parsed.reasoning || '')}`,
               entry: parsed.entry ?? livePrice,
               takeProfit: parsed.takeProfit ?? signal.takeProfit,
               stopLoss: parsed.stopLoss ?? signal.stopLoss,
-              sources: Array.isArray(parsed.sources) ? parsed.sources : signal.sources,
+              sources: parsedSources,
               raw: intel,
             };
           } catch {
@@ -243,6 +255,7 @@ Rules:
         user_id: opts.userId ?? null, asset: symbol, symbol,
         direction: signal.direction.toLowerCase(),
         confidence: Math.round(signal.confidence),
+        confidence_explanation: signal.confidence_explanation,
         reasoning: signal.reasoning, entry: signal.entry,
         take_profit: signal.takeProfit, stop_loss: signal.stopLoss,
         sources: signal.sources, citations, status: 'active',
