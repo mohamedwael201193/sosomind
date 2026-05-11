@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { sosovalue } from '../clients/sosovalue';
 import { sodex } from '../clients/sodex';
-import { getBinanceKlines, getBinanceTicker, getSpotPrice } from '../clients/market';
+import { getBinanceKlines, getBinanceTicker, getSpotPrice, getKrakenKlines } from '../clients/market';
 import { asyncHandler, validate } from '../utils/http';
 
 const router = Router();
@@ -39,15 +39,20 @@ router.get('/price/:symbol', asyncHandler(async (req, res) => {
   res.json({ symbol, price, change24h, source, ts: Date.now() });
 }));
 
-// Klines / candles for charting
+// Klines / candles for charting — Binance primary, Kraken fallback (geo-unrestricted)
 router.get('/klines/:symbol',
   validate(z.object({ interval: z.string().default('1h'), limit: z.coerce.number().default(100) })),
   asyncHandler(async (req, res) => {
     const symbol = req.params.symbol.toUpperCase();
     const { interval, limit } = (req as any).validated;
-    const klines = await getBinanceKlines(symbol, interval, limit);
-    if (!klines) return res.status(404).json({ error: 'klines_unavailable', symbol });
-    res.json({ symbol, interval, count: klines.length, data: klines });
+    let klines = await getBinanceKlines(symbol, interval, limit);
+    let source = 'binance';
+    if (!klines || klines.length === 0) {
+      klines = await getKrakenKlines(symbol, interval, limit);
+      source = 'kraken';
+    }
+    if (!klines || klines.length === 0) return res.status(404).json({ error: 'klines_unavailable', symbol });
+    res.json({ symbol, interval, count: klines.length, source, data: klines });
   })
 );
 

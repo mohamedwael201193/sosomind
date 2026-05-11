@@ -5,7 +5,7 @@ import { runStressTest, listPresetScenarios } from '../simulation/stress';
 import { getMacroOutlook } from '../agents/macroOverlay';
 import { generateVoiceBrief, briefingScript, hasVoice } from '../agents/voice';
 import { asyncHandler } from '../utils/http';
-import { getBinanceKlines } from '../clients/market';
+import { getBinanceKlines, getKrakenKlines } from '../clients/market';
 
 const router = Router();
 
@@ -56,10 +56,15 @@ router.get('/market/correlation', asyncHandler(async (_req, res) => {
     const d2 = Math.sqrt(ys.reduce((s, v) => s + (v - my) ** 2, 0));
     return d1 && d2 ? num / (d1 * d2) : 0;
   }
+  const klinesWithFallback = async (asset: string) => {
+    const b = await getBinanceKlines(asset, '1d', 30).catch(() => null);
+    if (b && b.length > 0) return b;
+    return getKrakenKlines(asset, '1d', 30).catch(() => null);
+  };
   const [btcK, ethK, solK] = await Promise.all([
-    getBinanceKlines('BTC', '1d', 30).catch(() => null),
-    getBinanceKlines('ETH', '1d', 30).catch(() => null),
-    getBinanceKlines('SOL', '1d', 30).catch(() => null),
+    klinesWithFallback('BTC'),
+    klinesWithFallback('ETH'),
+    klinesWithFallback('SOL'),
   ]);
   const c = (k: typeof btcK) => (k ?? []).map(kl => kl.close);
   const BTC_ETH = +pearson(c(btcK), c(ethK)).toFixed(2);

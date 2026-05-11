@@ -122,14 +122,59 @@ export interface BinanceKline {
  */
 export async function getBinanceKlines(asset: string, interval = '1h', limit = 24): Promise<BinanceKline[] | null> {
   const sym = toBinanceSymbol(asset);
-  return cachedFetch(`binance:klines:${sym}:${interval}:${limit}`, async () => {
+  return safe(cachedFetch(`binance:klines:${sym}:${interval}:${limit}`, async () => {
     const r = await binanceHttp.get('/api/v3/klines', { params: { symbol: sym, interval, limit } });
+    if (r.status === 451 || r.status >= 400) throw new Error(`Binance blocked: ${r.status}`);
     return (r.data as any[]).map((k: any[]) => ({
       openTime: k[0], open: Number(k[1]), high: Number(k[2]),
       low: Number(k[3]), close: Number(k[4]), volume: Number(k[5]),
       closeTime: k[6], quoteVolume: Number(k[7]), trades: Number(k[8]),
     }));
-  }, 60); // 60s cache
+  }, 60)); // 60s cache
+}
+
+// ─── Kraken config — geo-unrestricted fallback for klines ────────────────────
+const KRAKEN_BASE = 'https://api.kraken.com';
+const krakenHttp = axios.create({ baseURL: KRAKEN_BASE, timeout: 10000 });
+
+const KRAKEN_PAIR_MAP: Record<string, string> = {
+  BTC: 'XBTUSD', ETH: 'ETHUSD', SOL: 'SOLUSD', AVAX: 'AVAXUSD',
+  ARB: 'ARBUSD', OP: 'OPUSD', SUI: 'SUIUSD', ADA: 'ADAUSD',
+  DOT: 'DOTUSD', LINK: 'LINKUSD', UNI: 'UNIUSD', ATOM: 'ATOMUSD',
+  XRP: 'XRPUSD', DOGE: 'XDGUSD', LTC: 'LTCUSD',
+};
+
+const KRAKEN_INTERVAL_MAP: Record<string, number> = {
+  '1m': 1, '5m': 5, '15m': 15, '1h': 60, '4h': 240, '1d': 1440, '1w': 10080,
+};
+
+/**
+ * Kraken OHLC — geo-unrestricted fallback for Binance klines.
+ * Returns data in BinanceKline format for drop-in compatibility.
+ */
+export async function getKrakenKlines(asset: string, interval = '1h', limit = 100): Promise<BinanceKline[] | null> {
+  const a = asset.toUpperCase().replace(/^V/, '').replace(/(USDT|BUSD|USDC|USD)$/, '');
+  const pair = KRAKEN_PAIR_MAP[a];
+  if (!pair) return null; // asset not on Kraken (e.g. BNB)
+  const krakenInterval = KRAKEN_INTERVAL_MAP[interval] ?? 60;
+  return safe(cachedFetch(`kraken:klines:${pair}:${krakenInterval}:${limit}`, async () => {
+    const r = await krakenHttp.get('/0/public/OHLC', { params: { pair, interval: krakenInterval } });
+    if (r.data.error?.length) throw new Error(`Kraken error: ${r.data.error[0]}`);
+    const pairKey = Object.keys(r.data.result).find(k => k !== 'last')!;
+    const candles: any[][] = r.data.result[pairKey];
+    // Kraken: [time, open, high, low, close, vwap, volume, count]
+    const sliced = limit < candles.length ? candles.slice(-limit) : candles;
+    const intervalMs = krakenInterval * 60 * 1000;
+    return sliced.map((k: any[]) => ({
+      openTime: Number(k[0]) * 1000,
+      open: Number(k[1]), high: Number(k[2]),
+      low: Number(k[3]), close: Number(k[4]),
+      volume: Number(k[6]),
+      closeTime: Number(k[0]) * 1000 + intervalMs - 1,
+      quoteVolume: Number(k[5]) * Number(k[6]), // vwap * vol ≈ quote vol
+      trades: Number(k[7]),
+    }));
+  }, 60));
 }
 
 /**
