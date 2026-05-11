@@ -1,5 +1,5 @@
 "use client";
-import { motion, useMotionValue, useSpring, AnimatePresence } from "framer-motion";
+import { motion, useMotionValue, useSpring, AnimatePresence, useInView, animate as frameAnimate } from "framer-motion";
 import Link from "next/link";
 import { LogoMark } from "@/components/Logo";
 import { useWallet } from "@/context/WalletContext";
@@ -27,11 +27,11 @@ const HERO_SUB = "Multi-agent AI research, real-time signals, and DEX execution 
 const NAV_LINKS = ["Features", "Agents", "Data", "Bot", "FAQ"];
 
 const STATS = [
-  { value: "2,400+", label: "Assets Tracked" },
-  { value: "18K+",   label: "Signals Generated" },
-  { value: "15",     label: "AI Agents" },
-  { value: "13",     label: "Data Sources" },
-  { value: "67%",    label: "Signal Win Rate" },
+  { to: 2400, suffix: "+",  fmt: "2,400+", label: "Assets Tracked" },
+  { to: 18,   suffix: "K+", fmt: "18K+",   label: "Signals Generated" },
+  { to: 15,   suffix: "",   fmt: "15",     label: "AI Agents" },
+  { to: 13,   suffix: "",   fmt: "13",     label: "Data Sources" },
+  { to: 67,   suffix: "%",  fmt: "67%",    label: "Signal Win Rate" },
 ];
 
 const PARTNERS = [
@@ -220,6 +220,53 @@ function ImpactBadge({ impact }: { impact: string }) {
   return <span className="px-2 py-0.5 rounded text-xs font-bold border" style={map[impact]}>{impact}</span>;
 }
 
+function AnimatedStat({ to, suffix, fmt }: { to: number; suffix: string; fmt: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const isInView = useInView(ref, { once: true, margin: "-40px" });
+  useEffect(() => {
+    if (!isInView || !ref.current) return;
+    const el = ref.current;
+    const controls = frameAnimate(0, to, {
+      duration: 2,
+      ease: [0.16, 1, 0.3, 1] as [number, number, number, number],
+      onUpdate(v) {
+        const n = Math.round(v);
+        const formatted = n >= 1000 ? n.toLocaleString() : String(n);
+        el.textContent = formatted + suffix;
+      },
+    });
+    return () => controls.stop();
+  }, [isInView, to, suffix]);
+  return <span ref={ref}>{fmt}</span>;
+}
+
+function GradientBorderCard({ children, className = "", style }: {
+  children: React.ReactNode; className?: string; style?: React.CSSProperties;
+}) {
+  const [pos, setPos] = useState({ x: 0, y: 0, opacity: 0 });
+  return (
+    <div
+      className={`relative rounded-[8px] h-full ${className}`}
+      style={{
+        padding: "1.5px",
+        background: "linear-gradient(135deg, rgba(249,115,22,0.65) 0%, rgba(124,58,237,0.4) 50%, rgba(0,136,204,0.55) 100%)",
+        ...style,
+      }}
+      onMouseMove={(e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        setPos({ x: e.clientX - r.left, y: e.clientY - r.top, opacity: 1 });
+      }}
+      onMouseLeave={() => setPos((p) => ({ ...p, opacity: 0 }))}
+    >
+      <div className="pointer-events-none absolute inset-0 rounded-[8px] transition-opacity duration-300 z-10"
+        style={{ opacity: pos.opacity, background: `radial-gradient(500px circle at ${pos.x}px ${pos.y}px, rgba(249,115,22,0.12), transparent 60%)` }} />
+      <div className="relative h-full rounded-[8px] overflow-hidden" style={{ background: "var(--bg-card)" }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 // ── Main ───────────────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
@@ -347,10 +394,22 @@ export default function LandingPage() {
         </div>
         <div className="relative z-10 max-w-5xl mx-auto">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border mb-10 text-sm font-medium"
-              style={{ borderColor: "var(--glass-border)", background: "var(--bg-card)", backdropFilter: "blur(16px)", color: "var(--text-secondary)" }}>
+            <div
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full border mb-10 text-sm font-medium"
+              style={{
+                borderColor: "var(--glass-border)", background: "var(--bg-card)",
+                backdropFilter: "blur(16px)", color: "var(--text-secondary)",
+              }}
+            >
               <span className="w-2 h-2 rounded-full animate-pulse inline-block" style={{ background: "#22c55e" }} />
-              Live · AI-Powered Finance Intelligence
+              <span style={{
+                background: "linear-gradient(90deg, var(--text-secondary) 0%, #f97316 40%, var(--text-secondary) 80%)",
+                backgroundSize: "200% auto",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+                animation: "shimmer 3s linear infinite",
+              }}>Live · AI-Powered Finance Intelligence</span>
             </div>
           </motion.div>
 
@@ -415,19 +474,47 @@ export default function LandingPage() {
             </a>
           </motion.div>
 
+          {/* ── Social proof ─────────────────────────────────────────────── */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.35, duration: 0.55 }}
+            className="flex items-center justify-center gap-6 mt-6 mb-4 flex-wrap"
+          >
+            {[
+              ["2,400+", "Assets"],
+              ["18K+",   "Signals"],
+              ["67%",    "Win Rate"],
+              ["15",     "AI Agents"],
+            ].map(([v, l]) => (
+              <div key={l} className="flex items-center gap-1.5">
+                <span className="font-black text-sm" style={{ color: "#f97316" }}>{v}</span>
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>{l}</span>
+              </div>
+            ))}
+          </motion.div>
+
           {/* Mini dashboard mockup */}
           <motion.div
             initial={{ opacity: 0, y: 40, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ delay: 1.2, duration: 0.8, ease: [0.16, 1, 0.3, 1] as [number,number,number,number] }}
-            className="mt-16 rounded-[12px] border overflow-hidden max-w-2xl mx-auto"
-            style={{ borderColor: "var(--glass-border)", background: "var(--bg-card)", backdropFilter: "blur(20px)" }}
+            className="mt-16 max-w-2xl mx-auto relative"
           >
+            {/* Glow behind mockup */}
+            <div className="absolute inset-0 rounded-[16px] blur-2xl opacity-30 pointer-events-none"
+              style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(249,115,22,0.5) 0%, transparent 70%)" }} />
+            <div className="rounded-[12px] border overflow-hidden relative"
+              style={{ borderColor: "rgba(249,115,22,0.25)", background: "var(--bg-card)", backdropFilter: "blur(20px)" }}
+            >
             <div className="flex items-center gap-2 px-4 py-3 border-b" style={{ borderColor: "var(--glass-border)" }}>
               <div className="flex gap-1.5">
                 {["#ef4444","#eab308","#22c55e"].map((c) => <div key={c} className="w-3 h-3 rounded-full" style={{ background: c }} />)}
               </div>
               <span className="text-xs ml-2" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>SoSoMind · Signal Engine</span>
+              <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold" style={{ color: "#22c55e", fontFamily: "var(--font-mono)" }}>
+                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#22c55e" }} />LIVE
+              </span>
             </div>
             <div className="p-4 h-36">
               <ResponsiveContainer width="100%" height="100%">
@@ -442,32 +529,45 @@ export default function LandingPage() {
                 </AreaChart>
               </ResponsiveContainer>
             </div>
+            </div>
           </motion.div>
         </div>
       </section>
 
       {/* ── 3. PARTNERS MARQUEE + STATS ───────────────────────────────────── */}
-      <section className="border-y overflow-hidden py-3" style={{ borderColor: "var(--glass-border)" }}>
-        <div className="flex gap-12 whitespace-nowrap" style={{ animation: "marquee 25s linear infinite" }}>
+      <section className="border-y overflow-hidden py-4" style={{ borderColor: "var(--glass-border)" }}>
+        <div className="flex gap-10 whitespace-nowrap" style={{ animation: "marquee 28s linear infinite" }}>
           {[...PARTNERS, ...PARTNERS].map((p, i) => (
-            <span key={i} className="text-sm font-medium" style={{ color: "var(--text-muted)" }}>{p}</span>
+            <span key={i} className="text-sm font-semibold flex items-center gap-2" style={{ color: "var(--text-muted)" }}>
+              <span className="w-1 h-1 rounded-full inline-block" style={{ background: "rgba(249,115,22,0.5)" }} />
+              {p}
+            </span>
           ))}
         </div>
       </section>
 
-      <section className="py-16 border-b" style={{ borderColor: "var(--glass-border)" }}>
-        <div className="max-w-5xl mx-auto px-6 grid grid-cols-2 md:grid-cols-5 gap-8 text-center">
-          {STATS.map((s, i) => (
-            <motion.div key={s.label}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-80px" }}
-              transition={{ delay: i * 0.08, duration: 0.5 }}
-            >
-              <div className="text-3xl font-black" style={{ fontFamily: "var(--font-display)", color: "#f97316" }}>{s.value}</div>
-              <div className="text-xs mt-1 uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>{s.label}</div>
-            </motion.div>
-          ))}
+      <section className="py-20 border-b" style={{ borderColor: "var(--glass-border)" }}>
+        <div className="max-w-5xl mx-auto px-6">
+          <motion.p
+            initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="text-center text-xs font-bold uppercase tracking-widest mb-10" style={{ color: "var(--text-muted)" }}
+          >Platform at a glance</motion.p>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-8 text-center">
+            {STATS.map((s, i) => (
+              <motion.div key={s.label}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-80px" }}
+                transition={{ delay: i * 0.08, duration: 0.5 }}
+              >
+                <div className="text-4xl font-black mb-1" style={{ fontFamily: "var(--font-display)", color: "#f97316" }}>
+                  <AnimatedStat to={s.to} suffix={s.suffix} fmt={s.fmt} />
+                </div>
+                <div className="text-xs uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>{s.label}</div>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -476,47 +576,120 @@ export default function LandingPage() {
         <div className="max-w-4xl mx-auto">
           <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.6 }}>
             <p className="text-xs font-bold uppercase tracking-widest mb-4 text-center" style={{ color: "#f97316" }}>Architecture</p>
-            <h2 className="text-[clamp(2rem,5vw,3.5rem)] font-black text-center mb-4 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>Agents working in concert</h2>
+            <h2 className="text-[clamp(2rem,5vw,3.5rem)] font-black text-center mb-4 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
+              Agents working{" "}
+              <span style={{
+                background: "linear-gradient(135deg, #f97316, #ea580c)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}>in concert</span>
+            </h2>
             <p className="text-center max-w-xl mx-auto mb-16" style={{ color: "var(--text-secondary)" }}>Specialist AI agents collaborate in real time — each with its own domain expertise, all coordinated by the Orchestrator.</p>
           </motion.div>
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-12">
-            {[
-              { label: "13 Data Feeds",       sub: "SoSoValue · SoDEX · Binance", icon: Database },
-              { label: "Agent Orchestrator",  sub: "NLP · Risk · Research · Macro", icon: Network },
-              { label: "Signals & Execution", sub: "Trades · Alerts · Content",   icon: Zap },
-            ].map((node, i) => {
-              const Icon = node.icon;
-              return (
-                <div key={i} className="flex items-center gap-4 w-full md:w-auto">
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.85 }}
-                    whileInView={{ opacity: 1, scale: 1 }}
-                    viewport={{ once: true, margin: "-80px" }}
-                    transition={{ delay: i * 0.18, duration: 0.5 }}
-                    className="flex-1 md:flex-none"
-                  >
-                    <SpotlightCard className="p-5 text-center" style={{ minWidth: 160 }}>
-                      <div className="w-10 h-10 rounded-[8px] flex items-center justify-center mx-auto mb-3"
-                        style={{ background: "rgba(249,115,22,0.12)", border: "1px solid rgba(249,115,22,0.25)" }}>
-                        <Icon className="w-5 h-5" style={{ color: "#f97316" } as React.CSSProperties} />
-                      </div>
-                      <div className="font-bold text-sm" style={{ color: "var(--text-primary)" }}>{node.label}</div>
-                      <div className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{node.sub}</div>
-                    </SpotlightCard>
-                  </motion.div>
-                  {i < 2 && (
-                    <motion.div
-                      initial={{ scaleX: 0 }}
-                      whileInView={{ scaleX: 1 }}
-                      viewport={{ once: true, margin: "-80px" }}
-                      transition={{ delay: 0.3 + i * 0.2, duration: 0.5 }}
-                      className="hidden md:block h-px flex-1 origin-left"
-                      style={{ background: "linear-gradient(90deg, #f97316, transparent)" }}
-                    />
-                  )}
+          <div className="flex flex-col md:flex-row items-stretch justify-between gap-4 md:gap-0 mb-12">
+
+            {/* Node 1: Data Sources */}
+            <motion.div
+              initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.55 }}
+              className="flex-1"
+            >
+              <SpotlightCard className="p-6 h-full flex flex-col items-center text-center">
+                <div className="w-12 h-12 rounded-[10px] flex items-center justify-center mb-4"
+                  style={{ background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.3)" }}>
+                  <Database className="w-6 h-6" style={{ color: "#8b5cf6" }} />
                 </div>
-              );
-            })}
+                <div className="font-bold text-base mb-1" style={{ color: "var(--text-primary)" }}>13 Data Sources</div>
+                <div className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>MCP · REST · WebSocket</div>
+                <div className="flex flex-wrap gap-1.5 justify-center">
+                  {["SoSoValue", "SoDEX", "Binance", "Macro", "Social"].map((s) => (
+                    <span key={s} className="px-2 py-0.5 rounded text-[10px] font-semibold"
+                      style={{ background: "rgba(139,92,246,0.1)", color: "#8b5cf6" }}>{s}</span>
+                  ))}
+                </div>
+              </SpotlightCard>
+            </motion.div>
+
+            {/* Connector 1 */}
+            <div className="flex flex-col items-center justify-center md:w-14 flex-shrink-0 py-4 md:py-0">
+              <motion.div initial={{ scaleX: 0 }} whileInView={{ scaleX: 1 }} viewport={{ once: true }}
+                transition={{ delay: 0.3, duration: 0.6 }}
+                className="hidden md:block h-0.5 w-full origin-left"
+                style={{ background: "linear-gradient(90deg, rgba(139,92,246,0.8), #f97316)" }} />
+              <motion.div initial={{ scaleY: 0 }} whileInView={{ scaleY: 1 }} viewport={{ once: true }}
+                transition={{ delay: 0.3, duration: 0.4 }}
+                className="md:hidden w-0.5 h-8"
+                style={{ background: "linear-gradient(to bottom, rgba(139,92,246,0.8), #f97316)" }} />
+            </div>
+
+            {/* Node 2: Orchestrator (center) */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }} whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true, margin: "-80px" }} transition={{ delay: 0.18, duration: 0.6, ease: [0.16,1,0.3,1] as [number,number,number,number] }}
+              className="flex-1 relative"
+            >
+              <motion.div
+                animate={{ scale: [1, 1.04, 1], opacity: [0.4, 0.1, 0.4] }}
+                transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute inset-[-4px] rounded-[10px] pointer-events-none"
+                style={{ border: "1px solid rgba(249,115,22,0.35)" }}
+              />
+              <GradientBorderCard className="h-full">
+                <div className="p-6 flex flex-col items-center text-center h-full">
+                  <div className="w-12 h-12 rounded-[10px] flex items-center justify-center mb-4"
+                    style={{ background: "rgba(249,115,22,0.15)", border: "1px solid rgba(249,115,22,0.4)" }}>
+                    <Network className="w-6 h-6" style={{ color: "#f97316" }} />
+                  </div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-black text-base" style={{ color: "#f97316" }}>Orchestrator</span>
+                    <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "#22c55e" }} />
+                  </div>
+                  <div className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>Central Coordination Hub</div>
+                  <div className="flex flex-wrap gap-1.5 justify-center">
+                    {AGENTS.filter((a) => a.name !== "Orchestrator").map((a) => (
+                      <span key={a.name} className="px-2 py-0.5 rounded text-[10px] font-semibold"
+                        style={{ background: "rgba(249,115,22,0.1)", color: "#f97316" }}>{a.name}</span>
+                    ))}
+                  </div>
+                </div>
+              </GradientBorderCard>
+            </motion.div>
+
+            {/* Connector 2 */}
+            <div className="flex flex-col items-center justify-center md:w-14 flex-shrink-0 py-4 md:py-0">
+              <motion.div initial={{ scaleX: 0 }} whileInView={{ scaleX: 1 }} viewport={{ once: true }}
+                transition={{ delay: 0.5, duration: 0.6 }}
+                className="hidden md:block h-0.5 w-full origin-left"
+                style={{ background: "linear-gradient(90deg, #f97316, rgba(34,197,94,0.8))" }} />
+              <motion.div initial={{ scaleY: 0 }} whileInView={{ scaleY: 1 }} viewport={{ once: true }}
+                transition={{ delay: 0.5, duration: 0.4 }}
+                className="md:hidden w-0.5 h-8"
+                style={{ background: "linear-gradient(to bottom, #f97316, rgba(34,197,94,0.8))" }} />
+            </div>
+
+            {/* Node 3: Signals & Execution */}
+            <motion.div
+              initial={{ opacity: 0, x: 30 }} whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true, margin: "-80px" }} transition={{ delay: 0.36, duration: 0.55 }}
+              className="flex-1"
+            >
+              <SpotlightCard className="p-6 h-full flex flex-col items-center text-center">
+                <div className="w-12 h-12 rounded-[10px] flex items-center justify-center mb-4"
+                  style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.25)" }}>
+                  <Zap className="w-6 h-6" style={{ color: "#22c55e" }} />
+                </div>
+                <div className="font-bold text-base mb-1" style={{ color: "var(--text-primary)" }}>Signals & Actions</div>
+                <div className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>Real-time output</div>
+                <div className="flex flex-wrap gap-1.5 justify-center">
+                  {["DEX Orders", "Push Alerts", "Reports", "Telegram"].map((s) => (
+                    <span key={s} className="px-2 py-0.5 rounded text-[10px] font-semibold"
+                      style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>{s}</span>
+                  ))}
+                </div>
+              </SpotlightCard>
+            </motion.div>
+
           </div>
         </div>
       </section>
@@ -526,10 +699,18 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto">
           <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.6 }}>
             <p className="text-xs font-bold uppercase tracking-widest mb-4 text-center" style={{ color: "#f97316" }}>Features</p>
-            <h2 className="text-[clamp(2rem,5vw,3.5rem)] font-black text-center mb-4 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>15 tools. One command.</h2>
+            <h2 className="text-[clamp(2rem,5vw,3.5rem)] font-black text-center mb-4 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
+              15 tools.{" "}
+              <span style={{
+                background: "linear-gradient(135deg, #f97316, #ea580c)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}>One command.</span>
+            </h2>
             <p className="text-center max-w-xl mx-auto mb-12" style={{ color: "var(--text-secondary)" }}>Everything from NLP trade execution to tax reporting — unified in a single agentic interface.</p>
           </motion.div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 auto-rows-[160px]">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 auto-rows-[170px]">
             {FEATURES.map((f, i) => {
               const Icon = f.icon;
               const colSpan = f.size === "large" ? "md:col-span-2 md:row-span-2" : f.size === "medium" ? "md:col-span-2" : "md:col-span-1";
@@ -541,6 +722,20 @@ export default function LandingPage() {
                   transition={{ delay: (i % 4) * 0.07, duration: 0.5 }}
                   className={colSpan}
                 >
+                {f.size === "large" ? (
+                  <GradientBorderCard className="h-full">
+                    <div className="p-5 flex flex-col justify-between h-full">
+                      <div>
+                        <div className="w-10 h-10 rounded-[8px] flex items-center justify-center mb-3"
+                          style={{ background: "rgba(249,115,22,0.13)", border: "1px solid rgba(249,115,22,0.3)" }}>
+                          <Icon className="w-5 h-5" style={{ color: "#f97316" } as React.CSSProperties} />
+                        </div>
+                        <div className="font-bold text-base mb-1.5" style={{ color: "var(--text-primary)" }}>{f.title}</div>
+                      </div>
+                      <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>{f.desc}</p>
+                    </div>
+                  </GradientBorderCard>
+                ) : (
                   <SpotlightCard className="h-full p-5 flex flex-col justify-between">
                     <div>
                       <div className="w-9 h-9 rounded-[8px] flex items-center justify-center mb-3"
@@ -551,6 +746,7 @@ export default function LandingPage() {
                     </div>
                     <p className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>{f.desc}</p>
                   </SpotlightCard>
+                )}
                 </motion.div>
               );
             })}
@@ -650,8 +846,23 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto">
           <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.6 }}>
             <p className="text-xs font-bold uppercase tracking-widest mb-4 text-center" style={{ color: "#f97316" }}>Signal Engine</p>
-            <h2 className="text-[clamp(2rem,5vw,3.5rem)] font-black text-center mb-4 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>Real-time trading signals</h2>
-            <p className="text-center max-w-xl mx-auto mb-12" style={{ color: "var(--text-secondary)" }}>High-confidence directional signals powered by multi-source confluence scoring — updated every 30 seconds.</p>
+            <h2 className="text-[clamp(2rem,5vw,3.5rem)] font-black text-center mb-4 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
+              Real-time{" "}
+              <span style={{
+                background: "linear-gradient(135deg, #f97316, #ea580c)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}>trading signals</span>
+            </h2>
+            <p className="text-center max-w-xl mx-auto mb-12" style={{ color: "var(--text-secondary)" }}>
+              High-confidence directional signals powered by multi-source confluence scoring — updated every 30 seconds.
+            </p>
+            <div className="flex items-center justify-center gap-2 mb-8">
+              <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "#22c55e" }} />
+              <span className="text-xs font-semibold" style={{ color: "#22c55e", fontFamily: "var(--font-mono)" }}>LIVE SIGNALS</span>
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>· Updated every 30s</span>
+            </div>
           </motion.div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {SIGNALS.map((sig, i) => {
@@ -664,7 +875,10 @@ export default function LandingPage() {
                   viewport={{ once: true, margin: "-60px" }}
                   transition={{ delay: i * 0.1, duration: 0.5 }}
                 >
-                  <SpotlightCard className="p-4 flex flex-col gap-3">
+                  <SpotlightCard className="p-4 flex flex-col gap-3" style={{
+                    borderColor: sig.direction === "LONG" ? "rgba(34,197,94,0.2)" : sig.direction === "SHORT" ? "rgba(239,68,68,0.2)" : undefined,
+                    background: sig.direction === "LONG" ? "rgba(34,197,94,0.03)" : sig.direction === "SHORT" ? "rgba(239,68,68,0.03)" : undefined,
+                  }}>
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-sm" style={{ color: "var(--text-primary)" }}>{sig.pair}</span>
                       <SignalBadge dir={sig.direction} />
@@ -768,7 +982,15 @@ export default function LandingPage() {
         <div className="max-w-4xl mx-auto" ref={execRef}>
           <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.6 }}>
             <p className="text-xs font-bold uppercase tracking-widest mb-4 text-center" style={{ color: "#f97316" }}>DEX Execution</p>
-            <h2 className="text-[clamp(2rem,5vw,3.5rem)] font-black text-center mb-4 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>Trade in plain English</h2>
+            <h2 className="text-[clamp(2rem,5vw,3.5rem)] font-black text-center mb-4 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
+              Trade in{" "}
+              <span style={{
+                background: "linear-gradient(135deg, #f97316, #ea580c)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}>plain English</span>
+            </h2>
             <p className="text-center max-w-xl mx-auto mb-16" style={{ color: "var(--text-secondary)" }}>Type your intent. Our NLP agent parses it, structures the order, and sends it to SoDEX — you just confirm.</p>
           </motion.div>
 
@@ -854,7 +1076,13 @@ export default function LandingPage() {
           <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.6 }}>
             <p className="text-xs font-bold uppercase tracking-widest mb-4 text-center" style={{ color: "#0088cc" }}>Telegram Bot</p>
             <h2 className="text-[clamp(2rem,5vw,3.5rem)] font-black text-center mb-4 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
-              Trade from your phone
+              Trade from{" "}
+              <span style={{
+                background: "linear-gradient(135deg, #0088cc, #0066aa)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}>your phone</span>
             </h2>
             <p className="text-center max-w-xl mx-auto mb-16 text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
               The SoSoMind Telegram bot delivers real-time signals, portfolio updates, and DEX execution — no browser needed. Link your bot wallet to your dashboard in three steps.
@@ -994,7 +1222,15 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto">
           <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.6 }}>
             <p className="text-xs font-bold uppercase tracking-widest mb-4 text-center" style={{ color: "#f97316" }}>Data Sources</p>
-            <h2 className="text-[clamp(2rem,5vw,3.5rem)] font-black text-center mb-4 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>13 live data streams</h2>
+            <h2 className="text-[clamp(2rem,5vw,3.5rem)] font-black text-center mb-4 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
+              13 live{" "}
+              <span style={{
+                background: "linear-gradient(135deg, #8b5cf6, #6366f1)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}>data streams</span>
+            </h2>
             <p className="text-center max-w-xl mx-auto mb-12" style={{ color: "var(--text-secondary)" }}>Every agent is powered by real-time data from the most comprehensive crypto intelligence network.</p>
           </motion.div>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -1111,9 +1347,22 @@ export default function LandingPage() {
         />
         <div className="max-w-2xl mx-auto text-center relative z-10">
           <motion.div initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.7 }}>
-            <h2 className="text-[clamp(2.5rem,6vw,5rem)] font-black mb-4 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
-              Start trading<br />smarter today.
-            </h2>
+            <motion.h2
+              initial={{ opacity: 0, y: 30, filter: "blur(12px)" }}
+              whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              viewport={{ once: true, margin: "-80px" }}
+              transition={{ duration: 0.85, ease: [0.16, 1, 0.3, 1] as [number,number,number,number] }}
+              className="text-[clamp(2.5rem,6vw,5rem)] font-black mb-4 tracking-tight"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              Start trading<br />
+              <span style={{
+                background: "linear-gradient(135deg, #f97316 0%, #ea580c 50%, #c2410c 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}>smarter today.</span>
+            </motion.h2>
             <p className="text-lg mb-10" style={{ color: "var(--text-secondary)" }}>
               Connect your wallet and deploy the full AI agent stack in under 60 seconds.
             </p>
@@ -1137,6 +1386,14 @@ export default function LandingPage() {
                 {isConnecting ? "Connecting…" : "Connect Wallet"}
               </MagneticButton>
             )}
+            <motion.div
+              initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+              transition={{ delay: 0.3, duration: 0.5 }}
+              className="mt-8 flex items-center justify-center gap-2"
+            >
+              <span className="w-2 h-2 rounded-full" style={{ background: "#22c55e" }} />
+              <span className="text-sm" style={{ color: "var(--text-muted)" }}>No credit card · Free to start · Cancel anytime</span>
+            </motion.div>
           </motion.div>
         </div>
       </section>
@@ -1214,6 +1471,34 @@ export default function LandingPage() {
         @keyframes marquee {
           0%   { transform: translateX(0); }
           100% { transform: translateX(-50%); }
+        }
+        @keyframes shimmer {
+          0%   { background-position: -200% center; }
+          100% { background-position: 200% center; }
+        }
+        @keyframes float-slow {
+          0%, 100% { transform: translateY(0px); }
+          50%       { transform: translateY(-10px); }
+        }
+        @keyframes beam-pulse {
+          0%, 100% { opacity: 0.25; transform: scaleX(0.85); }
+          50%       { opacity: 1;    transform: scaleX(1); }
+        }
+        @keyframes ping-ring {
+          0%   { transform: scale(1);    opacity: 0.5; }
+          75%  { transform: scale(1.35); opacity: 0; }
+          100% { transform: scale(1.35); opacity: 0; }
+        }
+        :focus-visible {
+          outline: 2px solid #f97316;
+          outline-offset: 3px;
+          border-radius: 4px;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          *, *::before, *::after {
+            animation-duration: 0.01ms !important;
+            transition-duration: 0.01ms !important;
+          }
         }
       `}</style>
     </div>
