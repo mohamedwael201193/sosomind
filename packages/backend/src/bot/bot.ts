@@ -28,6 +28,7 @@ const MAIN_KB = new Keyboard()
   .text('📓 Journal').text('🤝 Subscribe').text('ℹ️ Help').row()
   .text('🐋 Whales').text('🔄 Arb').text('📡 Funding').row()
   .text('🏆 Leaderboard').text('🎯 Persona').text('📄 Tax').row()
+  .text('📈 SSI Indexes').text('📰 Newsletter').row()
   .text('✖ Hide Menu')
   .resized();
 
@@ -51,6 +52,9 @@ function mainMenuMsg() {
     `🐋 <b>Whales</b> — Smart money: ETF flows, treasuries, VC\n` +
     `🔄 <b>Arb</b> — Cross-exchange arbitrage scanner\n` +
     `📡 <b>Funding</b> — Perps funding rate contrarian signals\n\n` +
+    `<b>� SSI Indexes (SoSoValue Protocol):</b>\n` +
+    `📈 <b>SSI Indexes</b> — Live baskets: MAG7.ssi, DEFI.ssi, MEME.ssi, USSI\n` +
+    `📰 <b>Newsletter</b> — Smart-money daily brief with provenance\n\n` +
     `<b>💼 Portfolio &amp; Trading:</b>\n` +
     `💼 <b>Portfolio</b> — Positions, trades &amp; PnL\n` +
     `🏆 <b>Leaderboard</b> — Top paper traders\n` +
@@ -61,9 +65,9 @@ function mainMenuMsg() {
     `📄 <b>Tax</b> — Auto tax report export\n` +
     `🔔 <b>Alerts</b> — Price alerts &amp; notifications\n` +
     `📓 <b>Journal</b> — Signal history &amp; accuracy\n\n` +
-    `<b>💬 NLP:</b> Type naturally — <i>"buy $500 BTC"</i> or <i>"show whale alerts"</i>\n` +
+    `<b>💬 NLP:</b> Type naturally — <i>"buy $500 BTC"</i>, <i>"show MAG7.ssi"</i>, or <i>"show whale alerts"</i>\n` +
     `🎙️ <b>Voice:</b> Send a voice message to trade hands-free\n\n` +
-    `💎 <i>Zero mocks · Real APIs · EIP-712 signed trades</i>`
+    `💎 <i>Zero mocks · Real APIs · EIP-712 signed trades · SSI on-chain indexes</i>`
   );
 }
 
@@ -100,7 +104,8 @@ export function createBot(): Bot | null {
       .text('🎯 Persona', 'persona:view').text('📄 Tax Report', 'tax:cmd').row()
       .text('🔔 Alerts', 'menu:alerts').text('📓 Journal', 'journal:view').row()
       .text('🤝 Subscribe', 'subscribe:btc,macro,etf').text('⚙️ Settings', 'settings:view').row()
-      .text('👛 My Wallet', 'menu:wallet');
+      .text('� SSI Indexes', 'ssi:view').text('📰 Newsletter', 'newsletter:latest').row()
+      .text('�👛 My Wallet', 'menu:wallet');
 
     const text = mainMenuMsg();
     if ((ctx as any).callbackQuery) {
@@ -646,6 +651,222 @@ export function createBot(): Bot | null {
   bot.command('briefing', runBriefing);
   bot.hears('📊 Briefing', runBriefing);
   bot.callbackQuery('briefing:now', runBriefing);
+
+  // ── SSI Indexes (SoSoValue Protocol) ────────────────────────────────────────
+  async function sendSSIIndex(ctx: Context) {
+    const loadMsg = `📈 <b>SSI Indexes</b> — Loading live baskets…`;
+    let sent: any;
+    if ((ctx as any).callbackQuery) {
+      sent = await (ctx as any).editMessageText(loadMsg, { parse_mode: 'HTML' }).catch(() => null);
+      await (ctx as any).answerCallbackQuery().catch(() => {});
+    } else {
+      sent = await ctx.reply(loadMsg, { parse_mode: 'HTML' });
+    }
+
+    let products: any[] = [];
+    try {
+      const indices = await sosovalue.getIndices();
+      const tickers: string[] = Array.isArray(indices) && indices.length > 0
+        ? indices.map((idx: any) => String(idx.ticker ?? idx.symbol ?? idx.index_ticker ?? '')).filter(Boolean)
+        : ['MAG7.ssi', 'DEFI.ssi', 'MEME.ssi', 'USSI'];
+
+      const settled = await Promise.allSettled(tickers.map((t) => sosovalue.getIndexMarketSnapshot(t)));
+      products = tickers.map((t, i) => {
+        const r = settled[i];
+        const snap = r.status === 'fulfilled' && r.value ? r.value as any : {};
+        const price = Number(snap.price ?? snap.last_price ?? snap.nav ?? snap.current_price ?? 0);
+        const change = Number(snap.price_change_percent_24h ?? snap.change_24h ?? 0);
+        const tvl = Number(snap.tvl ?? snap.total_value_locked ?? snap.aum ?? 0);
+        const apy = Number(snap.apy ?? snap.staking_apy ?? 0);
+        const holders = Number(snap.holders ?? snap.holder_count ?? 0);
+        return { ticker: t, price, change, tvl, apy, holders };
+      });
+    } catch {
+      products = [
+        { ticker: 'MAG7.ssi', price: 0, change: 0, tvl: 0, apy: 0, holders: 0 },
+        { ticker: 'DEFI.ssi', price: 0, change: 0, tvl: 0, apy: 0, holders: 0 },
+        { ticker: 'MEME.ssi', price: 0, change: 0, tvl: 0, apy: 0, holders: 0 },
+        { ticker: 'USSI',     price: 0, change: 0, tvl: 0, apy: 0, holders: 0 },
+      ];
+    }
+
+    const lines = [
+      `📈 <b>SoSoValue Indexes (SSI Protocol)</b>`,
+      `<i>On-chain spot-index baskets · Institutional custody (Cobo/Ceffu) · Monthly rebalance</i>`,
+      ``,
+    ];
+    for (const p of products) {
+      const dir = p.change >= 0 ? '▲' : '▼';
+      const changeStr = p.price > 0 ? `${dir}${Math.abs(p.change).toFixed(2)}%` : 'N/A';
+      const priceStr  = p.price > 0 ? `$${p.price.toFixed(4)}` : 'N/A';
+      const tvlStr    = p.tvl > 0 ? `$${(p.tvl / 1e6).toFixed(1)}M TVL` : '';
+      const apyStr    = p.apy > 0 ? ` · ${p.apy.toFixed(1)}% APY` : '';
+      lines.push(`<b>${p.ticker}</b>  ${priceStr}  <code>${changeStr}</code>  ${tvlStr}${apyStr}`);
+    }
+    lines.push(``);
+    lines.push(`<b>Protocol TVL:</b> $108M+ · <b>Holders:</b> 491K+ · <b>Audited by:</b> BlockSec, SlowMist, Zenith`);
+    lines.push(`<b>Bridge:</b> Mirror Protocol (MPC+TEE) — deposit USDC on Base Chain`);
+    lines.push(`\n🔗 <a href="https://ssi.sosovalue.com">ssi.sosovalue.com</a>`);
+
+    const kb = new InlineKeyboard();
+    for (const p of products.slice(0, 4)) {
+      kb.text(`📊 ${p.ticker}`, `ssi:product:${p.ticker}`);
+    }
+    kb.row().text('📈 Recommend for Me', 'ssi:recommend').text('🏠 Menu', 'menu:main');
+
+    const text = lines.join('\n');
+    if (sent && (ctx as any).callbackQuery) {
+      await (ctx as any).editMessageText(text, { parse_mode: 'HTML', reply_markup: kb, link_preview_options: { is_disabled: true } });
+    } else {
+      await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb, link_preview_options: { is_disabled: true } });
+    }
+  }
+
+  bot.command('ssi', sendSSIIndex);
+  bot.hears('📈 SSI Indexes', sendSSIIndex);
+  bot.callbackQuery('ssi:view', sendSSIIndex);
+
+  // SSI product detail — composition + klines summary
+  bot.callbackQuery(/^ssi:product:(.+)$/, async (ctx) => {
+    const ticker = ctx.match[1];
+    await ctx.answerCallbackQuery({ text: `Loading ${ticker}…` });
+
+    let text = `📊 <b>${ticker}</b> — Composition\n\n`;
+    try {
+      const [cons, snap] = await Promise.all([
+        sosovalue.getIndexConstituents(ticker).catch(() => []),
+        sosovalue.getIndexMarketSnapshot(ticker).catch(() => null),
+      ]);
+      const price = (snap as any)?.price ?? (snap as any)?.nav ?? 0;
+      if (price > 0) text += `<b>Price:</b> $${Number(price).toFixed(4)}\n`;
+
+      if (Array.isArray(cons) && cons.length > 0) {
+        text += `\n<b>Constituents (${cons.length}):</b>\n`;
+        const total = cons.reduce((s: number, c: any) => s + Number(c.weight ?? c.weight_pct ?? c.allocation ?? 0), 0) || 1;
+        for (const c of cons.slice(0, 10)) {
+          const w = Number(c.weight ?? c.weight_pct ?? c.allocation ?? 0);
+          const pct = (w / total * 100).toFixed(1);
+          const sym = c.symbol ?? c.token ?? c.name ?? '?';
+          const ch = Number(c.price_change_percent_24h ?? c.change_24h ?? 0);
+          const chStr = ch !== 0 ? ` (${ch > 0 ? '+' : ''}${ch.toFixed(2)}%)` : '';
+          text += `  • <b>${sym}</b> ${pct}%${chStr}\n`;
+        }
+      } else {
+        text += `\n<i>Constituents loading from SoSoValue API…</i>\n`;
+      }
+    } catch {
+      text += `<i>Data unavailable — API may be rate-limited.</i>`;
+    }
+
+    const kb = new InlineKeyboard()
+      .text('⬅️ All Indexes', 'ssi:view')
+      .text('🏠 Menu', 'menu:main');
+    await (ctx as any).editMessageText(text, { parse_mode: 'HTML', reply_markup: kb });
+  });
+
+  // SSI persona recommendation via bot
+  bot.callbackQuery('ssi:recommend', async (ctx) => {
+    await ctx.answerCallbackQuery({ text: 'Getting recommendation…' });
+    const chatId = String(ctx.chat?.id ?? '');
+    const persona = await getUserPersona(chatId).catch(() => 'balanced' as const);
+    let text = `🎯 <b>SSI Recommendation</b> — persona: <code>${persona}</code>\n\n`;
+    try {
+      const tickers = ['MAG7.ssi', 'DEFI.ssi', 'MEME.ssi', 'USSI'];
+      const settled = await Promise.allSettled(tickers.map((t) => sosovalue.getIndexMarketSnapshot(t)));
+      const products = tickers.map((t, i) => {
+        const r = settled[i];
+        const snap = r.status === 'fulfilled' && r.value ? r.value as any : {};
+        return {
+          ticker: t,
+          change: Number(snap.price_change_percent_24h ?? snap.change_24h ?? 0),
+          tvl: Number(snap.tvl ?? snap.aum ?? 0),
+          apy: Number(snap.apy ?? snap.staking_apy ?? 0),
+          price: Number(snap.price ?? snap.nav ?? 0),
+        };
+      });
+      const scored = products.map((p) => {
+        let score = 50 + p.change * 1.5;
+        if (persona === 'aggressive') score += p.change * 2 + (p.ticker === 'MEME.ssi' ? 8 : 0);
+        if (persona === 'conservative') score += (p.ticker === 'MAG7.ssi' ? 12 : 0) + (p.ticker === 'USSI' ? 15 : 0) - Math.abs(p.change);
+        if (persona === 'balanced') score += (p.ticker === 'DEFI.ssi' ? 6 : 0) + (p.ticker === 'MAG7.ssi' ? 4 : 0);
+        if (persona === 'quant') score += p.tvl > 0 ? Math.log10(p.tvl + 1) * 2 : 0;
+        return { ...p, score };
+      }).sort((a, b) => b.score - a.score);
+      const top = scored[0];
+      const second = scored[1];
+      text += `🏆 <b>Top Pick:</b> <b>${top.ticker}</b>`;
+      if (top.price > 0) text += ` @ $${top.price.toFixed(4)}`;
+      if (top.apy > 0) text += ` · ${top.apy.toFixed(1)}% APY`;
+      text += `\n\n`;
+      text += `🥈 <b>Runner-up:</b> ${second.ticker}`;
+      text += `\n\n<i>Ranking by: 24h momentum, TVL depth, persona profile (${persona}).</i>`;
+      text += `\n🔗 <a href="https://ssi.sosovalue.com">Buy on ssi.sosovalue.com</a>`;
+    } catch {
+      text += `<i>Unable to fetch live data. Try again shortly.</i>`;
+    }
+    const kb = new InlineKeyboard().text('⬅️ All Indexes', 'ssi:view').text('🏠 Menu', 'menu:main');
+    await (ctx as any).editMessageText(text, { parse_mode: 'HTML', reply_markup: kb, link_preview_options: { is_disabled: true } });
+  });
+
+  // SSI NLP: "show ssi", "ssi indexes", "buy MAG7.ssi", "what is defi.ssi"
+  bot.hears(/\b(ssi|mag7\.ssi|defi\.ssi|meme\.ssi|ussi)\b/i, async (ctx) => {
+    const text = (ctx.message?.text ?? '').toLowerCase();
+    const tickerMatch = text.match(/\b(mag7\.ssi|defi\.ssi|meme\.ssi|ussi)\b/i);
+    if (tickerMatch) {
+      // Route to product detail
+      const ticker = tickerMatch[1].toUpperCase().replace('SSI', '.ssi').replace('USSI', 'USSI');
+      const realTicker = text.includes('mag7') ? 'MAG7.ssi' : text.includes('defi') ? 'DEFI.ssi' : text.includes('meme') ? 'MEME.ssi' : 'USSI';
+      await ctx.reply(`📊 Loading <b>${realTicker}</b>…`, { parse_mode: 'HTML' });
+      let detail = `📊 <b>${realTicker}</b>\n\n`;
+      try {
+        const snap = await sosovalue.getIndexMarketSnapshot(realTicker).catch(() => null);
+        const cons = await sosovalue.getIndexConstituents(realTicker).catch(() => []);
+        const price = (snap as any)?.price ?? (snap as any)?.nav ?? 0;
+        if (price > 0) detail += `<b>Price:</b> $${Number(price).toFixed(4)}\n`;
+        if (Array.isArray(cons) && cons.length > 0) {
+          detail += `\n<b>Constituents:</b> ${cons.slice(0, 7).map((c: any) => c.symbol ?? c.token ?? '?').join(', ')}...\n`;
+        }
+        detail += `\n🔗 <a href="https://ssi.sosovalue.com/buy/${realTicker}">Buy ${realTicker}</a>`;
+      } catch {
+        detail += `<i>Data loading…</i>`;
+      }
+      await ctx.reply(detail, { parse_mode: 'HTML', link_preview_options: { is_disabled: true } });
+    } else {
+      await sendSSIIndex(ctx);
+    }
+  });
+
+  // ── Newsletter latest ────────────────────────────────────────────────────────
+  bot.callbackQuery('newsletter:latest', async (ctx) => {
+    await ctx.answerCallbackQuery({ text: 'Loading latest brief…' });
+    try {
+      const { data: posts } = await supabase
+        .from('content_posts')
+        .select('id, title, summary, created_at, symbols, citations')
+        .eq('published', true)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      const post = posts?.[0];
+      if (!post) {
+        await (ctx as any).editMessageText(
+          `📰 <b>No newsletters yet</b>\n\nGenerate the first one at <b>/dashboard → Newsletter</b> or use <b>/briefing</b> to create a market brief.`,
+          { parse_mode: 'HTML', reply_markup: new InlineKeyboard().text('📊 Briefing', 'briefing:now').text('🏠 Menu', 'menu:main') },
+        );
+        return;
+      }
+      const citeCount = Array.isArray(post.citations) ? post.citations.length : 0;
+      const timeStr = new Date(post.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
+      const syms = Array.isArray(post.symbols) ? post.symbols.join(', ') : '';
+      let text = `📰 <b>${post.title}</b>\n<i>${timeStr} UTC ${syms ? `· ${syms}` : ''}</i>\n\n`;
+      text += (post.summary ?? '').slice(0, 600);
+      if (citeCount > 0) text += `\n\n<i>📌 ${citeCount} SoSoValue data sources cited</i>`;
+      const kb = new InlineKeyboard().text('📊 Briefing', 'briefing:now').text('🏠 Menu', 'menu:main');
+      await (ctx as any).editMessageText(text, { parse_mode: 'HTML', reply_markup: kb });
+    } catch {
+      await (ctx as any).editMessageText(`<i>Failed to load newsletter.</i>`, { parse_mode: 'HTML' });
+    }
+  });
+
 
   // ── Publish ──────────────────────────────────────────────────────────────────
   bot.command('publish', async (ctx) => {
@@ -1755,7 +1976,7 @@ export function createBot(): Bot | null {
       .text('🔄 Refresh Status', 'setup:start').text('🏠 Main Menu', 'menu:main');
 
     if ((ctx as any).callbackQuery) {
-      await (ctx as any).editMessageText(text, { parse_mode: 'HTML', reply_markup: kb, disable_web_page_preview: true });
+      await (ctx as any).editMessageText(text, { parse_mode: 'HTML', reply_markup: kb, link_preview_options: { is_disabled: true } });
       await (ctx as any).answerCallbackQuery();
     } else {
       await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb } as any);

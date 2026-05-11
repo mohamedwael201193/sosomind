@@ -20,6 +20,9 @@ import alerts from './routes/alerts.js';
 import health from './routes/health.js';
 import sectors from './routes/sectors.js';
 import content from './routes/content.js';
+import ssi from './routes/ssi.js';
+import roadmap from './routes/roadmap.js';
+import risk from './routes/risk.js';
 import trades from './routes/trades.js';
 import audit from './routes/audit.js';
 import stats from './routes/stats.js';
@@ -34,6 +37,7 @@ import { runHeartbeat } from './cron/heartbeat.js';
 import { runAnomalyResearch } from './cron/anomaly.js';
 import { startResearchLoop } from './agents/orchestrator.js';
 import { startWebSocketServer } from './ws/server.js';
+import { runDailyBriefing } from './content/pipeline.js';
 
 export async function startServer() {
   const app = express();
@@ -79,6 +83,9 @@ export async function startServer() {
   app.use('/api/alerts', alerts);
   app.use('/api/sectors', sectors);
   app.use('/api/content', content);
+  app.use('/api/ssi', ssi);
+  app.use('/api/roadmap', roadmap);
+  app.use('/api/risk', risk);
   app.use('/api/trades', trades);
   app.use('/api/audit', audit);
   app.use('/api/stats', stats);
@@ -146,6 +153,13 @@ export async function startServer() {
 
   // Start auto-research loop (BTC/ETH/SOL every 4h)
   startResearchLoop();
+
+  // Auto-publish Smart-Money brief every 15 minutes (newsletter feed). Bot may be optional.
+  const BRIEFING_MS = 15 * 60 * 1000;
+  setInterval(() => {
+    const b = (globalThis as any).__sosomind_bot;
+    if (b) runDailyBriefing(b).catch((e) => console.error('briefing tick error', e));
+  }, BRIEFING_MS);
 
   // Start WebSocket server
   startWebSocketServer();

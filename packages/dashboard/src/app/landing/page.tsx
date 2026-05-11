@@ -24,7 +24,15 @@ import Mistral from "@lobehub/icons/es/Mistral";
 
 const HERO_TAGLINE = "The Agentic Finance OS";
 const HERO_SUB = "Multi-agent AI research, real-time signals, and DEX execution — built for serious crypto traders.";
-const NAV_LINKS = ["Features", "Agents", "Data", "Bot", "FAQ"];
+const NAV_LINKS: { label: string; href: string; external?: boolean }[] = [
+  { label: "Features", href: "#features" },
+  { label: "Agents",   href: "#agents" },
+  { label: "Data",     href: "#data" },
+  { label: "Bot",      href: "#bot" },
+  { label: "Docs",     href: "/docs",    external: true },
+  { label: "Roadmap",  href: "/roadmap", external: true },
+  { label: "FAQ",      href: "#faq" },
+];
 
 const STATS = [
   { to: 2400, suffix: "+",  fmt: "2,400+", label: "Assets Tracked" },
@@ -345,11 +353,17 @@ export default function LandingPage() {
             </span>
           </Link>
           <div className="hidden md:flex items-center gap-6">
-            {NAV_LINKS.map((link) => (
-              <a key={link} href={`#${link.toLowerCase()}`} className="text-sm font-medium transition-colors" style={{ color: "var(--text-secondary)" }}
+            {NAV_LINKS.map((link) => link.external ? (
+              <Link key={link.label} href={link.href} className="text-sm font-medium transition-colors" style={{ color: "var(--text-secondary)" }}
                 onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "var(--text-primary)"; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "var(--text-secondary)"; }}>
-                {link}
+                {link.label}
+              </Link>
+            ) : (
+              <a key={link.label} href={link.href} className="text-sm font-medium transition-colors" style={{ color: "var(--text-secondary)" }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "var(--text-primary)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "var(--text-secondary)"; }}>
+                {link.label}
               </a>
             ))}
           </div>

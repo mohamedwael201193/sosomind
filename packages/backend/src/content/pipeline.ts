@@ -1,26 +1,32 @@
 import { sosovalue } from '../clients/sosovalue';
 import { chatComplete } from '../clients/ai';
 import { createContentPost } from '../db/supabase';
+import { CitationCollector, type Citation } from '../utils/provenance';
 
 export interface MarketBrief {
   title: string;
   body: string;
   hashtags: string[];
   chartSymbol?: string;
+  citations?: Citation[];
 }
 
 export async function generateMarketBrief(): Promise<MarketBrief> {
+  const cc = new CitationCollector();
   const safe = async <T>(p: Promise<T>): Promise<T | null> => p.catch(() => null);
+  const citeSafe = async <T>(source: string, endpoint: string, params: any, fn: () => Promise<T>): Promise<T | null> => {
+    try { return await cc.cite(source, endpoint, params, fn); } catch { return null; }
+  };
 
   const [sectors, hotNews, etfList, macros] = await Promise.all([
-    safe(sosovalue.getSectorSpotlight()),
-    safe(sosovalue.getHotNews({ page_size: 5 })),
-    safe(sosovalue.getETFList('BTC', 'US')),
-    safe(sosovalue.getMacroEvents()),
+    citeSafe('sosovalue', '/sectorSpotlight', null, () => sosovalue.getSectorSpotlight()),
+    citeSafe('sosovalue', '/news/hot', { page_size: 5 }, () => sosovalue.getHotNews({ page_size: 5 })),
+    citeSafe('sosovalue', '/etf/list', { sym: 'BTC', region: 'US' }, () => sosovalue.getETFList('BTC', 'US')),
+    citeSafe('sosovalue', '/macro/events', null, () => sosovalue.getMacroEvents()),
   ]);
 
-  const btcSnap: any = await safe(sosovalue.getMarketSnapshot('BTC'));
-  const ethSnap: any = await safe(sosovalue.getMarketSnapshot('ETH'));
+  const btcSnap: any = await citeSafe('sosovalue', '/market/snapshot', { sym: 'BTC' }, () => sosovalue.getMarketSnapshot('BTC'));
+  const ethSnap: any = await citeSafe('sosovalue', '/market/snapshot', { sym: 'ETH' }, () => sosovalue.getMarketSnapshot('ETH'));
 
   const context = {
     btcPrice: btcSnap?.price ?? btcSnap?.last_price,
@@ -58,7 +64,7 @@ export async function generateMarketBrief(): Promise<MarketBrief> {
 
   const hashtags = ['#Crypto', '#Bitcoin', '#DeFi', '#Markets', '#SosoMind'];
 
-  return { title: `SosoMind Market Brief — ${dateStr}`, body, hashtags, chartSymbol: 'BTC' };
+  return { title: `SosoMind Market Brief — ${dateStr}`, body, hashtags, chartSymbol: 'BTC', citations: cc.toArray() };
 }
 
 export async function publishToChannel(channelId: string, brief: MarketBrief, bot: any): Promise<void> {
@@ -76,7 +82,8 @@ export async function publishToChannel(channelId: string, brief: MarketBrief, bo
     channel: channelId,
     published: true,
     engagement: null,
-  });
+    citations: brief.citations ?? [],
+  } as any);
 }
 
 export async function runDailyBriefing(bot: any): Promise<void> {

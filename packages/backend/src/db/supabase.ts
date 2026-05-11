@@ -97,6 +97,7 @@ export interface ContentPost {
   channel?: string | null;
   published?: boolean;
   engagement?: any | null;
+  citations?: any[] | null;
   created_at?: string;
 }
 

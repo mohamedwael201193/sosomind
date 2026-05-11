@@ -11,7 +11,7 @@ import {
   Grid3X3, BarChart3, Bell, Settings, ChevronLeft,
   ChevronRight, Sun, Moon, Zap, Wallet, LogOut, User,
   Waves, ArrowLeftRight, BookOpen, Trophy, Scale, UserCircle2,
-  CandlestickChart, Activity,
+  CandlestickChart, Activity, Layers, Newspaper, Code2, Map,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,15 +22,23 @@ type NavSection = {
 
 const navSections: NavSection[] = [
   {
-    label: "PAGES",
+    label: "TRADE",
     items: [
       { href: "/", label: "Dashboard", icon: LayoutDashboard, count: 1 },
-      { href: "/signals", label: "Signals", icon: Zap, badge: true, count: 3 },
       { href: "/trade", label: "Trade", icon: CandlestickChart, count: 1 },
+      { href: "/strategies", label: "Strategies", icon: Layers, badge: true, count: 1 },
+      { href: "/signals", label: "Signals", icon: Zap, badge: true, count: 3 },
       { href: "/portfolio", label: "Portfolio", icon: PieChart, count: 1 },
+      { href: "/rebalance", label: "Rebalance", icon: Scale, count: 1 },
+    ],
+  },
+  {
+    label: "INTELLIGENCE",
+    items: [
+      { href: "/newsletter", label: "Newsletter", icon: Newspaper, badge: true, count: 1 },
       { href: "/research", label: "Research", icon: Search, count: 1 },
-      { href: "/sectors", label: "Sectors", icon: Grid3X3, count: 1 },
       { href: "/agents", label: "Macro & AI", icon: BarChart3, count: 1 },
+      { href: "/sectors", label: "Sectors", icon: Grid3X3, count: 1 },
       { href: "/whales", label: "Whales", icon: Waves, count: 1 },
       { href: "/arbitrage", label: "Arbitrage", icon: ArrowLeftRight, count: 1 },
     ],
@@ -40,7 +48,6 @@ const navSections: NavSection[] = [
     items: [
       { href: "/playbook", label: "Playbook", icon: BookOpen, count: 1 },
       { href: "/leaderboard", label: "Leaderboard", icon: Trophy, count: 1 },
-      { href: "/rebalance", label: "Rebalance", icon: Scale, count: 1 },
       { href: "/persona", label: "Persona", icon: UserCircle2, count: 1 },
       { href: "/alerts", label: "Alerts", icon: Bell, badge: true, count: 2 },
     ],
@@ -51,6 +58,13 @@ const navSections: NavSection[] = [
       { href: "/profile", label: "Profile", icon: User, count: 1 },
       { href: "/status", label: "System Status", icon: Activity, count: 1 },
       { href: "/settings", label: "Settings", icon: Settings, count: 1 },
+    ],
+  },
+  {
+    label: "RESOURCES",
+    items: [
+      { href: "/docs", label: "API Docs", icon: Code2, count: 1 },
+      { href: "/roadmap", label: "Roadmap", icon: Map, count: 1 },
     ],
   },
 ];
