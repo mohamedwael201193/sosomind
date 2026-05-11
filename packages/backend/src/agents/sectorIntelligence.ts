@@ -91,48 +91,49 @@ async function computeS1(sectorName: string, allProjects: any[]): Promise<number
   return clamp(matches.length * 10);
 }
 
-/** Signal 2 — Institutional momentum (0–100) */
+/**
+ * Signal 2 — Sector momentum via SSI index market snapshot (0–100).
+ * Uses the sector's own 7-day ROI from SoSoValue, giving DIFFERENT values per sector.
+ * Falls back to a BTC treasury acceleration estimate if the snapshot fails.
+ */
 async function computeS2(
+  ticker: string,
   btcTreasuries: any[] | null,
-  stockList: any[] | null,
 ): Promise<number> {
-  // BTC treasury component: recent purchase count (last 30 days proxy = any entry in list)
-  const btcScore = btcTreasuries ? clamp(Math.min(btcTreasuries.length * 2, 60)) : 30;
-
-  // Crypto stock 7-day price performance component
-  let stockScore = 50;
-  if (stockList && stockList.length > 0) {
-    const perfs: number[] = stockList
-      .map((s: any) => Number(s.price_change_percent_7d ?? s.change_7d ?? 0))
-      .filter((n) => !isNaN(n));
-    if (perfs.length > 0) {
-      const avg = perfs.reduce((a, b) => a + b, 0) / perfs.length;
-      stockScore = clamp(50 + avg * 3); // ±1% moves ±3 points
-    }
+  const snap = await safe(sosovalue.getIndexMarketSnapshot(ticker));
+  if (snap) {
+    // SoSoValue returns roi_7d as decimal (0.0497 = 4.97%) or as percentage (4.97)
+    let roi7d = Number(snap.roi_7d ?? snap.change_7d ?? 0);
+    // Normalise to percentage if it looks like a decimal ratio
+    if (roi7d !== 0 && Math.abs(roi7d) < 1) roi7d = roi7d * 100;
+    // Map: -20% → 20pts, 0% → 50pts, +20% → 80pts  (clamped 0–100)
+    return clamp(50 + roi7d * 1.5);
   }
-
-  return clamp(btcScore * 0.4 + stockScore * 0.6);
+  // Fallback: global BTC treasury count (same for all sectors but better than 50)
+  return btcTreasuries ? clamp(Math.min(btcTreasuries.length * 2, 60)) : 40;
 }
 
-/** Signal 3 — ETF flow health (0–100) */
+/**
+ * Signal 3 — Sector trend via SSI index 30-day klines (0–100).
+ * Uses the sector's own price history, giving DIFFERENT values per sector.
+ * Applies a macro proximity penalty on top.
+ */
 async function computeS3(
-  etfList: any[] | null,
+  ticker: string,
   macroEvents: any[] | null,
 ): Promise<number> {
-  // ETF net flow component
-  let flowScore = 50;
-  if (etfList && etfList.length > 0) {
-    const flows: number[] = etfList
-      .map((e: any) => Number(e.net_flow ?? e.net_inflow ?? e.flow_usd ?? 0))
-      .filter((n) => !isNaN(n));
-    if (flows.length > 0) {
-      const mean = flows.reduce((a, b) => a + b, 0) / flows.length;
-      const variance = flows.reduce((a, b) => a + (b - mean) ** 2, 0) / flows.length;
-      const stdDev = Math.sqrt(variance) || 1;
-      // z-score of most recent flow
-      const lastFlow = flows[flows.length - 1] ?? 0;
-      const zScore = (lastFlow - mean) / stdDev;
-      flowScore = clamp(50 + zScore * 15); // ±1 std ±15 pts
+  const klines = await safe(sosovalue.getIndexKlines(ticker, { limit: 30 }));
+  let trendScore = 50;
+  if (klines && klines.length >= 2) {
+    const prices: number[] = klines
+      .map((k: any) => Number(k.close ?? k.price ?? k.value ?? 0))
+      .filter((n) => n > 0);
+    if (prices.length >= 2) {
+      const first = prices[0];
+      const last = prices[prices.length - 1];
+      const pct30d = ((last - first) / first) * 100;
+      // Map: -20% → 20pts, 0% → 50pts, +20% → 80pts
+      trendScore = clamp(50 + pct30d * 1.5);
     }
   }
 
@@ -148,7 +149,7 @@ async function computeS3(
     penalty = Math.min(20, upcoming.length * 7); // up to -20 pts for macro risk
   }
 
-  return clamp(flowScore - penalty);
+  return clamp(trendScore - penalty);
 }
 
 /** Build a short AI narrative for a sector (2 sentences). Returns empty string on failure. */
@@ -189,11 +190,10 @@ export async function computeSectorScore(ticker: string): Promise<SectorIntelRes
       const sectorName = SSI_SECTOR_MAP[ticker];
       if (!sectorName) throw new Error(`Unknown ticker: ${ticker}`);
 
-      const [fundraisingRaw, btcTreasuries, stockList, etfListRaw, macroEvents] = await Promise.all([
+      // Shared data (fetched once, used across all sectors)
+      const [fundraisingRaw, btcTreasuries, macroEvents] = await Promise.all([
         safe(sosovalue.getFundraisingProjects({ page_size: 100 })),
         safe(sosovalue.getBTCTreasuries()),
-        safe(sosovalue.getCryptoStockList()),
-        safe(sosovalue.getETFList('BTC')),
         safe(sosovalue.getMacroEvents()),
       ]);
 
@@ -202,26 +202,23 @@ export async function computeSectorScore(ticker: string): Promise<SectorIntelRes
         ? fundraisingRaw
         : (fundraisingRaw as any)?.list ?? (fundraisingRaw as any)?.data ?? [];
 
-      // Normalise ETF list
-      const etfList: any[] = Array.isArray(etfListRaw)
-        ? etfListRaw
-        : (etfListRaw as any)?.list ?? (etfListRaw as any)?.data ?? [];
-
+      // All three signals now accept the sector ticker for per-sector data
       const [s1, s2, s3] = await Promise.all([
         computeS1(sectorName, allProjects),
-        computeS2(btcTreasuries, stockList),
-        computeS3(etfList, macroEvents),
+        computeS2(ticker, btcTreasuries),
+        computeS3(ticker, macroEvents),
       ]);
 
       const score = Math.round(s1 * 0.30 + s2 * 0.35 + s3 * 0.35);
       const verdict = verdictFor(score);
 
-      // Extract top assets from ETF constituents if available
+      // Top assets from index constituents (sector-specific)
       let topAssets: string[] = [];
-      if (etfList.length > 0) {
-        topAssets = etfList
+      const constituents = await safe(sosovalue.getIndexConstituents(ticker));
+      if (constituents && constituents.length > 0) {
+        topAssets = constituents
           .slice(0, 3)
-          .map((e: any) => String(e.symbol ?? e.ticker ?? e.asset ?? ''))
+          .map((c: any) => String(c.symbol ?? c.ticker ?? c.name ?? ''))
           .filter(Boolean);
       }
 

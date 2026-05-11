@@ -556,7 +556,15 @@ export default function ResearchPage() {
                 </motion.div>
               )}
 
-              {!edgeQuery.isLoading && edgeData.address && (
+              {!edgeQuery.isLoading && edgeData.address && edgeData.source === 'empty' && (
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                  <GlassCard padding="md">
+                    <p className="text-sm text-[var(--text-muted)] text-center py-2">No filled trades found for this wallet yet.</p>
+                  </GlassCard>
+                </motion.div>
+              )}
+
+              {!edgeQuery.isLoading && edgeData.address && edgeData.source !== 'empty' && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -573,7 +581,7 @@ export default function ResearchPage() {
                       <div className="flex items-center gap-1 text-xs text-[var(--text-muted)] mb-1">
                         <Clock className="w-3 h-3" /> Peak Hour UTC
                       </div>
-                      <div className="text-2xl font-black text-[var(--blue)]">{edgeData.peak_hour_utc ?? "–"}:00</div>
+                      <div className="text-2xl font-black text-[var(--blue)]">{edgeData.peak_hour_utc != null ? `${edgeData.peak_hour_utc}:00` : "–"}</div>
                     </GlassCard>
                     <GlassCard padding="sm" className="col-span-2 sm:col-span-1">
                       <div className="text-xs text-[var(--text-muted)] mb-1">Markets Traded</div>

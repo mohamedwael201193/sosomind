@@ -107,11 +107,12 @@ router.get('/edge/wallet/:address', asyncHandler(async (req, res) => {
     return res.json(wrapMeta({ address, trades: 0, source: 'empty' }, { ttlMs: 60_000, source: 'live' }));
   }
 
-  // Group by market → compute win rate per market
-  const byMarket: Record<string, { buys: number; sells: number }> = {};
+  // Group by market → compute trade count per market
+  const byMarket: Record<string, { count: number; buys: number; sells: number }> = {};
   for (const t of trades) {
     const m = String(t.market ?? 'unknown');
-    if (!byMarket[m]) byMarket[m] = { buys: 0, sells: 0 };
+    if (!byMarket[m]) byMarket[m] = { count: 0, buys: 0, sells: 0 };
+    byMarket[m].count++;
     if (t.side === 'buy') byMarket[m].buys++;
     else byMarket[m].sells++;
   }

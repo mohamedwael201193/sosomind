@@ -272,7 +272,7 @@ export default function SectorsPage() {
           <motion.div key="intelligence" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.22 }}>
             <div style={{ marginBottom: 14 }}>
               <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0 }}>
-                Multi-signal intelligence scoring: Signal 1 (Fundraising) · Signal 2 (Institutional) · Signal 3 (ETF Flows)
+                Multi-signal intelligence scoring: Signal 1 (Fundraising) · Signal 2 (Sector Momentum) · Signal 3 (Sector Trend)
               </p>
             </div>
 
@@ -327,8 +327,8 @@ export default function SectorsPage() {
 
                       {/* Signal bars */}
                       <SignalBar label="Signal 1 (Fundraising)" value={Number(s.s1 ?? 0)} color="rgba(59,130,246,0.8)" />
-                      <SignalBar label="Signal 2 (Institutional)" value={Number(s.s2 ?? 0)} color="rgba(168,85,247,0.8)" />
-                      <SignalBar label="Signal 3 (ETF Flows)" value={Number(s.s3 ?? 0)} color={vc.text} />
+                      <SignalBar label="Signal 2 (Momentum)" value={Number(s.s2 ?? 0)} color="rgba(168,85,247,0.8)" />
+                      <SignalBar label="Signal 3 (Trend)" value={Number(s.s3 ?? 0)} color={vc.text} />
 
                       {/* AI narrative */}
                       {s.aiNarrative && (

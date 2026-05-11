@@ -98,7 +98,7 @@ export default function SignalDetailPage({ params }: { params: Promise<{ id: str
 
   const { data: raw, isLoading, isError } = useQuery({
     queryKey: ["signal-detail", id],
-    queryFn: () => fetcher(`/api/agents/signals/${id}`),
+    queryFn: () => fetcher(`/api/signals/${id}`),
     staleTime: 60_000,
   });
 

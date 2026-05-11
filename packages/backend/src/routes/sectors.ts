@@ -3,6 +3,12 @@ import { getSectorMomentum } from '../agents/sectorRotation';
 import { computeSectorScore, runAllSectorIntel } from '../agents/sectorIntelligence';
 import { asyncHandler } from '../utils/http';
 import { wrapMeta } from '../utils/responseMeta';
+import { redis } from '../clients/redis';
+
+const SSI_TICKERS = [
+  'ssiDeFi','ssiAI','ssiLayer1','ssiLayer2','ssiRWA','ssiNFT','ssiMeme',
+  'ssiGameFi','ssiMAG7','ssiPayFi','ssiCeFi','ssiSocialFi','ssiDePIN',
+];
 
 const router = Router();
 
@@ -14,7 +20,12 @@ router.get('/', asyncHandler(async (_req, res) => {
 // ─── Sector Intelligence endpoints ───────────────────────────────────────────
 
 // GET /api/sectors/intel  →  intelligence scores for all 13 SSI sectors
-router.get('/intel', asyncHandler(async (_req, res) => {
+// Add ?refresh=1 to bust the Redis cache and recompute immediately
+router.get('/intel', asyncHandler(async (req, res) => {
+  if (req.query.refresh === '1') {
+    // Invalidate stale cached scores so the fixed algorithm runs fresh
+    await Promise.allSettled(SSI_TICKERS.map((t) => redis.del(`intel:sector:${t}`)));
+  }
   const results = await runAllSectorIntel();
   const sorted = [...results].sort((a, b) => b.score - a.score);
   res.json(wrapMeta(sorted, {
