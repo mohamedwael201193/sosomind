@@ -453,24 +453,33 @@ export default function LandingPage() {
 
             {/* Big left-aligned headline */}
             <div className="mb-6">
+              <motion.p
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1, duration: 0.5 }}
+                className="text-xs font-bold uppercase tracking-[0.18em] mb-3"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Agentic Finance Intelligence
+              </motion.p>
               <motion.h1
-                initial={{ opacity: 0, y: 32, filter: "blur(10px)" }}
+                initial={{ opacity: 0, y: 24, filter: "blur(8px)" }}
                 animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                transition={{ delay: 0.15, duration: 0.75, ease: [0.16, 1, 0.3, 1] as [number,number,number,number] }}
-                className="font-black leading-[0.92] tracking-[-0.04em]"
+                transition={{ delay: 0.2, duration: 0.7, ease: [0.16, 1, 0.3, 1] as [number,number,number,number] }}
+                className="font-bold leading-[1.08] tracking-[-0.025em]"
                 style={{
-                  fontSize: "clamp(3.2rem, 7vw, 6.5rem)",
+                  fontSize: "clamp(2rem, 4.2vw, 3.8rem)",
                   fontFamily: "var(--font-display)",
                   color: "var(--text-primary)",
                 }}
               >
-                The Agentic<br />
-                <span style={{
-                  background: "linear-gradient(135deg, #f97316 0%, #ea580c 60%, #fb923c 100%)",
+                The AI-powered OS<br />
+                for <span style={{
+                  background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
                   WebkitBackgroundClip: "text",
                   WebkitTextFillColor: "transparent",
                   backgroundClip: "text",
-                }}>Finance OS</span>
+                }}>serious crypto traders</span>
               </motion.h1>
             </div>
 
