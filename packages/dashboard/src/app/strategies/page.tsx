@@ -1,22 +1,28 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { fetchWithMeta, api } from "@/lib/api";
 import { GlassCard } from "@/components/GlassCard";
 import { CacheBadge } from "@/components/CacheBadge";
 import { CryptoIcon } from "@/components/CryptoIcon";
-import { CandlestickChart, ArrowUpRight, ArrowDownRight, Sparkles, Layers, ShieldCheck, TrendingUp, Brain } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, Sparkles, Layers, ShieldCheck, TrendingUp, Brain, Activity } from "lucide-react";
 
 interface SSIProduct {
   ticker: string;
+  name?: string;
   sector: string;
   thesis: string;
   price: number;
   change24h: number;
   tvl: number;
   apy: number;
-  holders: number;
+  holders?: number;
+  roi_7d?: number | null;
+  roi_1m?: number | null;
+  roi_3m?: number | null;
+  roi_1y?: number | null;
+  ytd?: number | null;
 }
 
 interface Constituent {
@@ -52,6 +58,119 @@ function fmtMoney(n: number) {
 function fmtPct(n: number) {
   if (!Number.isFinite(n)) return '—';
   return `${n > 0 ? '+' : ''}${n.toFixed(2)}%`;
+}
+
+function SSICard({ p, active, onClick, index }: { p: SSIProduct; active: boolean; onClick: () => void; index: number }) {
+  const [spot, setSpot] = useState({ x: 0, y: 0, visible: false });
+  const up = p.change24h >= 0;
+  const name = (p.name ?? p.ticker.replace(/^ssi/i, '')) || p.ticker;
+
+  const roiRows = [
+    { label: '7D',  val: p.roi_7d  },
+    { label: '1M',  val: p.roi_1m  },
+    { label: '3M',  val: p.roi_3m  },
+    { label: '1Y',  val: p.roi_1y  },
+  ].filter(r => r.val != null && Number.isFinite(r.val));
+
+  const maxAbs = Math.max(...roiRows.map(r => Math.abs(r.val ?? 0)), 0.01);
+
+  return (
+    <motion.button
+      type="button"
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.04, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+      onClick={onClick}
+      whileHover={{ y: -3 }}
+      whileTap={{ scale: 0.985 }}
+      className="relative text-left rounded-2xl overflow-hidden w-full"
+      style={{
+        border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.07)',
+        background: active ? 'color-mix(in srgb, var(--accent) 6%, var(--bg-card))' : 'var(--bg-card)',
+        boxShadow: active ? '0 0 32px color-mix(in srgb, var(--accent) 22%, transparent), inset 0 1px 0 rgba(255,255,255,0.08)' : 'inset 0 1px 0 rgba(255,255,255,0.04)',
+      }}
+      onMouseMove={e => {
+        const r = e.currentTarget.getBoundingClientRect();
+        setSpot({ x: e.clientX - r.left, y: e.clientY - r.top, visible: true });
+      }}
+      onMouseLeave={() => setSpot(s => ({ ...s, visible: false }))}
+    >
+      {/* Spotlight */}
+      <div className="pointer-events-none absolute inset-0 rounded-2xl transition-opacity duration-300"
+        style={{ opacity: spot.visible ? 1 : 0, background: `radial-gradient(480px circle at ${spot.x}px ${spot.y}px, rgba(249,115,22,0.10), transparent 55%)` }} />
+
+      {/* Active top shimmer */}
+      {active && (
+        <div className="absolute top-0 left-8 right-8 h-[1px]"
+          style={{ background: 'linear-gradient(90deg, transparent, var(--accent), transparent)' }} />
+      )}
+
+      <div className="p-4">
+        {/* Header row */}
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-[11px] flex-shrink-0"
+              style={{ background: 'color-mix(in srgb, var(--accent) 16%, transparent)', color: 'var(--accent)', fontFamily: 'var(--font-mono)', letterSpacing: '-0.01em' }}>
+              {name.length > 5 ? name.slice(0, 5) : name}
+            </div>
+            <div className="min-w-0">
+              <div className="font-bold text-sm leading-tight truncate" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
+                {name}
+              </div>
+              <div className="text-[10px] mt-0.5 leading-none uppercase tracking-[0.1em]" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                {p.sector}
+              </div>
+            </div>
+          </div>
+          {/* 24h badge */}
+          <div className="flex items-center gap-0.5 text-[11px] font-bold px-2 py-1 rounded-lg flex-shrink-0"
+            style={{ background: up ? 'rgba(80,220,160,0.1)' : 'rgba(255,90,90,0.1)', color: up ? 'rgb(80,220,160)' : 'rgb(255,90,90)' }}>
+            {up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+            {fmtPct(p.change24h)}
+          </div>
+        </div>
+
+        {/* NAV price */}
+        <div className="mb-3">
+          <div className="text-2xl font-black leading-none" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)', letterSpacing: '-0.04em' }}>
+            {fmtMoney(p.price)}
+          </div>
+          <div className="text-[10px] mt-1 uppercase tracking-[0.15em]" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+            NAV / unit
+          </div>
+        </div>
+
+        {/* ROI bars */}
+        {roiRows.length > 0 ? (
+          <div className="border-t pt-3 space-y-2" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+            {roiRows.map(({ label, val }) => {
+              const v = val ?? 0;
+              const barPct = Math.min(100, (Math.abs(v) / maxAbs) * 100);
+              const pos = v >= 0;
+              return (
+                <div key={label} className="flex items-center gap-2">
+                  <span className="text-[10px] w-5 flex-shrink-0 font-bold" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                    {label}
+                  </span>
+                  <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                    <div style={{ width: `${barPct}%`, height: '100%', borderRadius: 999, background: pos ? 'rgb(80,220,160)' : 'rgb(255,90,90)', transition: 'width 0.9s cubic-bezier(0.16,1,0.3,1)' }} />
+                  </div>
+                  <span className="text-[10px] w-14 text-right flex-shrink-0 font-bold" style={{ color: pos ? 'rgb(80,220,160)' : 'rgb(255,90,90)', fontFamily: 'var(--font-mono)' }}>
+                    {fmtPct(v)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="border-t pt-3 flex items-center gap-1.5" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+            <Activity className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
+            <span className="text-[10px]" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>Fetching ROI data…</span>
+          </div>
+        )}
+      </div>
+    </motion.button>
+  );
 }
 
 export default function StrategiesPage() {
@@ -154,59 +273,15 @@ export default function StrategiesPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {productList.map((p, i) => {
-              const active = activeTicker === p.ticker;
-              const up = p.change24h >= 0;
-              return (
-                <motion.button
-                  key={p.ticker}
-                  type="button"
-                  initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04, duration: 0.4 }}
-                  onClick={() => setSelected(p.ticker)}
-                  whileHover={{ y: -2 }} whileTap={{ scale: 0.985 }}
-                  className="text-left rounded-2xl border overflow-hidden transition-colors"
-                  style={{
-                    borderColor: active ? 'var(--accent)' : 'var(--glass-border)',
-                    background: active ? 'color-mix(in srgb, var(--accent) 8%, var(--bg-card))' : 'var(--bg-card)',
-                    boxShadow: active ? '0 0 24px color-mix(in srgb, var(--accent) 20%, transparent)' : 'none',
-                  }}
-                >
-                  <div className="p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs"
-                             style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
-                          {p.ticker.replace(/^ssi/, '')}
-                        </div>
-                        <div>
-                          <div className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{p.ticker}</div>
-                          <div className="text-[10px] uppercase tracking-[0.15em]" style={{ color: 'var(--text-muted)' }}>{p.sector}</div>
-                        </div>
-                      </div>
-                      <div className={`flex items-center gap-1 text-xs font-bold ${up ? '' : ''}`} style={{ color: up ? 'rgb(80,220,160)' : 'rgb(255,90,90)' }}>
-                        {up ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
-                        {fmtPct(p.change24h)}
-                      </div>
-                    </div>
-                    <p className="text-xs leading-relaxed mb-3" style={{ color: 'var(--text-secondary)' }}>{p.thesis}</p>
-                    <div className="grid grid-cols-3 gap-2 text-[10px]" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                      <div>
-                        <div>NAV</div>
-                        <div className="text-sm" style={{ color: 'var(--text-primary)' }}>{fmtMoney(p.price)}</div>
-                      </div>
-                      <div>
-                        <div>TVL</div>
-                        <div className="text-sm" style={{ color: 'var(--text-primary)' }}>{fmtMoney(p.tvl)}</div>
-                      </div>
-                      <div>
-                        <div>APY</div>
-                        <div className="text-sm" style={{ color: 'var(--text-primary)' }}>{p.apy ? `${p.apy.toFixed(2)}%` : '—'}</div>
-                      </div>
-                    </div>
-                  </div>
-                </motion.button>
-              );
-            })}
+            {productList.map((p, i) => (
+              <SSICard
+                key={p.ticker}
+                p={p}
+                active={activeTicker === p.ticker}
+                onClick={() => setSelected(p.ticker)}
+                index={i}
+              />
+            ))}
           </div>
         </div>
 
