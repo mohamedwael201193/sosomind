@@ -276,6 +276,7 @@ export default function LandingPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [navScrolled, setNavScrolled] = useState(false);
   const [execStep, setExecStep] = useState(-1);
+  const [heroTab, setHeroTab] = useState(0);
   const execRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -379,159 +380,409 @@ export default function LandingPage() {
       </motion.nav>
 
       {/* ── 2. HERO ───────────────────────────────────────────────────────── */}
-      <section className="relative min-h-screen flex flex-col items-center justify-center text-center px-6 pt-24 pb-16 overflow-hidden">
-        <div className="absolute inset-0 z-0">
+      <section className="relative min-h-screen flex items-center overflow-hidden px-6 pt-24 pb-0">
+
+        {/* ── 3D Perspective Grid Background ────────────────────────────── */}
+        <div className="absolute inset-0 z-0 pointer-events-none" aria-hidden>
+          {/* Base gradient */}
           <div className="absolute inset-0" style={{
             background: theme === "dark"
-              ? "radial-gradient(ellipse at 60% 0%, rgba(249,115,22,0.25) 0%, transparent 55%), radial-gradient(ellipse at 20% 100%, rgba(249,115,22,0.12) 0%, transparent 50%), #080910"
-              : "radial-gradient(ellipse at 60% 0%, rgba(249,115,22,0.1) 0%, transparent 55%), radial-gradient(ellipse at 20% 100%, rgba(249,115,22,0.05) 0%, transparent 50%), #ffffff",
+              ? "radial-gradient(ellipse at 30% 0%, rgba(249,115,22,0.22) 0%, transparent 50%), radial-gradient(ellipse at 80% 80%, rgba(249,115,22,0.08) 0%, transparent 50%), #080910"
+              : "radial-gradient(ellipse at 30% 0%, rgba(249,115,22,0.1) 0%, transparent 50%), #f8f8f5",
           }} />
-          <div className="absolute inset-0 opacity-30" style={{
-            backgroundImage: `radial-gradient(circle, ${theme === "dark" ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.07)"} 1px, transparent 1px)`,
-            backgroundSize: "28px 28px",
-            animation: "gridFloat 20s linear infinite",
-          }} />
+          {/* 3D Perspective grid — SVG-based like SoDEX */}
+          <svg
+            className="absolute bottom-0 left-0 w-full"
+            style={{ height: "65%", opacity: theme === "dark" ? 0.18 : 0.07 }}
+            viewBox="0 0 1440 500" preserveAspectRatio="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <defs>
+              <linearGradient id="gridFadeY" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#f97316" stopOpacity="0" />
+                <stop offset="70%" stopColor="#f97316" stopOpacity="1" />
+                <stop offset="100%" stopColor="#f97316" stopOpacity="1" />
+              </linearGradient>
+              <linearGradient id="gridFadeX" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="#f97316" stopOpacity="0" />
+                <stop offset="20%" stopColor="#f97316" stopOpacity="1" />
+                <stop offset="80%" stopColor="#f97316" stopOpacity="1" />
+                <stop offset="100%" stopColor="#f97316" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            {/* Horizontal converging lines */}
+            {[0.04,0.12,0.22,0.34,0.48,0.62,0.76,0.88,0.95,1].map((t, i) => (
+              <line key={`h${i}`}
+                x1={720 * (1 - t)} y1={t * 500}
+                x2={720 + 720 * t} y2={t * 500}
+                stroke="url(#gridFadeX)" strokeWidth="0.8" />
+            ))}
+            {/* Vertical converging lines radiating from horizon vanishing point */}
+            {[-6,-4,-2.5,-1.5,-0.7,0,0.7,1.5,2.5,4,6].map((slope, i) => (
+              <line key={`v${i}`}
+                x1={720} y1={0}
+                x2={720 + slope * 500} y2={500}
+                stroke="url(#gridFadeY)" strokeWidth="0.8" />
+            ))}
+          </svg>
+          {/* Animated glow orb */}
+          <motion.div
+            animate={{ opacity: [0.3, 0.55, 0.3], scale: [1, 1.12, 1] }}
+            transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute rounded-full blur-3xl pointer-events-none"
+            style={{ width: 500, height: 320, top: "10%", left: "5%", background: "radial-gradient(ellipse, rgba(249,115,22,0.2) 0%, transparent 70%)" }}
+          />
         </div>
-        <div className="relative z-10 max-w-5xl mx-auto">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+
+        {/* ── Content: Left headline + Right panel ──────────────────────── */}
+        <div className="relative z-10 w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-8 items-center min-h-[calc(100vh-96px)] py-12">
+
+          {/* ── LEFT: Headline + CTAs ──────────────────────────────────── */}
+          <div className="flex flex-col justify-center">
+
+            {/* Live badge */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5 }}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border self-start mb-8 text-xs font-semibold uppercase tracking-widest"
+              style={{ borderColor: "rgba(249,115,22,0.35)", background: "rgba(249,115,22,0.08)", color: "#f97316" }}
+            >
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse inline-block" style={{ background: "#22c55e" }} />
+              Live · AI-Powered Finance
+            </motion.div>
+
+            {/* Big left-aligned headline */}
+            <div className="mb-6">
+              <motion.h1
+                initial={{ opacity: 0, y: 32, filter: "blur(10px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                transition={{ delay: 0.15, duration: 0.75, ease: [0.16, 1, 0.3, 1] as [number,number,number,number] }}
+                className="font-black leading-[0.92] tracking-[-0.04em]"
+                style={{
+                  fontSize: "clamp(3.2rem, 7vw, 6.5rem)",
+                  fontFamily: "var(--font-display)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                The Agentic<br />
+                <span style={{
+                  background: "linear-gradient(135deg, #f97316 0%, #ea580c 60%, #fb923c 100%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                }}>Finance OS</span>
+              </motion.h1>
+            </div>
+
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.45, duration: 0.6, ease: [0.16, 1, 0.3, 1] as [number,number,number,number] }}
+              className="text-[clamp(1rem,2vw,1.2rem)] mb-10 leading-relaxed max-w-lg"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Multi-agent AI research, real-time signals, and DEX execution — built for serious crypto traders.
+            </motion.p>
+
+            {/* CTA buttons */}
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.65, duration: 0.5 }}
+              className="flex flex-col sm:flex-row gap-3 mb-10"
+            >
+              {address ? (
+                <Link href="/">
+                  <MagneticButton
+                    className="flex items-center gap-2 px-7 py-3.5 rounded-[14px] font-bold text-white text-sm"
+                    style={{ background: "linear-gradient(135deg,#f97316 0%,#ea580c 100%)" }}
+                  >
+                    Open Dashboard <ArrowRight className="w-4 h-4" />
+                  </MagneticButton>
+                </Link>
+              ) : (
+                <MagneticButton
+                  onClick={connect}
+                  disabled={isConnecting}
+                  className="flex items-center gap-2 px-7 py-3.5 rounded-[14px] font-bold text-white text-sm disabled:opacity-60"
+                  style={{ background: "linear-gradient(135deg,#f97316 0%,#ea580c 100%)" }}
+                >
+                  <Wallet className="w-4 h-4" />
+                  {isConnecting ? "Connecting…" : "Connect Wallet"}
+                </MagneticButton>
+              )}
+              <Link href="/research">
+                <motion.button
+                  whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                  className="flex items-center gap-2 px-7 py-3.5 rounded-[14px] font-medium text-sm border transition-colors"
+                  style={{ borderColor: "var(--glass-border)", color: "var(--text-primary)", background: "transparent" }}
+                >
+                  Explore Research <ArrowRight className="w-4 h-4" />
+                </motion.button>
+              </Link>
+              <a href="https://t.me/sosomind_bot" target="_blank" rel="noopener noreferrer">
+                <motion.button
+                  whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                  className="flex items-center gap-2 px-7 py-3.5 rounded-[14px] font-medium text-sm border transition-colors"
+                  style={{ borderColor: "rgba(0,136,204,0.35)", color: "#0088cc", background: "rgba(0,136,204,0.07)" }}
+                >
+                  <Send className="w-4 h-4" /> Telegram
+                </motion.button>
+              </a>
+            </motion.div>
+
+            {/* Stats row */}
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              transition={{ delay: 0.9, duration: 0.5 }}
+              className="flex flex-wrap gap-x-6 gap-y-2"
+            >
+              {[["2,400+","Assets"],["18K+","Signals"],["67%","Win Rate"],["15","AI Agents"]].map(([v, l]) => (
+                <div key={l} className="flex items-baseline gap-1.5">
+                  <span className="font-black text-base" style={{ color: "#f97316" }}>{v}</span>
+                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>{l}</span>
+                </div>
+              ))}
+            </motion.div>
+          </div>
+
+          {/* ── RIGHT: Live Data Panel ─────────────────────────────────── */}
+          <motion.div
+            initial={{ opacity: 0, x: 40, scale: 0.96 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            transition={{ delay: 0.35, duration: 0.85, ease: [0.16, 1, 0.3, 1] as [number,number,number,number] }}
+            className="relative"
+          >
+            {/* Glow behind panel */}
+            <div className="absolute -inset-4 rounded-[24px] blur-3xl pointer-events-none"
+              style={{ background: "radial-gradient(ellipse, rgba(249,115,22,0.18) 0%, transparent 70%)" }} />
+
             <div
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full border mb-10 text-sm font-medium"
+              className="relative rounded-[18px] border overflow-hidden"
               style={{
-                borderColor: "var(--glass-border)", background: "var(--bg-card)",
-                backdropFilter: "blur(16px)", color: "var(--text-secondary)",
+                borderColor: "rgba(249,115,22,0.2)",
+                background: theme === "dark" ? "rgba(8,9,16,0.88)" : "rgba(255,255,255,0.88)",
+                backdropFilter: "blur(28px)",
+                boxShadow: "0 32px 80px rgba(0,0,0,0.45), inset 0 1px 0 rgba(249,115,22,0.12)",
               }}
             >
-              <span className="w-2 h-2 rounded-full animate-pulse inline-block" style={{ background: "#22c55e" }} />
-              <span style={{
-                background: "linear-gradient(90deg, var(--text-secondary) 0%, #f97316 40%, var(--text-secondary) 80%)",
-                backgroundSize: "200% auto",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-                animation: "shimmer 3s linear infinite",
-              }}>Live · AI-Powered Finance Intelligence</span>
-            </div>
-          </motion.div>
-
-          <SplitHeadline
-            text={HERO_TAGLINE}
-            className="text-[clamp(3.5rem,9vw,8rem)] font-black leading-[0.95] tracking-[-0.04em] mb-6"
-          />
-
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8, duration: 0.6, ease: [0.16, 1, 0.3, 1] as [number,number,number,number] }}
-            className="text-[clamp(1.1rem,2.5vw,1.35rem)] max-w-2xl mx-auto mb-12 leading-relaxed"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            {HERO_SUB}
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1, duration: 0.5 }}
-            className="flex flex-col sm:flex-row gap-4 justify-center items-center"
-          >
-            {address ? (
-              <Link href="/">
-                <MagneticButton
-                  className="flex items-center gap-2 px-8 py-4 rounded-[20px] font-bold text-white text-base"
-                  style={{ background: "linear-gradient(135deg,#f97316 0%,#ea580c 50%,#c2410c 100%)" }}
-                >
-                  Open Dashboard <ArrowRight className="w-5 h-5" />
-                </MagneticButton>
-              </Link>
-            ) : (
-              <MagneticButton
-                onClick={connect}
-                disabled={isConnecting}
-                className="flex items-center gap-2 px-8 py-4 rounded-[20px] font-bold text-white text-base disabled:opacity-60"
-                style={{ background: "linear-gradient(135deg,#f97316 0%,#ea580c 50%,#c2410c 100%)" }}
-              >
-                <Wallet className="w-5 h-5" />
-                {isConnecting ? "Connecting…" : "Connect Wallet"}
-              </MagneticButton>
-            )}
-            <Link href="/research">
-              <motion.button
-                whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                className="flex items-center gap-2 px-8 py-4 rounded-[20px] font-medium text-base border transition-colors"
-                style={{ borderColor: "var(--glass-border)", color: "var(--text-primary)", background: "transparent" }}
-              >
-                Explore Research <ArrowRight className="w-4 h-4" />
-              </motion.button>
-            </Link>
-            <a href="https://t.me/sosomind_bot" target="_blank" rel="noopener noreferrer">
-              <motion.button
-                whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                className="flex items-center gap-2 px-8 py-4 rounded-[20px] font-medium text-base border transition-colors"
-                style={{ borderColor: "rgba(0,136,204,0.35)", color: "#0088cc", background: "rgba(0,136,204,0.07)" }}
-              >
-                <Send className="w-4 h-4" /> Open Telegram Bot
-              </motion.button>
-            </a>
-          </motion.div>
-
-          {/* ── Social proof ─────────────────────────────────────────────── */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.35, duration: 0.55 }}
-            className="flex items-center justify-center gap-6 mt-6 mb-4 flex-wrap"
-          >
-            {[
-              ["2,400+", "Assets"],
-              ["18K+",   "Signals"],
-              ["67%",    "Win Rate"],
-              ["15",     "AI Agents"],
-            ].map(([v, l]) => (
-              <div key={l} className="flex items-center gap-1.5">
-                <span className="font-black text-sm" style={{ color: "#f97316" }}>{v}</span>
-                <span className="text-xs" style={{ color: "var(--text-muted)" }}>{l}</span>
+              {/* Panel header */}
+              <div className="flex items-center gap-2 px-4 py-3 border-b" style={{ borderColor: "var(--glass-border)" }}>
+                <div className="flex gap-1.5">
+                  {["#ef4444","#eab308","#22c55e"].map((c) => (
+                    <div key={c} className="w-2.5 h-2.5 rounded-full" style={{ background: c }} />
+                  ))}
+                </div>
+                <span className="text-xs font-semibold ml-2" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+                  SoSoMind · Intelligence Hub
+                </span>
+                <span className="ml-auto flex items-center gap-1 text-[10px] font-bold" style={{ color: "#22c55e", fontFamily: "var(--font-mono)" }}>
+                  <span className="w-1.5 h-1.5 rounded-full animate-pulse inline-block" style={{ background: "#22c55e" }} />
+                  LIVE
+                </span>
               </div>
-            ))}
+
+              {/* Tabs */}
+              <div className="flex border-b" style={{ borderColor: "var(--glass-border)" }}>
+                {["Signals","Agents","ETF Flow"].map((tab, i) => (
+                  <button
+                    key={tab} onClick={() => setHeroTab(i)}
+                    className="relative flex-1 py-2.5 text-xs font-semibold transition-colors"
+                    style={{ color: heroTab === i ? "#f97316" : "var(--text-muted)", background: "transparent", border: "none" }}
+                  >
+                    {tab}
+                    {heroTab === i && (
+                      <motion.div
+                        layoutId="heroTabLine"
+                        className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full"
+                        style={{ background: "#f97316" }}
+                        transition={{ type: "spring", stiffness: 400, damping: 35 }}
+                      />
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {/* Tab content */}
+              <div className="p-4" style={{ minHeight: 320 }}>
+                <AnimatePresence mode="wait">
+
+                  {/* Tab 0: Signals */}
+                  {heroTab === 0 && (
+                    <motion.div key="signals"
+                      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.25 }}
+                      className="flex flex-col gap-2"
+                    >
+                      {SIGNALS.map((sig, i) => {
+                        const color = sig.direction === "LONG" ? "#22c55e" : sig.direction === "SHORT" ? "#ef4444" : "#f97316";
+                        const chartData = sig.data.map((v, j) => ({ v, j }));
+                        return (
+                          <motion.div key={sig.pair}
+                            initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: i * 0.07, duration: 0.35 }}
+                            className="flex items-center gap-3 px-3 py-2.5 rounded-[10px]"
+                            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}
+                          >
+                            <div className="flex flex-col min-w-[72px]">
+                              <span className="font-bold text-xs" style={{ color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>{sig.pair}</span>
+                              <span className="text-[10px] font-bold uppercase" style={{ color }}>{sig.direction}</span>
+                            </div>
+                            {/* Sparkline */}
+                            <div style={{ width: 80, height: 30, flexShrink: 0 }}>
+                              <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={chartData}>
+                                  <defs>
+                                    <linearGradient id={`sg${i}`} x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="0%" stopColor={color} stopOpacity={0.3} />
+                                      <stop offset="100%" stopColor={color} stopOpacity={0} />
+                                    </linearGradient>
+                                  </defs>
+                                  <Area dataKey="v" stroke={color} fill={`url(#sg${i})`} strokeWidth={1.5} dot={false} isAnimationActive />
+                                </AreaChart>
+                              </ResponsiveContainer>
+                            </div>
+                            {/* Confidence */}
+                            <div className="flex flex-col items-end ml-auto">
+                              <span className="text-xs font-black" style={{ color, fontFamily: "var(--font-mono)" }}>{sig.confidence}%</span>
+                              <span className="text-[9px]" style={{ color: "var(--text-muted)" }}>confidence</span>
+                            </div>
+                            {/* Confidence bar */}
+                            <div className="hidden sm:block w-16">
+                              <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
+                                <motion.div
+                                  initial={{ width: 0 }} animate={{ width: `${sig.confidence}%` }}
+                                  transition={{ delay: 0.3 + i * 0.07, duration: 0.7 }}
+                                  className="h-full rounded-full"
+                                  style={{ background: color }}
+                                />
+                              </div>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                      {/* Mini summary */}
+                      <div className="mt-2 flex items-center gap-2 px-2">
+                        <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#22c55e" }} />
+                        <span className="text-[10px]" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>Updated 12s ago · Confluence Engine v2</span>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* Tab 1: Agents */}
+                  {heroTab === 1 && (
+                    <motion.div key="agents"
+                      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.25 }}
+                      className="flex flex-col gap-2"
+                    >
+                      {AGENTS.map((ag, i) => {
+                        const Icon = ag.icon;
+                        return (
+                          <motion.div key={ag.name}
+                            initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: i * 0.07, duration: 0.35 }}
+                            className="flex items-center gap-3 px-3 py-2.5 rounded-[10px]"
+                            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}
+                          >
+                            <div className="w-8 h-8 rounded-[8px] flex items-center justify-center flex-shrink-0"
+                              style={{ background: "rgba(249,115,22,0.12)", border: "1px solid rgba(249,115,22,0.2)" }}>
+                              <Icon className="w-4 h-4" style={{ color: "#f97316" }} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>{ag.name}</div>
+                              <div className="text-[10px] truncate" style={{ color: "var(--text-muted)" }}>{ag.desc.substring(0, 55)}…</div>
+                            </div>
+                            <div className="flex flex-col items-end">
+                              <span className="text-xs font-black" style={{ color: "#22c55e", fontFamily: "var(--font-mono)" }}>{ag.confidence}%</span>
+                              <div className="w-12 h-1 rounded-full overflow-hidden mt-1" style={{ background: "rgba(255,255,255,0.07)" }}>
+                                <motion.div
+                                  initial={{ width: 0 }} animate={{ width: `${ag.confidence}%` }}
+                                  transition={{ delay: 0.3 + i * 0.06, duration: 0.65 }}
+                                  className="h-full rounded-full" style={{ background: "#22c55e" }}
+                                />
+                              </div>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </motion.div>
+                  )}
+
+                  {/* Tab 2: ETF Flow */}
+                  {heroTab === 2 && (
+                    <motion.div key="etf"
+                      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.25 }}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>BTC ETF Net Flows (7d)</span>
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(34,197,94,0.12)", color: "#22c55e" }}>+$2.4B</span>
+                      </div>
+                      <div style={{ height: 180 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={ETF_DATA}>
+                            <defs>
+                              <linearGradient id="etfIn" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#f97316" stopOpacity={0.4} />
+                                <stop offset="100%" stopColor="#f97316" stopOpacity={0} />
+                              </linearGradient>
+                              <linearGradient id="etfOut" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#ef4444" stopOpacity={0.3} />
+                                <stop offset="100%" stopColor="#ef4444" stopOpacity={0} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                            <XAxis dataKey="date" tick={{ fontSize: 9, fill: "var(--text-muted)" }} axisLine={false} tickLine={false} />
+                            <Tooltip
+                              contentStyle={{ background: "var(--bg-card)", border: "1px solid var(--glass-border)", borderRadius: 8, fontSize: 11 }}
+                              labelStyle={{ color: "var(--text-muted)" }}
+                            />
+                            <Area type="monotone" dataKey="inflow" stroke="#f97316" fill="url(#etfIn)" strokeWidth={2} dot={false} isAnimationActive name="Inflow $M" />
+                            <Area type="monotone" dataKey="outflow" stroke="#ef4444" fill="url(#etfOut)" strokeWidth={1.5} dot={false} isAnimationActive name="Outflow $M" />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="flex gap-4 mt-2 px-1">
+                        {[["#f97316","Inflow"],["#ef4444","Outflow"]].map(([c,l]) => (
+                          <div key={l} className="flex items-center gap-1.5">
+                            <div className="w-2.5 h-0.5 rounded-full" style={{ background: c as string }} />
+                            <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>{l}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+
+                </AnimatePresence>
+              </div>
+
+              {/* Panel footer */}
+              <div className="px-4 py-2.5 border-t flex items-center gap-2" style={{ borderColor: "var(--glass-border)" }}>
+                <span className="text-[10px]" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>Powered by 13 live data sources · MCP protocol</span>
+                <div className="ml-auto flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#f97316" }} />
+                  <span className="text-[10px] font-semibold" style={{ color: "#f97316", fontFamily: "var(--font-mono)" }}>STREAMING</span>
+                </div>
+              </div>
+            </div>
           </motion.div>
 
-          {/* Mini dashboard mockup */}
-          <motion.div
-            initial={{ opacity: 0, y: 40, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ delay: 1.2, duration: 0.8, ease: [0.16, 1, 0.3, 1] as [number,number,number,number] }}
-            className="mt-16 max-w-2xl mx-auto relative"
-          >
-            {/* Glow behind mockup */}
-            <div className="absolute inset-0 rounded-[16px] blur-2xl opacity-30 pointer-events-none"
-              style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(249,115,22,0.5) 0%, transparent 70%)" }} />
-            <div className="rounded-[12px] border overflow-hidden relative"
-              style={{ borderColor: "rgba(249,115,22,0.25)", background: "var(--bg-card)", backdropFilter: "blur(20px)" }}
-            >
-            <div className="flex items-center gap-2 px-4 py-3 border-b" style={{ borderColor: "var(--glass-border)" }}>
-              <div className="flex gap-1.5">
-                {["#ef4444","#eab308","#22c55e"].map((c) => <div key={c} className="w-3 h-3 rounded-full" style={{ background: c }} />)}
-              </div>
-              <span className="text-xs ml-2" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>SoSoMind · Signal Engine</span>
-              <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold" style={{ color: "#22c55e", fontFamily: "var(--font-mono)" }}>
-                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#22c55e" }} />LIVE
-              </span>
-            </div>
-            <div className="p-4 h-36">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={ETF_DATA}>
-                  <defs>
-                    <linearGradient id="heroGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#f97316" stopOpacity={0.35} />
-                      <stop offset="100%" stopColor="#f97316" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <Area type="monotone" dataKey="inflow" stroke="#f97316" fill="url(#heroGrad)" strokeWidth={2} dot={false} isAnimationActive />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-            </div>
-          </motion.div>
         </div>
+
+        {/* Scroll hint */}
+        <motion.div
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2, duration: 0.5 }}
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1"
+        >
+          <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>Scroll</span>
+          <motion.div
+            animate={{ y: [0, 6, 0] }} transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <ChevronDown className="w-4 h-4" style={{ color: "var(--text-muted)" }} />
+          </motion.div>
+        </motion.div>
+
       </section>
 
       {/* ── 3. PARTNERS MARQUEE + STATS ───────────────────────────────────── */}
