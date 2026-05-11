@@ -3,7 +3,6 @@ import { usePathname } from 'next/navigation';
 import { Sidebar } from './Sidebar';
 import { MobileNav } from './MobileNav';
 import { StatusBar } from './StatusBar';
-import { AnimatedBackground } from './AnimatedBackground';
 import { PageTransition } from './PageTransition';
 
 const STANDALONE_ROUTES = ['/landing', '/trade/sign'];
@@ -18,7 +17,6 @@ export function ConditionalLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <AnimatedBackground />
       <Sidebar />
       <MobileNav />
       <main className="md:ml-[240px] min-h-screen p-6 pb-20 md:pb-6 relative z-10">

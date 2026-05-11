@@ -79,7 +79,7 @@ export function Sidebar() {
       >
         <Link href="/landing" className="flex items-center min-w-0 flex-1 gap-0">
           {/* SVG mark — always visible, scales with collapsed state */}
-          <LogoMark size={collapsed ? 38 : 42} />
+          <LogoMark size={collapsed ? 30 : 34} />
           <AnimatePresence>
             {!collapsed && (
               <motion.div
@@ -93,7 +93,7 @@ export function Sidebar() {
                   className="font-black whitespace-nowrap leading-none"
                   style={{
                     fontFamily: 'var(--font-display)',
-                    fontSize: 18,
+                    fontSize: 15,
                     letterSpacing: '-0.04em',
                     color: theme === 'dark' ? '#f1f1f5' : '#111111',
                   }}

@@ -133,18 +133,26 @@ const FAQ_ITEMS = [
 function SplitHeadline({ text, className }: { text: string; className?: string }) {
   const container = {
     hidden: {},
-    visible: { transition: { staggerChildren: 0.04, delayChildren: 0.1 } },
+    visible: { transition: { staggerChildren: 0.05, delayChildren: 0.1 } },
   };
   const char = {
     hidden:  { opacity: 0, y: 28, filter: "blur(8px)" },
     visible: { opacity: 1, y: 0,  filter: "blur(0px)", transition: { duration: 0.65, ease: [0.16, 1, 0.3, 1] as [number,number,number,number] } },
   };
+  const words = text.split(" ");
   return (
     <motion.h1 className={className} variants={container} initial="hidden" animate="visible">
-      {text.split("").map((c, i) => (
-        <motion.span key={i} variants={char} style={{ display: "inline-block" }}>
-          {c === " " ? "\u00A0" : c}
-        </motion.span>
+      {words.map((word, wi) => (
+        <span key={wi} style={{ display: "inline-block", whiteSpace: "nowrap" }}>
+          {word.split("").map((c, ci) => (
+            <motion.span key={ci} variants={char} style={{ display: "inline-block" }}>
+              {c}
+            </motion.span>
+          ))}
+          {wi < words.length - 1 && (
+            <motion.span variants={char} style={{ display: "inline-block" }}>&nbsp;</motion.span>
+          )}
+        </span>
       ))}
     </motion.h1>
   );
@@ -224,21 +232,11 @@ export default function LandingPage() {
   const [navScrolled, setNavScrolled] = useState(false);
   const [execStep, setExecStep] = useState(-1);
   const execRef = useRef<HTMLDivElement | null>(null);
-  const cursorX = useMotionValue(-100);
-  const cursorY = useMotionValue(-100);
-  const springX = useSpring(cursorX, { stiffness: 350, damping: 28 });
-  const springY = useSpring(cursorY, { stiffness: 350, damping: 28 });
 
   useEffect(() => {
     const saved = localStorage.getItem("soso-theme") as Theme | null;
     if (saved) setTheme(saved);
   }, []);
-
-  useEffect(() => {
-    const move = (e: MouseEvent) => { cursorX.set(e.clientX); cursorY.set(e.clientY); };
-    window.addEventListener("mousemove", move);
-    return () => window.removeEventListener("mousemove", move);
-  }, [cursorX, cursorY]);
 
   const toggleTheme = () => {
     setTheme((t) => {
@@ -275,22 +273,13 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div data-theme={theme} className="min-h-screen overflow-x-hidden" style={{ background: "var(--bg-base)", color: "var(--text-primary)", cursor: "none" }}>
+    <div data-theme={theme} className="min-h-screen overflow-x-hidden" style={{ background: "var(--bg-base)", color: "var(--text-primary)" }}>
 
       {/* Noise overlay */}
       <div className="pointer-events-none fixed inset-0 z-[1] opacity-[0.04]" style={{
         backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
         backgroundSize: "200px 200px",
       }} />
-
-      {/* Custom cursor */}
-      <motion.div
-        style={{ x: springX, y: springY, translateX: "-50%", translateY: "-50%", mixBlendMode: "difference" as const }}
-        className="fixed top-0 left-0 w-5 h-5 rounded-full pointer-events-none z-[9999]"
-        css-bg={theme === "dark" ? "#ffffff" : "#111111"}
-      >
-        <div className="w-full h-full rounded-full" style={{ background: theme === "dark" ? "#ffffff" : "#111111" }} />
-      </motion.div>
 
       {/* ── 1. NAVBAR ─────────────────────────────────────────────────────── */}
       <motion.nav
@@ -306,8 +295,8 @@ export default function LandingPage() {
         }}
       >
         <div className="flex items-center gap-8">
-          <Link href="/landing" className="flex items-center gap-3">
-            <LogoMark size={46} />
+          <Link href="/landing" className="flex items-center gap-2.5">
+            <LogoMark size={32} />
             <span
               className="font-black text-xl tracking-tight hidden sm:block"
               style={{
@@ -1170,8 +1159,8 @@ export default function LandingPage() {
       <footer className="border-t py-16 px-6" style={{ borderColor: "var(--glass-border)" }}>
         <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-10">
           <div>
-            <div className="flex items-center gap-3 mb-4">
-              <LogoMark size={46} />
+            <div className="flex items-center gap-2.5 mb-4">
+              <LogoMark size={30} />
               <span
                 className="font-black text-xl tracking-tight"
                 style={{
