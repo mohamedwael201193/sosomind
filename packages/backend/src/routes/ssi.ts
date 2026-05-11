@@ -136,21 +136,27 @@ async function discoverTickers(): Promise<string[]> {
 router.get('/products', asyncHandler(async (_req, res) => {
   const cacheTtl = 60;
   const startedAt = Date.now();
-  const products = await cached('ssi:products', cacheTtl, async () => {
-    // Step 1: discover real tickers from the API
-    const tickers = await discoverTickers();
-    // Step 2: fetch all snapshots in parallel; failures resolve to null
-    const settled = await Promise.allSettled(
-      tickers.map((t) => sosovalue.getIndexMarketSnapshot(t)),
-    );
-    return tickers.map((t, i) => {
-      const r = settled[i];
-      const snap = r.status === 'fulfilled' ? r.value : null;
-      const staticMeta = SSI_STATIC[t];
-      return normalizeSnapshot(t, snap ?? {}, staticMeta);
+  try {
+    const products = await cached('ssi:products', cacheTtl, async () => {
+      // Step 1: discover real tickers from the API
+      const tickers = await discoverTickers();
+      // Step 2: fetch all snapshots in parallel; failures resolve to null
+      const settled = await Promise.allSettled(
+        tickers.map((t) => sosovalue.getIndexMarketSnapshot(t)),
+      );
+      return tickers.map((t, i) => {
+        const r = settled[i];
+        const snap = r.status === 'fulfilled' ? r.value : null;
+        const staticMeta = SSI_STATIC[t];
+        return normalizeSnapshot(t, snap ?? {}, staticMeta);
+      });
     });
-  });
-  res.json(wrapMeta(products, { ttlMs: cacheTtl * 1000, source: 'live', cachedAt: startedAt }));
+    res.json(wrapMeta(products, { ttlMs: cacheTtl * 1000, source: 'live', cachedAt: startedAt }));
+  } catch {
+    // Always return static fallback — never let this endpoint return 500
+    const fallback = FALLBACK_TICKERS.map((t) => normalizeSnapshot(t, {}, SSI_STATIC[t]));
+    res.json(wrapMeta(fallback, { ttlMs: 0, source: 'fallback', cachedAt: startedAt }));
+  }
 }));
 
 // Protocol-level aggregate stats (TVL, holders, APY)

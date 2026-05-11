@@ -48,7 +48,7 @@ export default function NewsletterPage() {
   async function triggerNew() {
     setGenerating(true);
     try {
-      await api.post('/api/content/trigger', {});
+      await api.post('/api/content/generate', {});
       await refetch();
     } finally { setGenerating(false); }
   }

@@ -141,6 +141,20 @@ export async function startServer() {
     });
   }
 
+  // Graceful shutdown — stops the bot's long-poll before process exits.
+  // Without this, tsx watch restarts leave an orphaned getUpdates request,
+  // which causes Telegram to return 409 Conflict on the next startup.
+  const gracefulShutdown = async (signal: string) => {
+    console.log(`[shutdown] received ${signal}`);
+    const b = (globalThis as any).__sosomind_bot;
+    if (b) {
+      try { await b.stop(); } catch {}
+    }
+    process.exit(0);
+  };
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT',  () => gracefulShutdown('SIGINT'));
+
   const HEARTBEAT_MS = 5 * 60 * 1000;
   setInterval(() => {
     runHeartbeat().catch((e) => console.error('heartbeat error', e));

@@ -9,6 +9,16 @@ const router = Router();
 
 router.post('/generate', asyncHandler(async (_req, res) => {
   const brief = await generateMarketBrief();
+  // Persist to DB so it shows up in /posts
+  await supabase.from('content_posts').insert({
+    title: brief.title,
+    body: brief.body,
+    summary: brief.body.slice(0, 200).replace(/<[^>]+>/g, ''),
+    symbols: ['BTC', 'ETH'],
+    sentiment: 'neutral',
+    published: false,
+    citations: brief.citations ?? [],
+  } as any);
   res.json({ data: brief });
 }));
 
