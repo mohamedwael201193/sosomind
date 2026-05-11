@@ -57,6 +57,7 @@ Kimi_Agent_Ultimate Design Skill.md/
 
 # ── Docs folder (keep only README.md at root) ────────────────────────────────────
 docs/
+!packages/dashboard/src/app/docs/
 
 # ── Internal prompts and references ─────────────────────────────────────────────
 prompts/
