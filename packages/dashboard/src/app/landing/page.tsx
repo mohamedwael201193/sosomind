@@ -277,7 +277,10 @@ export default function LandingPage() {
   const [navScrolled, setNavScrolled] = useState(false);
   const [execStep, setExecStep] = useState(-1);
   const [heroTab, setHeroTab] = useState(0);
+  const [mounted, setMounted] = useState(false);
   const execRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     const handler = () => setNavScrolled(window.scrollY > 40);
@@ -639,6 +642,7 @@ export default function LandingPage() {
                             </div>
                             {/* Sparkline */}
                             <div style={{ width: 80, height: 30, flexShrink: 0 }}>
+                              {mounted && (
                               <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={chartData}>
                                   <defs>
@@ -650,6 +654,7 @@ export default function LandingPage() {
                                   <Area dataKey="v" stroke={color} fill={`url(#sg${i})`} strokeWidth={1.5} dot={false} isAnimationActive />
                                 </AreaChart>
                               </ResponsiveContainer>
+                              )}
                             </div>
                             {/* Confidence */}
                             <div className="flex flex-col items-end ml-auto">
@@ -729,6 +734,7 @@ export default function LandingPage() {
                         <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(34,197,94,0.12)", color: "#22c55e" }}>+$2.4B</span>
                       </div>
                       <div style={{ height: 180 }}>
+                        {mounted && (
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart data={ETF_DATA}>
                             <defs>
@@ -751,6 +757,7 @@ export default function LandingPage() {
                             <Area type="monotone" dataKey="outflow" stroke="#ef4444" fill="url(#etfOut)" strokeWidth={1.5} dot={false} isAnimationActive name="Outflow $M" />
                           </AreaChart>
                         </ResponsiveContainer>
+                        )}
                       </div>
                       <div className="flex gap-4 mt-2 px-1">
                         {[["#f97316","Inflow"],["#ef4444","Outflow"]].map(([c,l]) => (
@@ -955,58 +962,351 @@ export default function LandingPage() {
       </section>
 
       {/* ── 5. FEATURES BENTO GRID ────────────────────────────────────────── */}
-      <section id="features" className="py-12 px-6 border-t" style={{ borderColor: "var(--glass-border)" }}>
+      <section id="features" className="py-20 px-6 border-t" style={{ borderColor: "var(--glass-border)" }}>
         <div className="max-w-6xl mx-auto">
-          <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.6 }}>
-            <p className="text-xs font-bold uppercase tracking-widest mb-4 text-center" style={{ color: "#f97316" }}>Features</p>
+          <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.6 }} className="text-center mb-14">
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest mb-6" style={{ background: "rgba(249,115,22,0.1)", border: "1px solid rgba(249,115,22,0.25)", color: "#f97316" }}>
+              Features
+            </span>
             <h2 className="text-[clamp(2rem,5vw,3.5rem)] font-black text-center mb-4 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
               15 tools.{" "}
-              <span style={{
-                background: "linear-gradient(135deg, #f97316, #ea580c)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}>One command.</span>
+              <span style={{ background: "linear-gradient(135deg, #f97316, #ea580c)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>One command.</span>
             </h2>
-            <p className="text-center max-w-xl mx-auto mb-12" style={{ color: "var(--text-secondary)" }}>Everything from NLP trade execution to tax reporting — unified in a single agentic interface.</p>
+            <p className="text-center max-w-xl mx-auto" style={{ color: "var(--text-secondary)" }}>Everything from NLP trade execution to tax reporting — unified in a single agentic interface.</p>
           </motion.div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 auto-rows-[170px]">
-            {FEATURES.map((f, i) => {
-              const Icon = f.icon;
-              const colSpan = f.size === "large" ? "md:col-span-2 md:row-span-2" : f.size === "medium" ? "md:col-span-2" : "md:col-span-1";
-              return (
-                <motion.div key={f.title}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-60px" }}
-                  transition={{ delay: (i % 4) * 0.07, duration: 0.5 }}
-                  className={colSpan}
-                >
-                {f.size === "large" ? (
-                  <GradientBorderCard className="h-full">
-                    <div className="p-5 flex flex-col justify-between h-full">
-                      <div>
-                        <div className="w-10 h-10 rounded-[8px] flex items-center justify-center mb-3"
-                          style={{ background: "rgba(249,115,22,0.13)", border: "1px solid rgba(249,115,22,0.3)" }}>
-                          <Icon className="w-5 h-5" style={{ color: "#f97316" } as React.CSSProperties} />
+
+          {/* Bento grid */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+
+            {/* ── LARGE: NLP Intent Trading ── */}
+            <motion.div className="md:col-span-2 md:row-span-2" style={{ minHeight: 360 }}
+              initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-60px" }} transition={{ duration: 0.55 }}>
+              <GradientBorderCard className="h-full">
+                <div className="p-6 flex flex-col h-full relative overflow-hidden" style={{ minHeight: 360 }}>
+                  {/* SVG: NLP parse flow diagram */}
+                  <svg className="absolute right-0 bottom-0 opacity-[0.12] pointer-events-none" width="220" height="180" viewBox="0 0 220 180" fill="none">
+                    <rect x="10" y="60" width="56" height="28" rx="6" stroke="#f97316" strokeWidth="1.5" />
+                    <text x="38" y="78" textAnchor="middle" fill="#f97316" fontSize="9" fontFamily="monospace">INPUT</text>
+                    <line x1="66" y1="74" x2="90" y2="74" stroke="#f97316" strokeWidth="1.5" strokeDasharray="4 2" />
+                    <rect x="90" y="56" width="56" height="36" rx="6" stroke="#f97316" strokeWidth="1.5" />
+                    <text x="118" y="72" textAnchor="middle" fill="#f97316" fontSize="8" fontFamily="monospace">NLP</text>
+                    <text x="118" y="84" textAnchor="middle" fill="#f97316" fontSize="8" fontFamily="monospace">AGENT</text>
+                    <line x1="146" y1="74" x2="170" y2="74" stroke="#f97316" strokeWidth="1.5" strokeDasharray="4 2" />
+                    <rect x="170" y="50" width="42" height="20" rx="4" stroke="#22c55e" strokeWidth="1.2" />
+                    <text x="191" y="63" textAnchor="middle" fill="#22c55e" fontSize="7" fontFamily="monospace">BUY</text>
+                    <rect x="170" y="76" width="42" height="20" rx="4" stroke="#eab308" strokeWidth="1.2" />
+                    <text x="191" y="89" textAnchor="middle" fill="#eab308" fontSize="7" fontFamily="monospace">HEDGE</text>
+                    <rect x="170" y="102" width="42" height="20" rx="4" stroke="#ef4444" strokeWidth="1.2" />
+                    <text x="191" y="115" textAnchor="middle" fill="#ef4444" fontSize="7" fontFamily="monospace">EXIT</text>
+                    <line x1="191" y1="70" x2="191" y2="76" stroke="#f97316" strokeWidth="1" strokeDasharray="2 2" />
+                    <line x1="191" y1="96" x2="191" y2="102" stroke="#f97316" strokeWidth="1" strokeDasharray="2 2" />
+                    <circle cx="38" cy="110" r="16" stroke="#f97316" strokeWidth="1.2" strokeDasharray="3 2" />
+                    <text x="38" y="114" textAnchor="middle" fill="#f97316" fontSize="8" fontFamily="monospace">VOICE</text>
+                    <line x1="50" y1="100" x2="90" y2="86" stroke="#f97316" strokeWidth="1" strokeDasharray="3 2" />
+                  </svg>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4 relative z-10"
+                    style={{ background: "rgba(249,115,22,0.15)", border: "1px solid rgba(249,115,22,0.35)" }}>
+                    <MessageSquare className="w-5 h-5" style={{ color: "#f97316" }} />
+                  </div>
+                  <div className="font-bold text-lg mb-2 relative z-10" style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)" }}>NLP Intent Trading</div>
+                  <p className="text-sm leading-relaxed relative z-10 mb-6" style={{ color: "var(--text-secondary)" }}>Type in plain English, execute with precision. Our NLP agent parses your intent and routes it to the right strategy.</p>
+                  {/* Animated chat bubbles */}
+                  <div className="flex flex-col gap-2 relative z-10 mt-auto">
+                    {[
+                      { msg: "Buy 0.1 ETH if RSI < 35", delay: 0 },
+                      { msg: "↳ Routing to SoDEX execution…", delay: 0.2, muted: true },
+                      { msg: "✓ Order filled at $2,381", delay: 0.4, green: true },
+                    ].map((b, i) => (
+                      <motion.div key={i} initial={{ opacity: 0, x: -10 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: b.delay + 0.3, duration: 0.4 }}
+                        className="text-xs px-3 py-1.5 rounded-lg self-start"
+                        style={{
+                          background: b.green ? "rgba(34,197,94,0.12)" : "rgba(249,115,22,0.08)",
+                          border: `1px solid ${b.green ? "rgba(34,197,94,0.25)" : "rgba(249,115,22,0.18)"}`,
+                          color: b.green ? "#22c55e" : b.muted ? "var(--text-muted)" : "var(--text-primary)",
+                          fontFamily: "var(--font-mono)",
+                        }}>
+                        {b.msg}
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              </GradientBorderCard>
+            </motion.div>
+
+            {/* ── LARGE: Signal Marketplace ── */}
+            <motion.div className="md:col-span-2 md:row-span-2" style={{ minHeight: 360 }}
+              initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-60px" }} transition={{ delay: 0.08, duration: 0.55 }}>
+              <GradientBorderCard className="h-full">
+                <div className="p-6 flex flex-col h-full relative overflow-hidden" style={{ minHeight: 360 }}>
+                  {/* SVG: signal wave diagram */}
+                  <svg className="absolute right-0 top-0 opacity-[0.13] pointer-events-none" width="180" height="100" viewBox="0 0 180 100" fill="none">
+                    <polyline points="0,70 20,50 40,65 60,30 80,55 100,20 120,45 140,25 160,40 180,15" stroke="#f97316" strokeWidth="2" fill="none" strokeLinecap="round" />
+                    <circle cx="100" cy="20" r="5" fill="#f97316" fillOpacity="0.7" />
+                    <circle cx="60" cy="30" r="4" fill="#f97316" fillOpacity="0.5" />
+                    <circle cx="140" cy="25" r="4" fill="#22c55e" fillOpacity="0.6" />
+                  </svg>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4"
+                    style={{ background: "rgba(249,115,22,0.15)", border: "1px solid rgba(249,115,22,0.35)" }}>
+                    <Zap className="w-5 h-5" style={{ color: "#f97316" }} />
+                  </div>
+                  <div className="font-bold text-lg mb-2" style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)" }}>Signal Marketplace</div>
+                  <p className="text-sm leading-relaxed mb-5" style={{ color: "var(--text-secondary)" }}>Subscribe to curated signal streams from top-performing strategies, each verified with live backtest performance.</p>
+                  {/* Signal rows */}
+                  <div className="flex flex-col gap-2 mt-auto">
+                    {[
+                      { pair: "BTC/USDT", dir: "LONG", win: "74%", color: "#22c55e" },
+                      { pair: "ETH/USDT", dir: "LONG", win: "69%", color: "#22c55e" },
+                      { pair: "SOL/USDT", dir: "SHORT", win: "61%", color: "#ef4444" },
+                    ].map((s, i) => (
+                      <motion.div key={i} initial={{ opacity: 0, x: 10 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.12 + 0.2 }}
+                        className="flex items-center justify-between px-3 py-2 rounded-lg"
+                        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--glass-border)" }}>
+                        <span className="text-xs font-mono font-bold" style={{ color: "var(--text-primary)" }}>{s.pair}</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: `${s.color}18`, color: s.color }}>{s.dir}</span>
+                        <div className="flex items-center gap-2">
+                          <div className="w-20 h-1.5 rounded-full" style={{ background: "var(--surface-2)" }}>
+                            <motion.div className="h-1.5 rounded-full" style={{ background: s.color }} initial={{ width: 0 }} whileInView={{ width: s.win }} viewport={{ once: true }} transition={{ delay: i * 0.12 + 0.4, duration: 0.7 }} />
+                          </div>
+                          <span className="text-[10px] font-mono" style={{ color: s.color }}>{s.win}</span>
                         </div>
-                        <div className="font-bold text-base mb-1.5" style={{ color: "var(--text-primary)" }}>{f.title}</div>
-                      </div>
-                      <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>{f.desc}</p>
-                    </div>
-                  </GradientBorderCard>
-                ) : (
-                  <SpotlightCard className="h-full p-5 flex flex-col justify-between">
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              </GradientBorderCard>
+            </motion.div>
+
+            {/* ── MEDIUM: Arbitrage Scanner ── */}
+            <motion.div className="md:col-span-2" style={{ minHeight: 180 }}
+              initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-60px" }} transition={{ delay: 0.1, duration: 0.5 }}>
+              <SpotlightCard className="h-full">
+                <div className="p-5 flex gap-4 h-full items-start" style={{ minHeight: 180 }}>
+                  {/* SVG: exchange spread diagram */}
+                  <svg width="90" height="72" viewBox="0 0 90 72" fill="none" className="flex-shrink-0 mt-1 opacity-80">
+                    <rect x="1" y="18" width="26" height="36" rx="5" stroke="#f97316" strokeWidth="1.3" fill="rgba(249,115,22,0.07)" />
+                    <text x="14" y="34" textAnchor="middle" fill="#f97316" fontSize="7" fontFamily="monospace">CEX</text>
+                    <text x="14" y="44" textAnchor="middle" fill="#f97316" fontSize="7" fontFamily="monospace">$63.1k</text>
+                    <rect x="63" y="18" width="26" height="36" rx="5" stroke="#22c55e" strokeWidth="1.3" fill="rgba(34,197,94,0.07)" />
+                    <text x="76" y="34" textAnchor="middle" fill="#22c55e" fontSize="7" fontFamily="monospace">DEX</text>
+                    <text x="76" y="44" textAnchor="middle" fill="#22c55e" fontSize="7" fontFamily="monospace">$63.4k</text>
+                    <line x1="27" y1="36" x2="63" y2="36" stroke="#eab308" strokeWidth="1.5" strokeDasharray="4 2" />
+                    <polygon points="59,32 63,36 59,40" fill="#eab308" />
+                    <text x="45" y="28" textAnchor="middle" fill="#eab308" fontSize="7" fontFamily="monospace">+$300</text>
+                    <text x="45" y="52" textAnchor="middle" fill="#eab308" fontSize="7" fontFamily="monospace">SPREAD</text>
+                    <circle cx="45" cy="36" r="4" fill="#eab308" fillOpacity="0.25" />
+                    <circle cx="45" cy="36" r="2" fill="#eab308" />
+                  </svg>
+                  <div className="flex flex-col justify-between flex-1 h-full">
                     <div>
-                      <div className="w-9 h-9 rounded-[8px] flex items-center justify-center mb-3"
-                        style={{ background: "rgba(249,115,22,0.10)", border: "1px solid rgba(249,115,22,0.2)" }}>
-                        <Icon className="w-4 h-4" style={{ color: "#f97316" } as React.CSSProperties} />
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center mb-2" style={{ background: "rgba(249,115,22,0.12)", border: "1px solid rgba(249,115,22,0.25)" }}>
+                        <Search className="w-4 h-4" style={{ color: "#f97316" }} />
                       </div>
-                      <div className="font-bold text-sm mb-1" style={{ color: "var(--text-primary)" }}>{f.title}</div>
+                      <div className="font-bold text-sm mb-1" style={{ color: "var(--text-primary)" }}>Arbitrage Scanner</div>
+                      <p className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>Real-time cross-exchange spread detection with slippage-adjusted execution paths.</p>
                     </div>
-                    <p className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>{f.desc}</p>
+                    <div className="flex items-center gap-2 mt-3">
+                      <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "#22c55e" }} />
+                      <span className="text-[10px] font-mono" style={{ color: "var(--text-muted)" }}>3 spreads live · avg +0.47%</span>
+                    </div>
+                  </div>
+                </div>
+              </SpotlightCard>
+            </motion.div>
+
+            {/* ── MEDIUM: Whale Tracker ── */}
+            <motion.div className="md:col-span-2" style={{ minHeight: 180 }}
+              initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-60px" }} transition={{ delay: 0.15, duration: 0.5 }}>
+              <SpotlightCard className="h-full">
+                <div className="p-5 flex gap-4 h-full items-start" style={{ minHeight: 180 }}>
+                  {/* SVG: whale flow */}
+                  <svg width="90" height="72" viewBox="0 0 90 72" fill="none" className="flex-shrink-0 mt-1 opacity-80">
+                    <circle cx="20" cy="20" r="12" stroke="#f97316" strokeWidth="1.3" fill="rgba(249,115,22,0.08)" />
+                    <text x="20" y="24" textAnchor="middle" fill="#f97316" fontSize="8" fontFamily="monospace">🐋</text>
+                    <circle cx="70" cy="20" r="8" stroke="#3b82f6" strokeWidth="1.3" fill="rgba(59,130,246,0.08)" />
+                    <text x="70" y="24" textAnchor="middle" fill="#3b82f6" fontSize="7" fontFamily="monospace">CEX</text>
+                    <line x1="32" y1="20" x2="62" y2="20" stroke="#f97316" strokeWidth="1.5" strokeDasharray="4 2" />
+                    <polygon points="58,16 62,20 58,24" fill="#f97316" />
+                    <text x="45" y="14" textAnchor="middle" fill="#eab308" fontSize="7" fontFamily="monospace">$14.2M</text>
+                    <circle cx="20" cy="54" r="8" stroke="#f97316" strokeWidth="1.3" fill="rgba(249,115,22,0.08)" />
+                    <text x="20" y="58" textAnchor="middle" fill="#f97316" fontSize="7" fontFamily="monospace">COLD</text>
+                    <circle cx="70" cy="54" r="8" stroke="#22c55e" strokeWidth="1.3" fill="rgba(34,197,94,0.08)" />
+                    <text x="70" y="58" textAnchor="middle" fill="#22c55e" fontSize="7" fontFamily="monospace">DEX</text>
+                    <line x1="28" y1="54" x2="62" y2="54" stroke="#22c55e" strokeWidth="1.5" strokeDasharray="4 2" />
+                    <polygon points="58,50 62,54 58,58" fill="#22c55e" />
+                  </svg>
+                  <div className="flex flex-col justify-between flex-1 h-full">
+                    <div>
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center mb-2" style={{ background: "rgba(249,115,22,0.12)", border: "1px solid rgba(249,115,22,0.25)" }}>
+                        <Eye className="w-4 h-4" style={{ color: "#f97316" }} />
+                      </div>
+                      <div className="font-bold text-sm mb-1" style={{ color: "var(--text-primary)" }}>Whale Tracker</div>
+                      <p className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>Follow on-chain wallet movements of known large traders with entry/exit alerts.</p>
+                    </div>
+                    <div className="flex items-center gap-2 mt-3">
+                      <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "#f97316" }} />
+                      <span className="text-[10px] font-mono" style={{ color: "var(--text-muted)" }}>$14.2M moved · 2m ago</span>
+                    </div>
+                  </div>
+                </div>
+              </SpotlightCard>
+            </motion.div>
+
+            {/* ── MEDIUM: Voice Trading ── */}
+            <motion.div className="md:col-span-2" style={{ minHeight: 180 }}
+              initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-60px" }} transition={{ delay: 0.2, duration: 0.5 }}>
+              <SpotlightCard className="h-full">
+                <div className="p-5 flex gap-4 h-full items-start" style={{ minHeight: 180 }}>
+                  {/* SVG: waveform */}
+                  <svg width="80" height="72" viewBox="0 0 80 72" fill="none" className="flex-shrink-0 mt-1 opacity-85">
+                    {[8,16,24,32,40,48,56,64,72].map((x, i) => {
+                      const h = [10,22,36,48,56,44,30,18,10][i];
+                      return <rect key={x} x={x - 3} y={(72-h)/2} width="5" height={h} rx="2.5" fill="#f97316" fillOpacity={0.35 + i*0.07} />;
+                    })}
+                    <circle cx="40" cy="36" r="14" stroke="#f97316" strokeWidth="1" strokeDasharray="3 2" />
+                  </svg>
+                  <div className="flex flex-col justify-between flex-1 h-full">
+                    <div>
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center mb-2" style={{ background: "rgba(249,115,22,0.12)", border: "1px solid rgba(249,115,22,0.25)" }}>
+                        <Mic className="w-4 h-4" style={{ color: "#f97316" }} />
+                      </div>
+                      <div className="font-bold text-sm mb-1" style={{ color: "var(--text-primary)" }}>Voice Trading</div>
+                      <p className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>Hands-free trading via voice commands. Powered by Whisper AI and integrated directly into SoDEX execution.</p>
+                    </div>
+                    <div className="flex items-center gap-2 mt-3">
+                      <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "#a855f7" }} />
+                      <span className="text-[10px] font-mono" style={{ color: "var(--text-muted)" }}>Whisper AI · &lt;300ms latency</span>
+                    </div>
+                  </div>
+                </div>
+              </SpotlightCard>
+            </motion.div>
+
+            {/* ── SMALL CARDS (remaining 9) ── */}
+            {FEATURES.slice(5).map((f, i) => {
+              const Icon = f.icon;
+              // Micro SVG diagrams per card
+              const microSvgs: Record<string, React.ReactNode> = {
+                "Portfolio Rebalancer": (
+                  <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+                    <circle cx="22" cy="22" r="18" stroke="#f97316" strokeWidth="1.2" fill="none" />
+                    <path d="M22 22 L22 6 A16 16 0 0 1 36 28 Z" fill="rgba(249,115,22,0.25)" />
+                    <path d="M22 22 L36 28 A16 16 0 0 1 8 28 Z" fill="rgba(59,130,246,0.2)" />
+                    <path d="M22 22 L8 28 A16 16 0 0 1 22 6 Z" fill="rgba(34,197,94,0.18)" />
+                    <circle cx="22" cy="22" r="4" fill="#f97316" fillOpacity="0.7" />
+                  </svg>
+                ),
+                "Paper Trading": (
+                  <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+                    <polyline points="4,36 12,24 20,28 28,14 36,18 44,6" stroke="#f97316" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+                    <polyline points="4,36 12,28 20,32 28,20 36,24 44,12" stroke="#3b82f6" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeDasharray="3 2" />
+                    <circle cx="28" cy="14" r="3" fill="#f97316" fillOpacity="0.7" />
+                  </svg>
+                ),
+                "Confluence Engine": (
+                  <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+                    <circle cx="14" cy="22" r="10" stroke="#f97316" strokeWidth="1.2" fill="rgba(249,115,22,0.08)" />
+                    <circle cx="30" cy="22" r="10" stroke="#3b82f6" strokeWidth="1.2" fill="rgba(59,130,246,0.08)" />
+                    <ellipse cx="22" cy="22" rx="4" ry="8" fill="rgba(249,115,22,0.22)" />
+                    <circle cx="22" cy="22" r="2" fill="#f97316" />
+                  </svg>
+                ),
+                "Kelly Criterion": (
+                  <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+                    <rect x="4" y="28" width="8" height="12" rx="2" fill="rgba(249,115,22,0.5)" />
+                    <rect x="16" y="18" width="8" height="22" rx="2" fill="rgba(249,115,22,0.7)" />
+                    <rect x="28" y="10" width="8" height="30" rx="2" fill="#f97316" />
+                    <polyline points="4,28 12,20 20,18 28,10 36,10" stroke="#22c55e" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+                    <circle cx="28" cy="10" r="3" fill="#22c55e" />
+                  </svg>
+                ),
+                "Social Sentiment": (
+                  <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+                    <circle cx="22" cy="22" r="14" stroke="#f97316" strokeWidth="1.2" fill="none" />
+                    <path d="M15 20 Q22 14 29 20" stroke="#22c55e" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+                    <circle cx="17" cy="23" r="1.5" fill="#f97316" />
+                    <circle cx="27" cy="23" r="1.5" fill="#f97316" />
+                    <path d="M16 28 Q22 34 28 28" stroke="#f97316" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+                    {/* Pre-computed: r=20, center=(22,22), angles 0/60/120/180/240/300° */}
+                    <circle cx="42" cy="22" r="2" fill="#f97316" fillOpacity="0.4" />
+                    <circle cx="32" cy="39.32" r="2" fill="#f97316" fillOpacity="0.4" />
+                    <circle cx="12" cy="39.32" r="2" fill="#f97316" fillOpacity="0.4" />
+                    <circle cx="2" cy="22" r="2" fill="#f97316" fillOpacity="0.4" />
+                    <circle cx="12" cy="4.68" r="2" fill="#f97316" fillOpacity="0.4" />
+                    <circle cx="32" cy="4.68" r="2" fill="#f97316" fillOpacity="0.4" />
+                  </svg>
+                ),
+                "Tax Reporting": (
+                  <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+                    <rect x="8" y="4" width="28" height="36" rx="4" stroke="#f97316" strokeWidth="1.2" fill="rgba(249,115,22,0.06)" />
+                    <line x1="13" y1="14" x2="31" y2="14" stroke="#f97316" strokeWidth="1" strokeOpacity="0.6" />
+                    <line x1="13" y1="20" x2="31" y2="20" stroke="#f97316" strokeWidth="1" strokeOpacity="0.4" />
+                    <line x1="13" y1="26" x2="25" y2="26" stroke="#f97316" strokeWidth="1" strokeOpacity="0.3" />
+                    <circle cx="31" cy="32" r="6" fill="rgba(34,197,94,0.15)" stroke="#22c55e" strokeWidth="1.2" />
+                    <polyline points="27,32 30,35 35,29" stroke="#22c55e" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+                  </svg>
+                ),
+                "MEV Protection": (
+                  <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+                    <path d="M22 4 L38 12 L38 24 Q38 36 22 42 Q6 36 6 24 L6 12 Z" stroke="#f97316" strokeWidth="1.3" fill="rgba(249,115,22,0.07)" />
+                    <polyline points="15,22 20,27 30,17" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" fill="none" />
+                    <circle cx="22" cy="22" r="3" fill="#f97316" fillOpacity="0.3" />
+                  </svg>
+                ),
+                "Trader Persona": (
+                  <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+                    <circle cx="22" cy="16" r="8" stroke="#f97316" strokeWidth="1.3" fill="rgba(249,115,22,0.1)" />
+                    <path d="M8 38 Q8 28 22 28 Q36 28 36 38" stroke="#f97316" strokeWidth="1.3" fill="none" strokeLinecap="round" />
+                    {/* Pre-computed spider lines: r=20, vals=[0.8,0.5,0.9,0.6,0.7,0.4,0.85,0.65], center=(22,22) */}
+                    <line x1="22" y1="22" x2="38" y2="22" stroke="#f97316" strokeWidth="0.8" strokeOpacity="0.4" />
+                    <line x1="22" y1="22" x2="29.07" y2="29.07" stroke="#f97316" strokeWidth="0.8" strokeOpacity="0.4" />
+                    <line x1="22" y1="22" x2="22" y2="40" stroke="#f97316" strokeWidth="0.8" strokeOpacity="0.4" />
+                    <line x1="22" y1="22" x2="13.51" y2="30.49" stroke="#f97316" strokeWidth="0.8" strokeOpacity="0.4" />
+                    <line x1="22" y1="22" x2="8" y2="22" stroke="#f97316" strokeWidth="0.8" strokeOpacity="0.4" />
+                    <line x1="22" y1="22" x2="16.34" y2="16.34" stroke="#f97316" strokeWidth="0.8" strokeOpacity="0.4" />
+                    <line x1="22" y1="22" x2="22" y2="5" stroke="#f97316" strokeWidth="0.8" strokeOpacity="0.4" />
+                    <line x1="22" y1="22" x2="31.19" y2="12.81" stroke="#f97316" strokeWidth="0.8" strokeOpacity="0.4" />
+                  </svg>
+                ),
+                "Funding Signals": (
+                  <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+                    <line x1="4" y1="22" x2="40" y2="22" stroke="#f97316" strokeWidth="1" strokeOpacity="0.3" />
+                    <polyline points="4,30 10,25 16,28 22,16 28,20 34,12 40,16" stroke="#22c55e" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+                    <polyline points="4,18 10,22 16,19 22,28 28,24 34,30 40,26" stroke="#ef4444" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeDasharray="3 2" />
+                    <text x="22" y="40" textAnchor="middle" fill="#f97316" fontSize="7" fontFamily="monospace">FUNDING RATE</text>
+                  </svg>
+                ),
+                "Macro Playbook": (
+                  <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+                    <rect x="6" y="6" width="32" height="32" rx="4" stroke="#f97316" strokeWidth="1.2" fill="rgba(249,115,22,0.05)" />
+                    <rect x="11" y="11" width="10" height="10" rx="2" fill="rgba(249,115,22,0.3)" />
+                    <rect x="23" y="11" width="10" height="10" rx="2" fill="rgba(59,130,246,0.25)" />
+                    <rect x="11" y="23" width="10" height="10" rx="2" fill="rgba(34,197,94,0.25)" />
+                    <rect x="23" y="23" width="10" height="10" rx="2" fill="rgba(234,179,8,0.25)" />
+                    <line x1="22" y1="6" x2="22" y2="38" stroke="#f97316" strokeWidth="0.8" strokeOpacity="0.3" />
+                    <line x1="6" y1="22" x2="38" y2="22" stroke="#f97316" strokeWidth="0.8" strokeOpacity="0.3" />
+                  </svg>
+                ),
+              };
+
+              return (
+                <motion.div key={f.title} className="md:col-span-1"
+                  initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-50px" }}
+                  transition={{ delay: (i % 4) * 0.07, duration: 0.45 }}>
+                  <SpotlightCard className="h-full">
+                    <div className="p-4 flex flex-col gap-3" style={{ minHeight: 160 }}>
+                      <div className="flex items-start justify-between">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                          style={{ background: "rgba(249,115,22,0.11)", border: "1px solid rgba(249,115,22,0.22)" }}>
+                          <Icon className="w-4 h-4" style={{ color: "#f97316" }} />
+                        </div>
+                        <div className="opacity-60 flex-shrink-0">
+                          {microSvgs[f.title]}
+                        </div>
+                      </div>
+                      <div className="font-bold text-sm" style={{ color: "var(--text-primary)" }}>{f.title}</div>
+                      <p className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>{f.desc}</p>
+                    </div>
                   </SpotlightCard>
-                )}
                 </motion.div>
               );
             })}
@@ -1144,6 +1444,7 @@ export default function LandingPage() {
                       <SignalBadge dir={sig.direction} />
                     </div>
                     <div className="h-16">
+                      {mounted && (
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={sparkData}>
                           <defs>
@@ -1155,6 +1456,7 @@ export default function LandingPage() {
                           <Area type="monotone" dataKey="v" stroke={color} fill={`url(#sg${i})`} strokeWidth={1.5} dot={false} isAnimationActive />
                         </AreaChart>
                       </ResponsiveContainer>
+                      )}
                     </div>
                     <div>
                       <div className="flex justify-between text-xs mb-1" style={{ color: "var(--text-muted)" }}>
@@ -1189,6 +1491,7 @@ export default function LandingPage() {
             <h2 className="text-[clamp(1.8rem,4vw,2.8rem)] font-black mb-2 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>ETF Flow Intelligence</h2>
             <p className="text-sm mb-6" style={{ color: "var(--text-secondary)" }}>Track institutional capital flows across Spot Bitcoin ETFs and correlate with price action.</p>
             <div className="rounded-[8px] border p-4" style={{ borderColor: "var(--glass-border)", background: "var(--bg-card)" }}>
+              {mounted && (
               <ResponsiveContainer width="100%" height={200}>
                 <AreaChart data={ETF_DATA}>
                   <defs>
@@ -1209,6 +1512,7 @@ export default function LandingPage() {
                   <Area type="monotone" dataKey="outflow" stroke="#ef4444" fill="url(#outflowGrad)" strokeWidth={2} dot={false} isAnimationActive />
                 </AreaChart>
               </ResponsiveContainer>
+              )}
             </div>
           </motion.div>
 
