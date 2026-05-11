@@ -11,7 +11,7 @@
  * ✅ Auto account ID (always 0 — wallet address is the identifier)
  * ✅ EIP-712 non-custodial signing (unchanged)
  */
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -191,7 +191,7 @@ function CandlestickChart({ klines, symbol }: { klines: any[]; symbol: string })
 
 // ─── page ─────────────────────────────────────────────────────────────────────
 
-export default function TradePage() {
+function TradeInner() {
   const { address, token } = useWallet();
   const searchParams = useSearchParams();
   const initSide = (searchParams.get('side') ?? 'buy') as 'buy' | 'sell';
@@ -807,5 +807,13 @@ export default function TradePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function TradePage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-64 text-[var(--text-muted)]"><Loader2 className="w-6 h-6 animate-spin" /></div>}>
+      <TradeInner />
+    </Suspense>
   );
 }
