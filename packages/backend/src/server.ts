@@ -37,7 +37,7 @@ import { runHeartbeat } from './cron/heartbeat.js';
 import { runAnomalyResearch } from './cron/anomaly.js';
 import { startResearchLoop } from './agents/orchestrator.js';
 import { startWebSocketServer } from './ws/server.js';
-import { runDailyBriefing } from './content/pipeline.js';
+import { runDailyBriefing, runContentPipeline } from './content/pipeline.js';
 
 export async function startServer() {
   const app = express();
@@ -168,11 +168,13 @@ export async function startServer() {
   // Start auto-research loop (BTC/ETH/SOL every 4h)
   startResearchLoop();
 
-  // Auto-publish Smart-Money brief every 15 minutes (newsletter feed). Bot may be optional.
-  const BRIEFING_MS = 15 * 60 * 1000;
+  // Auto-generate market brief every 30 minutes (newsletter feed).
+  // runContentPipeline always persists to DB — no bot or channel ID required.
+  // On startup we run immediately so the feed is fresh after a cold start.
+  const BRIEFING_MS = 30 * 60 * 1000;
+  runContentPipeline(); // immediate on startup
   setInterval(() => {
-    const b = (globalThis as any).__sosomind_bot;
-    if (b) runDailyBriefing(b).catch((e) => console.error('briefing tick error', e));
+    runContentPipeline().catch((e) => console.error('briefing tick error', e));
   }, BRIEFING_MS);
 
   // Start WebSocket server

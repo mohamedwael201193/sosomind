@@ -97,3 +97,36 @@ export async function runDailyBriefing(bot: any): Promise<void> {
     console.error('daily briefing failed', (e as Error).message);
   }
 }
+
+/**
+ * runContentPipeline — generates a market brief and persists it to the
+ * content_posts table. Does NOT require a Telegram bot or channel ID.
+ * Called by the server cron every 30 minutes so the newsletter feed is always
+ * fresh, even on Render free-tier where external cron calls are unreliable.
+ */
+export async function runContentPipeline(): Promise<void> {
+  try {
+    const brief = await generateMarketBrief();
+    await createContentPost({
+      title: brief.title,
+      body: brief.body,
+      summary: brief.body.slice(0, 200).replace(/<[^>]+>/g, ''),
+      sector: null,
+      symbols: ['BTC', 'ETH'],
+      sentiment: 'neutral',
+      published: false,
+      citations: brief.citations ?? [],
+    } as any);
+    console.log(`[newsletter] brief saved: ${brief.title}`);
+    // Also publish to Telegram if bot + channel are available
+    const b = (globalThis as any).__sosomind_bot;
+    const channelId = process.env.TELEGRAM_CHANNEL_ID;
+    if (b && channelId) {
+      await publishToChannel(channelId, brief, b).catch((e) =>
+        console.error('[newsletter] telegram publish failed:', e),
+      );
+    }
+  } catch (e) {
+    console.error('[newsletter] pipeline error:', (e as Error).message);
+  }
+}
