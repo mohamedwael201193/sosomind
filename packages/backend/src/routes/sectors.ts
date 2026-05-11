@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { getSectorMomentum } from '../agents/sectorRotation';
+import { computeSectorScore, runAllSectorIntel } from '../agents/sectorIntelligence';
 import { asyncHandler } from '../utils/http';
+import { wrapMeta } from '../utils/responseMeta';
 
 const router = Router();
 
@@ -9,6 +11,30 @@ router.get('/', asyncHandler(async (_req, res) => {
   res.json({ data: sectors });
 }));
 
+// ─── Sector Intelligence endpoints ───────────────────────────────────────────
+
+// GET /api/sectors/intel  →  intelligence scores for all 13 SSI sectors
+router.get('/intel', asyncHandler(async (_req, res) => {
+  const results = await runAllSectorIntel();
+  const sorted = [...results].sort((a, b) => b.score - a.score);
+  res.json(wrapMeta(sorted, {
+    ttlMs: 300_000,
+    source: results.some((r) => r.source === 'fallback') ? 'fallback' : 'live',
+  }));
+}));
+
+// GET /api/sectors/intel/:ticker  →  deep dive for a single SSI ticker
+router.get('/intel/:ticker', asyncHandler(async (req, res) => {
+  const ticker = req.params.ticker;
+  try {
+    const result = await computeSectorScore(ticker);
+    res.json(wrapMeta(result, { ttlMs: 300_000, source: result.source }));
+  } catch (e: any) {
+    res.status(404).json({ error: e?.message ?? 'Ticker not found' });
+  }
+}));
+
+// ─── Generic sector lookup (must come AFTER named /intel routes) ──────────────
 router.get('/:sector', asyncHandler(async (req, res) => {
   const all = await getSectorMomentum();
   const match = all.find((s) => s.sector.toLowerCase() === req.params.sector.toLowerCase());

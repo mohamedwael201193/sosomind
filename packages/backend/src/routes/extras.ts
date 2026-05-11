@@ -6,6 +6,9 @@ import { getMacroOutlook } from '../agents/macroOverlay';
 import { generateVoiceBrief, briefingScript, hasVoice } from '../agents/voice';
 import { asyncHandler } from '../utils/http';
 import { getBinanceKlines, getKrakenKlines } from '../clients/market';
+import { supabase } from '../db/supabase';
+import { chatComplete, ChatMessage } from '../clients/ai';
+import { wrapMeta } from '../utils/responseMeta';
 
 const router = Router();
 
@@ -82,6 +85,77 @@ router.post('/voice/brief', asyncHandler(async (req, res) => {
   res.setHeader('Content-Type', 'audio/mpeg');
   res.setHeader('Content-Disposition', 'inline; filename="brief.mp3"');
   res.send(buf);
+}));
+
+// ─── Edge Analytics — wallet trade performance ────────────────────────────────
+router.get('/edge/wallet/:address', asyncHandler(async (req, res) => {
+  const { address } = req.params;
+
+  // Validate EVM address format (0x + 40 hex chars)
+  if (!/^0x[0-9a-fA-F]{40}$/.test(address)) {
+    return res.status(400).json({ error: 'invalid_address', message: 'Address must be a valid 0x EVM address (42 chars)' });
+  }
+
+  const { data: trades } = await supabase
+    .from('trades')
+    .select('market, side, price, amount, status, created_at')
+    .eq('status', 'filled')
+    .ilike('confirmed_by', `%${address.toLowerCase()}%`)
+    .limit(200);
+
+  if (!trades || trades.length === 0) {
+    return res.json(wrapMeta({ address, trades: 0, source: 'empty' }, { ttlMs: 60_000, source: 'live' }));
+  }
+
+  // Group by market → compute win rate per market
+  const byMarket: Record<string, { buys: number; sells: number }> = {};
+  for (const t of trades) {
+    const m = String(t.market ?? 'unknown');
+    if (!byMarket[m]) byMarket[m] = { buys: 0, sells: 0 };
+    if (t.side === 'buy') byMarket[m].buys++;
+    else byMarket[m].sells++;
+  }
+
+  // Hour-of-day distribution for timing insight
+  const byHour: number[] = Array(24).fill(0);
+  for (const t of trades) {
+    const hr = new Date(t.created_at ?? 0).getUTCHours();
+    byHour[hr] = (byHour[hr] ?? 0) + 1;
+  }
+  const peakHour = byHour.indexOf(Math.max(...byHour));
+
+  // AI summary
+  const messages: ChatMessage[] = [
+    {
+      role: 'system',
+      content: 'You are a concise DeFi trade analyst. Respond ONLY with valid JSON: {"summary":"..."}',
+    },
+    {
+      role: 'user',
+      content: `Wallet ${address} has ${trades.length} filled trades across ${Object.keys(byMarket).length} markets. Most active hour UTC: ${peakHour}. Top markets: ${Object.keys(byMarket).slice(0, 3).join(', ')}. Write a 1-sentence performance edge summary.`,
+    },
+  ];
+
+  let aiSummary = '';
+  try {
+    const resp = await chatComplete(messages, 0.3);
+    if (resp) {
+      const parsed = JSON.parse(resp.content);
+      aiSummary = parsed.summary ?? '';
+    }
+  } catch { /* non-fatal */ }
+
+  return res.json(wrapMeta(
+    {
+      address,
+      total_trades: trades.length,
+      markets: byMarket,
+      peak_hour_utc: peakHour,
+      ai_summary: aiSummary,
+      source: 'live',
+    },
+    { ttlMs: 300_000, source: 'live' },
+  ));
 }));
 
 export default router;

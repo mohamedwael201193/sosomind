@@ -2,10 +2,10 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { fetcher } from "@/lib/api";
+import { fetcher, fetchWithMeta } from "@/lib/api";
 import { GlassCard } from "@/components/GlassCard";
 import { useWebSocket } from "@/lib/websocket";
-import { TrendingUp, TrendingDown, Minus, Zap, Filter } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Zap, Filter, Target, CheckCircle2, XCircle } from "lucide-react";
 import { CryptoIcon } from "@/components/CryptoIcon";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +40,17 @@ export default function SignalsPage() {
     queryFn: () => fetcher("/api/signals?limit=50"),
     refetchInterval: 30000,
   });
+
+  const trackRecord = useQuery({
+    queryKey: ["track-record"],
+    queryFn: () => fetchWithMeta<any>("/api/signals/track-record"),
+    refetchInterval: 300000,
+  });
+
+  const trData = (trackRecord.data as any)?.data ?? {};
+  const hitRate = Number(trData.hit_rate ?? 0);
+  const evaluated = Number(trData.evaluated_count ?? 0);
+  const avgReturn = Number(trData.avg_return_pct ?? 0);
 
   const [liveSignals, setLiveSignals] = useState<Signal[]>([]);
 
@@ -95,6 +106,45 @@ export default function SignalsPage() {
           LIVE
         </div>
       </motion.div>
+
+      {/* Track Record Banner */}
+      {!trackRecord.isLoading && evaluated > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+        >
+          <GlassCard animate padding="md" glow={hitRate >= 0.6 ? "green" : hitRate >= 0.4 ? "none" : "red"}>
+            <div className="flex items-center gap-3 flex-wrap">
+              <Target className="w-4 h-4 text-[var(--text-muted)] flex-shrink-0" />
+              <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Signal Track Record</span>
+              <div className="flex items-center gap-6 flex-wrap ml-auto">
+                <div className="text-center">
+                  <motion.div
+                    className={cn("text-xl font-black tabular-nums", hitRate >= 0.6 ? "text-[var(--green)]" : hitRate >= 0.4 ? "text-[var(--yellow)]" : "text-[var(--red)]")}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.3 }}
+                  >
+                    {(hitRate * 100).toFixed(1)}%
+                  </motion.div>
+                  <div className="text-[10px] text-[var(--text-muted)]">Hit Rate</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-xl font-black tabular-nums text-[var(--text-primary)]">{evaluated}</div>
+                  <div className="text-[10px] text-[var(--text-muted)]">Evaluated</div>
+                </div>
+                <div className="text-center">
+                  <div className={cn("text-xl font-black tabular-nums", avgReturn >= 0 ? "text-[var(--green)]" : "text-[var(--red)]")}>
+                    {avgReturn >= 0 ? "+" : ""}{avgReturn.toFixed(2)}%
+                  </div>
+                  <div className="text-[10px] text-[var(--text-muted)]">Avg Return</div>
+                </div>
+              </div>
+            </div>
+          </GlassCard>
+        </motion.div>
+      )}
 
       {/* Filter bar */}
       <GlassCard animate padding="sm">
@@ -201,6 +251,22 @@ export default function SignalsPage() {
                           )}
                           {signal.status && (
                             <span className="text-xs text-[var(--text-muted)]">{String(signal.status)}</span>
+                          )}
+                          {/* Outcome badge */}
+                          {(signal as any).outcome === "HIT" && (
+                            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-[var(--green-soft)] text-[var(--green)]">
+                              <CheckCircle2 className="w-3 h-3" /> HIT
+                            </span>
+                          )}
+                          {(signal as any).outcome === "STOP" && (
+                            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-[var(--red-soft)] text-[var(--red)]">
+                              <XCircle className="w-3 h-3" /> STOP
+                            </span>
+                          )}
+                          {(signal as any).outcome === "DRIFT" && (
+                            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[rgba(251,191,36,0.15)] text-[#fbbf24]">
+                              DRIFT
+                            </span>
                           )}
                         </div>
 

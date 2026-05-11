@@ -28,7 +28,7 @@ const MAIN_KB = new Keyboard()
   .text('📓 Journal').text('🤝 Subscribe').text('ℹ️ Help').row()
   .text('🐋 Whales').text('🔄 Arb').text('📡 Funding').row()
   .text('🏆 Leaderboard').text('🎯 Persona').text('📄 Tax').row()
-  .text('📈 SSI Indexes').text('📰 Newsletter').row()
+  .text('📈 SSI Indexes').text('📰 Newsletter').text('🧠 Intel').row()
   .text('✖ Hide Menu')
   .resized();
 
@@ -1760,6 +1760,7 @@ export function createBot(): Bot | null {
     '🔬 Research', '⚡ Signal', '💼 Portfolio', '📊 Briefing',
     '🔔 Alerts', '⚙️ Settings', '📓 Journal', '🤝 Subscribe', 'ℹ️ Help', '🎙️ Voice',
     '🐋 Whales', '🔄 Arb', '📡 Funding', '🏆 Leaderboard', '🎯 Persona', '📄 Tax',
+    '📈 SSI Indexes', '📰 Newsletter', '🧠 Intel',
     '✖ Hide Menu',
   ]);
   bot.on('message:text', async (ctx, next) => {
@@ -2222,6 +2223,134 @@ export function createBot(): Bot | null {
       );
     }
   });
+
+  // ── Sector Intelligence (/intel) ────────────────────────────────────────────
+  const sendSectorIntel = async (ctx: Context) => {
+    const loading = `🧠 <b>Loading Sector Intelligence…</b>\n\n<i>Computing multi-signal scores for all 13 sectors…</i>`;
+    if ((ctx as any).callbackQuery) {
+      await (ctx as any).editMessageText(loading, { parse_mode: 'HTML' });
+      await (ctx as any).answerCallbackQuery({ text: 'Loading sector intel…' });
+    } else {
+      await ctx.reply(loading, { parse_mode: 'HTML' });
+    }
+    try {
+      const resp = await fetch(`http://localhost:${process.env.PORT || 10000}/api/sectors/intel`);
+      const json = await resp.json() as any;
+      const sectors: any[] = Array.isArray(json.data) ? json.data : [];
+      const top3 = sectors.filter(s => s.verdict === 'STRONG_BUY' || s.verdict === 'BUY').slice(0, 3);
+      const lines = [`🧠 <b>Sector Intelligence</b> — Top Opportunities\n`];
+      if (!top3.length && sectors.length === 0) {
+        lines.push('<i>Intel engine warming up. Try again shortly.</i>');
+      } else {
+        const display = top3.length ? top3 : sectors.slice(0, 3);
+        for (const s of display) {
+          const verdictIcon = s.verdict === 'STRONG_BUY' ? '🟢🟢' : s.verdict === 'BUY' ? '🟢' : s.verdict === 'NEUTRAL' ? '⚪' : '🔴';
+          const scoreBar = '█'.repeat(Math.round(s.score / 10)) + '░'.repeat(10 - Math.round(s.score / 10));
+          lines.push(`${verdictIcon} <b>${s.sector}</b> (<code>${s.ticker}</code>) — Score: ${s.score.toFixed(0)}/100`);
+          lines.push(`   [${scoreBar}] ${s.verdict}`);
+          lines.push(`   S1: ${s.s1.toFixed(0)} · S2: ${s.s2.toFixed(0)} · S3: ${s.s3.toFixed(0)}`);
+          if (s.aiNarrative) lines.push(`   <i>${String(s.aiNarrative).slice(0, 100)}</i>`);
+          lines.push('');
+        }
+        lines.push(`<i>📊 ${sectors.length} sectors scored · Updated ${new Date().toLocaleTimeString('en-US', { timeZone: 'UTC', hour12: false })} UTC</i>`);
+      }
+      const kb = new InlineKeyboard()
+        .text('🔄 Refresh', 'intel:refresh').text('📊 All Sectors', 'intel:all').row()
+        .text('⬅️ Back', 'menu:main');
+      const text = lines.join('\n');
+      if ((ctx as any).callbackQuery) {
+        await (ctx as any).editMessageText(text, { parse_mode: 'HTML', reply_markup: kb });
+      } else {
+        await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
+      }
+    } catch (e) {
+      const errMsg = `❌ Intel Error: ${(e as Error).message}`;
+      if ((ctx as any).callbackQuery) await (ctx as any).editMessageText(errMsg, { parse_mode: 'HTML' });
+      else await ctx.reply(errMsg, { parse_mode: 'HTML' });
+    }
+  };
+
+  bot.command('intel', sendSectorIntel);
+  bot.hears('🧠 Intel', sendSectorIntel);
+  bot.callbackQuery('intel:refresh', sendSectorIntel);
+  bot.hears(/\b(intel|sector intel|intelligence|sector score)\b/i, sendSectorIntel);
+
+  bot.callbackQuery('intel:all', async (ctx) => {
+    await ctx.answerCallbackQuery({ text: 'Loading all sectors…' });
+    try {
+      const resp = await fetch(`http://localhost:${process.env.PORT || 10000}/api/sectors/intel`);
+      const json = await resp.json() as any;
+      const sectors: any[] = Array.isArray(json.data) ? json.data : [];
+      const lines = [`🧠 <b>All Sector Scores</b>\n`];
+      for (const s of sectors) {
+        const icon = s.verdict === 'STRONG_BUY' ? '🟢🟢' : s.verdict === 'BUY' ? '🟢' : s.verdict === 'NEUTRAL' ? '⚪' : '🔴';
+        lines.push(`${icon} <b>${s.sector}</b> ${s.score.toFixed(0)}/100 — ${s.verdict}`);
+      }
+      await (ctx as any).editMessageText(lines.join('\n'), {
+        parse_mode: 'HTML',
+        reply_markup: new InlineKeyboard().text('⬅️ Back', 'intel:refresh').text('🏠 Menu', 'menu:main'),
+      });
+    } catch (e) {
+      await (ctx as any).editMessageText(`❌ ${(e as Error).message}`, { parse_mode: 'HTML' });
+    }
+  });
+
+  // ── Signal Track Record (/track_record) ─────────────────────────────────────
+  const sendTrackRecord = async (ctx: Context) => {
+    const loading = `📊 <b>Loading Signal Track Record…</b>`;
+    if ((ctx as any).callbackQuery) {
+      await (ctx as any).editMessageText(loading, { parse_mode: 'HTML' });
+      await (ctx as any).answerCallbackQuery({ text: 'Loading track record…' });
+    } else {
+      await ctx.reply(loading, { parse_mode: 'HTML' });
+    }
+    try {
+      const resp = await fetch(`http://localhost:${process.env.PORT || 10000}/api/signals/track-record`);
+      const json = await resp.json() as any;
+      const d = json.data ?? {};
+      const hitRate = Number(d.hit_rate ?? 0);
+      const evaluated = Number(d.evaluated_count ?? 0);
+      const avgReturn = Number(d.avg_return_pct ?? 0);
+      const total = Number(d.total_signals ?? 0);
+      const active = Number(d.active_signals ?? 0);
+      const hitPct = (hitRate * 100).toFixed(1);
+      const perfIcon = hitRate >= 0.6 ? '🟢' : hitRate >= 0.4 ? '🟡' : '🔴';
+      const lines = [
+        `📊 <b>Signal Track Record</b>\n`,
+        `${perfIcon} Hit Rate: <b>${hitPct}%</b>`,
+        `✅ Evaluated: <b>${evaluated}</b> signals`,
+        `📈 Avg Return: <b>${avgReturn >= 0 ? '+' : ''}${avgReturn.toFixed(2)}%</b>`,
+        `📋 Total Signals: <b>${total}</b> (${active} active)\n`,
+      ];
+      const byDir = d.by_direction ?? {};
+      if (Object.keys(byDir).length > 0) {
+        lines.push(`<b>By Direction:</b>`);
+        for (const [dir, stats] of Object.entries(byDir) as any) {
+          const rate = stats.total > 0 ? ((stats.hits / stats.total) * 100).toFixed(0) : '0';
+          lines.push(`  ${dir === 'LONG' ? '📈' : '📉'} ${dir}: ${stats.hits}/${stats.total} (${rate}% hit)`);
+        }
+        lines.push('');
+      }
+      lines.push(`<i>⛓️ Powered by SosoMind outcome evaluator · Auto-updates hourly</i>`);
+      const kb = new InlineKeyboard()
+        .text('🔄 Refresh', 'track_record:refresh').text('📓 View Signals', 'journal:view').row()
+        .text('⬅️ Back', 'menu:main');
+      const text = lines.join('\n');
+      if ((ctx as any).callbackQuery) {
+        await (ctx as any).editMessageText(text, { parse_mode: 'HTML', reply_markup: kb });
+      } else {
+        await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
+      }
+    } catch (e) {
+      const errMsg = `❌ Track Record Error: ${(e as Error).message}`;
+      if ((ctx as any).callbackQuery) await (ctx as any).editMessageText(errMsg, { parse_mode: 'HTML' });
+      else await ctx.reply(errMsg, { parse_mode: 'HTML' });
+    }
+  };
+
+  bot.command('track_record', sendTrackRecord);
+  bot.callbackQuery('track_record:refresh', sendTrackRecord);
+  bot.hears(/\b(track record|hit rate|signal accuracy|win rate)\b/i, sendTrackRecord);
 
   // ── Error handler ─────────────────────────────────────────────────────────────
   bot.catch((err) => {

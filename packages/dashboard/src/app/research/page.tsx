@@ -5,7 +5,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { api, fetcher } from "@/lib/api";
 import { GlassCard } from "@/components/GlassCard";
 import LightweightCandlestickChart, { CandlePoint } from "@/components/LightweightCandlestickChart";
-import { TrendingUp, TrendingDown, Search, Zap, BarChart2, BookOpen, Activity, MessageSquare } from "lucide-react";
+import { TrendingUp, TrendingDown, Search, Zap, BarChart2, BookOpen, Activity, MessageSquare, Target, Wallet, Clock } from "lucide-react";
+import { fetchWithMeta } from "@/lib/api";
+import { AgentCycle } from "@/components/AgentCycle";
 import { cn } from "@/lib/utils";
 
 const ASSETS = ["BTC", "ETH", "SOL", "BNB", "AVAX", "ARB", "OP", "SUI"];
@@ -33,7 +35,10 @@ function normalizeKlines(raw: unknown[]): CandlePoint[] {
 export default function ResearchPage() {
   const [asset, setAsset] = useState("BTC");
   const [interval, setInterval] = useState("1h");
-  const [tab, setTab] = useState<"chart" | "signals" | "orderbook" | "confluence" | "sentiment">("chart");
+  const [tab, setTab] = useState<"chart" | "signals" | "orderbook" | "confluence" | "sentiment" | "my-edge">("chart");
+  const [walletInput, setWalletInput] = useState("");
+  const [walletAddress, setWalletAddress] = useState("");
+  const [showAgentCycle, setShowAgentCycle] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +76,14 @@ export default function ResearchPage() {
     refetchInterval: 60000,
     enabled: tab === "sentiment",
   });
+
+  const edgeQuery = useQuery({
+    queryKey: ["edge-wallet", walletAddress],
+    queryFn: () => fetchWithMeta<any>(`/api/edge/wallet/${walletAddress}`),
+    enabled: tab === "my-edge" && /^0x[0-9a-fA-F]{40}$/.test(walletAddress),
+    staleTime: 60000,
+  });
+  const edgeData = (edgeQuery.data as any)?.data ?? {};
 
   async function runAnalysis() {
     setAnalyzing(true);
@@ -168,12 +181,12 @@ export default function ResearchPage() {
 
       {/* Tabs */}
       <div className="flex flex-wrap gap-2">
-        {(["chart", "signals", "orderbook", "confluence", "sentiment"] as const).map((t) => (
+        {(["chart", "signals", "orderbook", "confluence", "sentiment", "my-edge"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={cn(
-              "flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-md)] text-sm font-semibold transition-all capitalize border",
+              "flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-md)] text-sm font-semibold transition-all border",
               tab === t
                 ? "bg-[rgba(59,130,246,0.15)] text-[var(--blue)] border-[rgba(59,130,246,0.3)]"
                 : "text-[var(--text-muted)] border-[var(--glass-border)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-glass-hover)]"
@@ -184,7 +197,8 @@ export default function ResearchPage() {
             {t === "orderbook" && <BookOpen className="w-4 h-4" />}
             {t === "confluence" && <Activity className="w-4 h-4" />}
             {t === "sentiment" && <MessageSquare className="w-4 h-4" />}
-            {t}
+            {t === "my-edge" && <Target className="w-4 h-4" />}
+            {t === "my-edge" ? "My Edge" : t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
       </div>
@@ -487,6 +501,138 @@ export default function ResearchPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* My Edge Tab */}
+      <AnimatePresence>
+        {tab === "my-edge" && (
+          <motion.div
+            key="my-edge"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-4"
+          >
+            {/* Wallet input */}
+            <GlassCard padding="md">
+              <div className="flex items-center gap-2 mb-1">
+                <Wallet className="w-4 h-4 text-[var(--text-muted)]" />
+                <span className="text-sm font-bold text-[var(--text-primary)]">My Edge Analysis</span>
+              </div>
+              <p className="text-xs text-[var(--text-muted)] mb-4">Enter your EVM wallet address to analyze your trading performance pattern</p>
+              <div className="flex gap-2">
+                <input
+                  value={walletInput}
+                  onChange={(e) => setWalletInput(e.target.value)}
+                  placeholder="0x..."
+                  className="flex-1 bg-[var(--surface)] border border-[var(--glass-border)] rounded-[var(--radius-sm)] px-3 py-2 text-sm font-mono text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[rgba(59,130,246,0.5)]"
+                  onKeyDown={(e) => { if (e.key === "Enter") setWalletAddress(walletInput.trim()); }}
+                />
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setWalletAddress(walletInput.trim())}
+                  disabled={!/^0x[0-9a-fA-F]{40}$/.test(walletInput.trim())}
+                  className="px-4 py-2 rounded-[var(--radius-sm)] text-sm font-bold text-white disabled:opacity-40 flex-shrink-0"
+                  style={{ background: "var(--grad-brand)" }}
+                >
+                  Analyze
+                </motion.button>
+              </div>
+              {walletInput.trim().length > 2 && !/^0x[0-9a-fA-F]{40}$/.test(walletInput.trim()) && (
+                <p className="text-xs text-[var(--red)] mt-1.5">Invalid EVM address format</p>
+              )}
+            </GlassCard>
+
+            {/* Edge results */}
+            <AnimatePresence>
+              {edgeQuery.isLoading && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                  <GlassCard padding="md">
+                    <div className="flex items-center gap-3 text-[var(--text-muted)]">
+                      <div className="w-4 h-4 border-2 border-[var(--blue)] border-t-transparent rounded-full animate-spin" />
+                      <span className="text-sm">Analyzing wallet edge…</span>
+                    </div>
+                  </GlassCard>
+                </motion.div>
+              )}
+
+              {!edgeQuery.isLoading && edgeData.address && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="space-y-4"
+                >
+                  {/* Summary stats */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <GlassCard padding="sm">
+                      <div className="text-xs text-[var(--text-muted)] mb-1">Total Trades</div>
+                      <div className="text-2xl font-black text-[var(--text-primary)]">{edgeData.total_trades ?? 0}</div>
+                    </GlassCard>
+                    <GlassCard padding="sm">
+                      <div className="flex items-center gap-1 text-xs text-[var(--text-muted)] mb-1">
+                        <Clock className="w-3 h-3" /> Peak Hour UTC
+                      </div>
+                      <div className="text-2xl font-black text-[var(--blue)]">{edgeData.peak_hour_utc ?? "–"}:00</div>
+                    </GlassCard>
+                    <GlassCard padding="sm" className="col-span-2 sm:col-span-1">
+                      <div className="text-xs text-[var(--text-muted)] mb-1">Markets Traded</div>
+                      <div className="text-2xl font-black text-[var(--text-primary)]">{Object.keys(edgeData.markets ?? {}).length}</div>
+                    </GlassCard>
+                  </div>
+
+                  {/* AI Summary */}
+                  {edgeData.ai_summary && (
+                    <GlassCard glow="blue" padding="md">
+                      <div className="text-xs font-bold text-[var(--blue)] uppercase tracking-wider mb-2">AI Edge Summary</div>
+                      <p className="text-sm text-[var(--text-primary)] leading-relaxed">{edgeData.ai_summary}</p>
+                    </GlassCard>
+                  )}
+
+                  {/* Markets breakdown */}
+                  {edgeData.markets && Object.keys(edgeData.markets).length > 0 && (
+                    <GlassCard padding="md">
+                      <div className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">Markets Breakdown</div>
+                      <div className="space-y-2">
+                        {Object.entries(edgeData.markets as Record<string, { count: number; pnl?: number }>)
+                          .sort(([, a], [, b]) => b.count - a.count)
+                          .map(([market, stats]) => (
+                            <div key={market} className="flex items-center justify-between py-1.5 border-b border-[var(--border)] last:border-0">
+                              <span className="text-sm font-mono font-bold text-[var(--text-primary)]">{market}</span>
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs text-[var(--text-muted)]">{stats.count} trades</span>
+                                {stats.pnl != null && (
+                                  <span className={cn("text-xs font-bold", stats.pnl >= 0 ? "text-[var(--green)]" : "text-[var(--red)]")}>
+                                    {stats.pnl >= 0 ? "+" : ""}{stats.pnl.toFixed(2)}%
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </GlassCard>
+                  )}
+
+                  {/* Run full analysis */}
+                  <motion.button
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => setShowAgentCycle(true)}
+                    className="w-full py-3 rounded-[var(--radius-md)] text-sm font-bold text-white flex items-center justify-center gap-2"
+                    style={{ background: "var(--grad-brand)" }}
+                  >
+                    <Zap className="w-4 h-4" />
+                    Run Full AI Analysis
+                  </motion.button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Agent Cycle Modal */}
+      <AgentCycle isOpen={showAgentCycle} onClose={() => setShowAgentCycle(false)} asset={asset} />
     </div>
   );
 }

@@ -38,6 +38,7 @@ import { runAnomalyResearch } from './cron/anomaly.js';
 import { startResearchLoop } from './agents/orchestrator.js';
 import { startWebSocketServer } from './ws/server.js';
 import { runDailyBriefing, runContentPipeline } from './content/pipeline.js';
+import { runOutcomeEvaluation } from './cron/outcomeEvaluator.js';
 
 export async function startServer() {
   const app = express();
@@ -176,6 +177,12 @@ export async function startServer() {
   setInterval(() => {
     runContentPipeline().catch((e) => console.error('briefing tick error', e));
   }, BRIEFING_MS);
+
+  // Outcome evaluator — hourly: resolves HIT/STOP/DRIFT on active signals
+  setTimeout(() => runOutcomeEvaluation().catch((e) => console.error('outcomeEval startup error', e)), 15_000);
+  setInterval(() => {
+    runOutcomeEvaluation().catch((e) => console.error('outcomeEval tick error', e));
+  }, 60 * 60 * 1000);
 
   // Start WebSocket server
   startWebSocketServer();

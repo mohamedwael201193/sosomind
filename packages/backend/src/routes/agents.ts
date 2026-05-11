@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { runResearchAgent } from '../agents/research';
 import { supabase } from '../db/supabase';
 import { asyncHandler, validate } from '../utils/http';
+import { wrapMeta } from '../utils/responseMeta';
 
 const router = Router();
 
@@ -12,6 +13,54 @@ router.post('/research/:asset', asyncHandler(async (req, res) => {
   const userId = (req.body?.userId as string | undefined) ?? undefined;
   const signal = await runResearchAgent(asset, { userId, saveToDb: true });
   res.json({ signal });
+}));
+
+// ─── Signal Track Record (public) ────────────────────────────────────────────
+router.get('/signals/track-record', asyncHandler(async (_req, res) => {
+  // Try to fetch persisted stats from agent_meta first
+  const { data: metaRow } = await supabase
+    .from('agent_meta')
+    .select('value, updated_at')
+    .eq('key', 'track_record')
+    .maybeSingle();
+
+  // Also pull live aggregate counts for enrichment
+  const { data: liveStats } = await supabase
+    .from('signals')
+    .select('direction, status, outcome')
+    .limit(1000);
+
+  const totalSignals = liveStats?.length ?? 0;
+  const activeSignals = liveStats?.filter((s: any) => s.status === 'active').length ?? 0;
+
+  if (metaRow?.value) {
+    const stored = metaRow.value as Record<string, any>;
+    return res.json(wrapMeta(
+      { ...stored, total_signals: totalSignals, active_signals: activeSignals },
+      { cachedAt: metaRow.updated_at, ttlMs: 3_600_000, source: 'cache' },
+    ));
+  }
+
+  // No persisted stats yet — return live aggregate placeholder
+  const longSignals = liveStats?.filter((s: any) => s.direction === 'long').length ?? 0;
+  const shortSignals = liveStats?.filter((s: any) => s.direction === 'short').length ?? 0;
+
+  return res.json(wrapMeta(
+    {
+      hit_rate: null,
+      evaluated_count: 0,
+      avg_return_pct: null,
+      by_direction: {
+        long: { hits: 0, stops: 0, total: longSignals },
+        short: { hits: 0, stops: 0, total: shortSignals },
+      },
+      by_asset: {},
+      last_updated: null,
+      total_signals: totalSignals,
+      active_signals: activeSignals,
+    },
+    { ttlMs: 3_600_000, source: 'live' },
+  ));
 }));
 
 router.get('/signals', validate(z.object({ status: z.string().optional(), asset: z.string().optional(), limit: z.coerce.number().default(50) })), asyncHandler(async (req, res) => {
