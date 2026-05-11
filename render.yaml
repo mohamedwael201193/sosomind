@@ -5,7 +5,7 @@ services:
     plan: starter
     region: oregon
     rootDir: packages/backend
-    buildCommand: npm install && npm run build
+    buildCommand: npm install --include=dev && npm run build
     startCommand: node dist/index.js
     healthCheckPath: /api/health
     envVars:
@@ -53,7 +53,7 @@ services:
     runtime: node
     rootDir: packages/backend
     schedule: "*/5 * * * *"
-    buildCommand: npm install && npm run build
+    buildCommand: npm install --include=dev && npm run build
     startCommand: node -e "require('./dist/cron/heartbeat.js').runHeartbeat().then(r => console.log(r))"
     envVars:
       - fromGroup: sosomind-backend
