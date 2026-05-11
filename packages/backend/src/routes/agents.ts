@@ -25,7 +25,13 @@ router.get('/signals', validate(z.object({ status: z.string().optional(), asset:
 }));
 
 router.get('/signals/:id', asyncHandler(async (req, res) => {
-  const { data, error } = await supabase.from('signals').select('*').eq('id', req.params.id).single();
+  const { id } = req.params;
+  // Validate UUID format to prevent routing collision with named sub-routes
+  // (e.g. GET /signals/funding which is registered in the features router)
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return res.status(404).json({ error: 'not_found' });
+  }
+  const { data, error } = await supabase.from('signals').select('*').eq('id', id).single();
   if (error) throw error;
   res.json({ data });
 }));

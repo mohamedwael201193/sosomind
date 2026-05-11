@@ -27,7 +27,9 @@ const BINANCE_SYMBOL_MAP: Record<string, string> = {
 };
 
 function toBinanceSymbol(asset: string): string {
-  const a = asset.toUpperCase().replace(/^V/, ''); // strip SoDEX "v" prefix
+  // Strip SoDEX "v" prefix and any existing quote suffix (USDT/BUSD/USDC/USD)
+  // so that "BTCUSDT" → "BTC" → "BTCUSDT" (not "BTCUSDTUSDT")
+  const a = asset.toUpperCase().replace(/^V/, '').replace(/(USDT|BUSD|USDC|USD)$/, '');
   return BINANCE_SYMBOL_MAP[a] || `${a}USDT`;
 }
 

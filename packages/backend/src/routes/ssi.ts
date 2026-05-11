@@ -34,9 +34,9 @@ import { wrapMeta } from '../utils/responseMeta.js';
 const router = Router();
 
 /**
- * Static metadata for the 4 live SSI products (whitepaper §5.2 + ssi.sosovalue.com).
- * Keyed by the exact ticker used in the SoSoValue API `/indices` endpoint.
- * Merged with live data from `getIndices()` — static fields are fallbacks only.
+ * Static metadata for live SSI products.
+ * Keyed by the EXACT ticker returned by the SoSoValue API `/indices` endpoint.
+ * All 13 confirmed tickers from: GET /openapi/v1/indices
  */
 const SSI_STATIC: Record<string, {
   sector: string;
@@ -47,7 +47,7 @@ const SSI_STATIC: Record<string, {
   custodian: string;
   sodex_tradeable: boolean;
 }> = {
-  'MAG7.ssi': {
+  'ssiMAG7': {
     sector: 'Mega-Cap Blend',
     thesis: 'Top 7 crypto projects by market cap. Minimum 10% per token; remainder weighted by circulating market cap. Monthly rebalance.',
     constituents_count: 7,
@@ -56,7 +56,7 @@ const SSI_STATIC: Record<string, {
     custodian: 'Cobo/Ceffu',
     sodex_tradeable: true,
   },
-  'DEFI.ssi': {
+  'ssiDeFi': {
     sector: 'DeFi',
     thesis: 'Top DeFi protocols ranked by TVL and on-chain volume. Market-cap weighted. Monthly rebalance.',
     constituents_count: 10,
@@ -65,45 +65,137 @@ const SSI_STATIC: Record<string, {
     custodian: 'Cobo/Ceffu',
     sodex_tradeable: true,
   },
-  'MEME.ssi': {
+  'ssiMeme': {
     sector: 'Meme',
-    thesis: 'Top 10 meme tokens by circulating market cap. Pure market-cap weighted. Monthly rebalance.',
+    thesis: 'Top meme tokens by circulating market cap. Pure market-cap weighted. Monthly rebalance.',
     constituents_count: 10,
     weighting: 'Market-cap weighted',
     rebalance: 'Monthly',
     custodian: 'Cobo/Ceffu',
     sodex_tradeable: true,
   },
-  'USSI': {
-    sector: 'Hedged / Stable',
-    thesis: 'USD-hedged basket. Provides broad crypto exposure with reduced drawdown risk. For capital preservation.',
-    constituents_count: 5,
-    weighting: 'Equal-weight + hedge overlay',
+  'ssiLayer1': {
+    sector: 'Layer 1',
+    thesis: 'Top L1 blockchains by market cap and ecosystem activity. Market-cap weighted. Monthly rebalance.',
+    constituents_count: 8,
+    weighting: 'Market-cap weighted',
+    rebalance: 'Monthly',
+    custodian: 'Cobo/Ceffu',
+    sodex_tradeable: true,
+  },
+  'ssiLayer2': {
+    sector: 'Layer 2',
+    thesis: 'Top Ethereum L2 scaling solutions by TVL and transaction volume. Market-cap weighted. Monthly rebalance.',
+    constituents_count: 8,
+    weighting: 'Market-cap weighted',
+    rebalance: 'Monthly',
+    custodian: 'Cobo/Ceffu',
+    sodex_tradeable: true,
+  },
+  'ssiAI': {
+    sector: 'AI',
+    thesis: 'Top AI-focused crypto projects by market cap and developer activity. Market-cap weighted. Monthly rebalance.',
+    constituents_count: 8,
+    weighting: 'Market-cap weighted',
+    rebalance: 'Monthly',
+    custodian: 'Cobo/Ceffu',
+    sodex_tradeable: true,
+  },
+  'ssiRWA': {
+    sector: 'RWA',
+    thesis: 'Real World Asset protocols bringing traditional finance on-chain. Market-cap weighted. Monthly rebalance.',
+    constituents_count: 7,
+    weighting: 'Market-cap weighted',
+    rebalance: 'Monthly',
+    custodian: 'Cobo/Ceffu',
+    sodex_tradeable: false,
+  },
+  'ssiNFT': {
+    sector: 'NFT',
+    thesis: 'Top NFT marketplace and infrastructure protocols by market cap. Monthly rebalance.',
+    constituents_count: 7,
+    weighting: 'Market-cap weighted',
+    rebalance: 'Monthly',
+    custodian: 'Cobo/Ceffu',
+    sodex_tradeable: false,
+  },
+  'ssiGameFi': {
+    sector: 'GameFi',
+    thesis: 'Leading blockchain gaming and metaverse projects by market cap. Monthly rebalance.',
+    constituents_count: 8,
+    weighting: 'Market-cap weighted',
+    rebalance: 'Monthly',
+    custodian: 'Cobo/Ceffu',
+    sodex_tradeable: false,
+  },
+  'ssiDePIN': {
+    sector: 'DePIN',
+    thesis: 'Decentralized Physical Infrastructure Network protocols. Market-cap weighted. Monthly rebalance.',
+    constituents_count: 7,
+    weighting: 'Market-cap weighted',
+    rebalance: 'Monthly',
+    custodian: 'Cobo/Ceffu',
+    sodex_tradeable: false,
+  },
+  'ssiPayFi': {
+    sector: 'PayFi',
+    thesis: 'Payment-focused crypto protocols enabling global transactions. Market-cap weighted. Monthly rebalance.',
+    constituents_count: 7,
+    weighting: 'Market-cap weighted',
+    rebalance: 'Monthly',
+    custodian: 'Cobo/Ceffu',
+    sodex_tradeable: false,
+  },
+  'ssiCeFi': {
+    sector: 'CeFi',
+    thesis: 'Centralized finance crypto tokens including top exchange tokens. Market-cap weighted. Monthly rebalance.',
+    constituents_count: 7,
+    weighting: 'Market-cap weighted',
+    rebalance: 'Monthly',
+    custodian: 'Cobo/Ceffu',
+    sodex_tradeable: false,
+  },
+  'ssiSocialFi': {
+    sector: 'SocialFi',
+    thesis: 'Social finance and creator economy protocols on-chain. Market-cap weighted. Monthly rebalance.',
+    constituents_count: 7,
+    weighting: 'Market-cap weighted',
     rebalance: 'Monthly',
     custodian: 'Cobo/Ceffu',
     sodex_tradeable: false,
   },
 };
 
-// Fallback tickers if the API `getIndices()` returns empty
+// Fallback tickers if the API `getIndices()` returns empty or throws
 const FALLBACK_TICKERS = Object.keys(SSI_STATIC);
 
-/** Normalize one SSI snapshot into a stable shape for the dashboard. */
+/** Normalize one SSI snapshot into a stable shape for the dashboard.
+ *  All percentage fields (change24h, roi_*) are returned as percent values
+ *  (e.g. -0.45 means -0.45%), converted from the API's decimal format (e.g. -0.0045).
+ */
 function normalizeSnapshot(ticker: string, snap: any, indexMeta?: any): any {
   const staticMeta = SSI_STATIC[ticker] ?? { sector: 'Index Basket', thesis: 'On-chain SSI index basket.' };
   const price = Number(
     snap?.price ?? snap?.last_price ?? snap?.close ?? snap?.nav ?? snap?.current_price ?? 0,
   );
-  const change24h = Number(
-    snap?.price_change_percent_24h ?? snap?.change_pct_24h ?? snap?.change_24h ?? snap?.priceChangePct24h ?? 0,
-  );
-  // TVL: try multiple field names the API might return
+  // API returns change_pct_24h as decimal (e.g. -0.0045 = -0.45%) — multiply by 100
+  const rawChange = snap?.change_pct_24h ?? snap?.price_change_percent_24h ?? snap?.change_24h ?? snap?.priceChangePct24h;
+  const change24h = rawChange != null ? Number(rawChange) * 100 : 0;
+  // TVL: API does not return TVL — keep at 0 (no fabricated data)
   const tvl = Number(snap?.tvl ?? snap?.total_value_locked ?? snap?.market_cap ?? snap?.aum ?? indexMeta?.tvl ?? 0);
   const apy = Number(snap?.apy ?? snap?.staking_apy ?? snap?.yield_rate ?? snap?.yield ?? 0);
   const holders = Number(snap?.holders ?? snap?.holder_count ?? snap?.total_holders ?? 0);
+  // ROI fields from real API (decimal → percent)
+  const roi7d  = snap?.roi_7d  != null ? Number(snap.roi_7d)  * 100 : null;
+  const roi1m  = snap?.roi_1m  != null ? Number(snap.roi_1m)  * 100 : null;
+  const roi3m  = snap?.roi_3m  != null ? Number(snap.roi_3m)  * 100 : null;
+  const roi1y  = snap?.roi_1y  != null ? Number(snap.roi_1y)  * 100 : null;
+  const ytd    = snap?.ytd     != null ? Number(snap.ytd)     * 100 : null;
+  // Human-readable name: strip ssi prefix
+  const displayName = ticker.startsWith('ssi') ? ticker.slice(3) : ticker;
   return {
     ticker,
-    name: indexMeta?.name ?? snap?.name ?? ticker,
+    name: indexMeta?.name ?? snap?.name ?? displayName,
     sector: indexMeta?.sector ?? staticMeta.sector,
     thesis: staticMeta.thesis,
     custodian: staticMeta.custodian ?? 'Cobo/Ceffu',
@@ -117,17 +209,30 @@ function normalizeSnapshot(ticker: string, snap: any, indexMeta?: any): any {
     apy,
     holders,
     nav: snap?.nav ?? snap?.net_asset_value ?? null,
-    // Pass raw through so UI can inspect any extra fields
+    roi_7d: roi7d,
+    roi_1m: roi1m,
+    roi_3m: roi3m,
+    roi_1y: roi1y,
+    ytd,
     _raw: snap ?? {},
   };
 }
 
-/** Discover tickers: getIndices() first, fallback to FALLBACK_TICKERS if empty. */
+/** Discover tickers: getIndices() first, fallback to FALLBACK_TICKERS if empty.
+ *  The /indices endpoint returns a plain string array: ["ssiMAG7", "ssiDeFi", ...]
+ */
 async function discoverTickers(): Promise<string[]> {
   try {
     const indices = await sosovalue.getIndices();
     if (Array.isArray(indices) && indices.length > 0) {
-      return indices.map((idx: any) => String(idx.ticker ?? idx.symbol ?? idx.index_ticker ?? '')).filter(Boolean);
+      // API returns plain strings: ["ssiMAG7", "ssiDeFi", ...]
+      if (typeof indices[0] === 'string') {
+        const strings = (indices as unknown[]).filter((t): t is string => typeof t === 'string' && t.length > 0);
+        if (strings.length > 0) return strings;
+      }
+      // Future-proof: handle object format {ticker, symbol, ...}
+      const mapped = indices.map((idx: any) => String(idx.ticker ?? idx.symbol ?? idx.index_ticker ?? '')).filter(Boolean);
+      if (mapped.length > 0) return mapped;
     }
   } catch {}
   return FALLBACK_TICKERS;
@@ -264,19 +369,21 @@ router.post('/recommend', validate(recommendSchema, 'body'), asyncHandler(async 
     const t = p.ticker;
     if (persona === 'aggressive') {
       score += p.change24h * 2;
-      if (t === 'MEME.ssi') score += 8;
+      if (t === 'ssiMeme') score += 8;
+      if (t === 'ssiGameFi' || t === 'ssiDePIN') score += 5;
     }
     if (persona === 'conservative') {
-      score += (t === 'MAG7.ssi' ? 12 : 0) + (t === 'USSI' ? 15 : 0) - Math.abs(p.change24h);
+      score += (t === 'ssiMAG7' ? 12 : 0) + (t === 'ssiRWA' ? 8 : 0) - Math.abs(p.change24h);
     }
     if (persona === 'balanced') {
-      score += (t === 'DEFI.ssi' ? 6 : 0) + (t === 'MAG7.ssi' ? 4 : 0);
+      score += (t === 'ssiDeFi' ? 6 : 0) + (t === 'ssiMAG7' ? 4 : 0) + (t === 'ssiAI' ? 3 : 0);
     }
     if (persona === 'quant') {
-      score += p.tvl > 0 ? Math.log10(p.tvl + 1) * 2 : 0;
+      // Favour sectors with stronger ROI data
+      score += p.roi_7d != null ? p.roi_7d * 0.5 : 0;
     }
     if (persona === 'swing') score += Math.abs(p.change24h) * 2;
-    if (horizon === 'long')  score += (t === 'MAG7.ssi' ? 6 : 0) + (t === 'DEFI.ssi' ? 4 : 0);
+    if (horizon === 'long')  score += (t === 'ssiMAG7' ? 6 : 0) + (t === 'ssiDeFi' ? 4 : 0) + (t === 'ssiLayer1' ? 3 : 0);
     if (horizon === 'short') score += Math.abs(p.change24h);
     score += (riskAppetite - 50) * 0.05 * p.change24h;
     return { ...p, score: Math.round(score) };
