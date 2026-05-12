@@ -116,53 +116,68 @@ export function createBot(): Bot | null {
       await (ctx as any).editMessageText(text, { parse_mode: 'HTML', reply_markup: kb });
       await (ctx as any).answerCallbackQuery();
     } else {
-      await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
-      // Show embedded wallet address on first start
+      // ── New user: show onboarding wizard (Step 1) immediately ──────────────
       const chatId = String(ctx.chat?.id ?? '');
-      if (chatId) {
-        const embWallet = await getOrCreateTelegramWallet(chatId, ctx.from?.username, ctx.from?.first_name).catch(() => null);
-        if (embWallet) {
-          const short = `${embWallet.wallet_address.slice(0, 6)}…${embWallet.wallet_address.slice(-4)}`;
-          await ctx.reply(
-            `👛 <b>Your SosoMind Wallet</b>\n\n` +
-            `<code>${embWallet.wallet_address}</code>\n\n` +
-            `🚀 <b>3 Steps to start trading:</b>\n` +
-            `① Export your key → import to MetaMask\n` +
-            `② Visit faucet → claim 100 USDC/day\n` +
-            `③ Enable Trading on SoDEX (one-time)\n\n` +
-            `<i>Then just say "buy $10 of BTC" in this chat!</i>\n\n` +
-            `👉 Use <b>/setup</b> for the full step-by-step guide.`,
-            {
-              parse_mode: 'HTML',
-              reply_markup: new InlineKeyboard()
-                .text('📋 Full Setup Guide', 'setup:start').text('👛 My Wallet', 'menu:wallet'),
+      const embWallet = chatId
+        ? await getOrCreateTelegramWallet(chatId, ctx.from?.username, ctx.from?.first_name).catch(() => null)
+        : null;
+
+      if (embWallet) {
+        // Fire-and-forget SoDEX auto-register
+        setImmediate(async () => {
+          try {
+            const { SoDEXClient } = await import('../clients/sodex');
+            const { decryptPrivateKey } = await import('../utils/walletCrypto');
+            const userClient = new SoDEXClient({
+              chainId: parseInt(process.env.SODEX_CHAIN_ID || '138565', 10),
+              privateKey: decryptPrivateKey(embWallet.encrypted_key),
+              isTestnet: true,
+            });
+            const accID = await userClient.resolveAccountID().catch(() => 0);
+            if (!accID) {
+              await userClient.registerApiKey({ name: `tg-${chatId}` });
+              console.log(`[Bot] Auto-registered SoDEX for chatId=${chatId} addr=${embWallet.wallet_address}`);
             }
-          );
-          // Fire-and-forget: try to auto-register this wallet on SoDEX
-          // so the user may not need to click "Enable Trading" manually
-          setImmediate(async () => {
-            try {
-              const { SoDEXClient } = await import('../clients/sodex');
-              const { decryptPrivateKey } = await import('../utils/walletCrypto');
-              const userClient = new SoDEXClient({
-                chainId: parseInt(process.env.SODEX_CHAIN_ID || '138565', 10),
-                privateKey: decryptPrivateKey(embWallet.encrypted_key),
-                isTestnet: true,
-              });
-              const accID = await userClient.resolveAccountID().catch(() => 0);
-              if (!accID) {
-                await userClient.registerApiKey({ name: `tg-${chatId}` });
-                console.log(`[Bot] Auto-registered SoDEX account for chatId=${chatId} addr=${embWallet.wallet_address}`);
-              }
-            } catch (e) {
-              console.warn(`[Bot] SoDEX auto-register skipped for chatId=${chatId}:`, (e as Error).message);
-            }
-          });
-        }
+          } catch (e) {
+            console.warn(`[Bot] SoDEX auto-register skipped for chatId=${chatId}:`, (e as Error).message);
+          }
+        });
+
+        // Send the beautiful onboarding wizard — Step 1
+        await ctx.reply(
+          `🚀 <b>Welcome to SosoMind!</b>\n\n` +
+          `Your AI-powered crypto trading assistant on <b>SoDEX Testnet</b>.\n\n` +
+          `A personal trading wallet has been created for you automatically.\n` +
+          `Follow the 4-step guide below to activate trading in under 3 minutes.\n\n` +
+          `━━━━━━━━━━━━━━━━━━━━━\n` +
+          `<b>● ○ ○ ○  STEP 1 — Your Wallet Address</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━━━\n\n` +
+          `📍 <b>Your wallet address:</b>\n` +
+          `<code>${embWallet.wallet_address}</code>\n\n` +
+          `This wallet is used to sign all your trades automatically — <i>no MetaMask popup needed during trading.</i>\n\n` +
+          `<b>What to do now:</b>\n` +
+          `① Tap <b>📤 Export Private Key</b> below\n` +
+          `② Copy the key\n` +
+          `③ Open <b>MetaMask</b> → tap your account icon → <b>Import Account</b>\n` +
+          `④ Paste the key and import\n\n` +
+          `⚠️ <i>Keep your key secret. Never share it with anyone.</i>\n\n` +
+          `<i>When done, tap ➡️ Next Step to continue.</i>`,
+          {
+            parse_mode: 'HTML',
+            reply_markup: new InlineKeyboard()
+              .text('📤 Export Private Key', 'wallet:export').row()
+              .text('➡️ Next Step: Add Network', 'setup:step2').row()
+              .text('⏭ Skip — Go to Menu', 'menu:main'),
+          }
+        );
+      } else {
+        // Fallback: no wallet (very rare), show main menu
+        await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
       }
-      // Also send the persistent keyboard
+
+      // Always send the persistent bottom keyboard
       await ctx.reply(
-        `🔑 <b>Quick keyboard activated</b> — tap any button below or use inline buttons above.`,
+        `⌨️ <b>Keyboard ready</b> — use buttons below anytime, or type commands naturally.`,
         { parse_mode: 'HTML', reply_markup: MAIN_KB }
       );
     }
@@ -2119,15 +2134,26 @@ export function createBot(): Bot | null {
     }
   });
 
-  // ── Setup Onboarding (/setup) ────────────────────────────────────────────────
-  const sendSetupGuide = async (ctx: Context) => {
-    const chatId = String(ctx.chat?.id ?? '');
-    const wallet = chatId ? await getOrCreateTelegramWallet(chatId, ctx.from?.username, ctx.from?.first_name).catch(() => null) : null;
+  // ── Setup Onboarding — 4-Step Interactive Wizard ─────────────────────────────
+  //
+  //  Step 1 (/start)  → Wallet address + Export key → MetaMask import
+  //  Step 2 (setup:step2) → Add ValueChain Testnet network to MetaMask
+  //  Step 3 (setup:step3) → testnet.sodex.com/portfolio: connect, claim, enable
+  //  Step 4 (setup:step4) / done → Fully ready, show trading shortcuts
+  //
+  // setup:start re-shows Step 1 overview (used from buttons throughout bot)
+  // ─────────────────────────────────────────────────────────────────────────────
 
-    // Check SoDEX account registration status
-    let sodexStatus = '⏳ Unknown';
-    let balance = '⏳ Unknown';
-    if (wallet) {
+  const sendSetupGuide = async (ctx: Context) => {
+    // Overview / re-entry point — shows wallet status and step links
+    const chatId = String(ctx.chat?.id ?? '');
+    const wallet = chatId
+      ? await getOrCreateTelegramWallet(chatId, ctx.from?.username, ctx.from?.first_name).catch(() => null)
+      : null;
+
+    let sodexStatus = '⏳ Checking…';
+    let balanceLine = '⏳ Checking…';
+    if (wallet?.encrypted_key) {
       try {
         const { SoDEXClient } = await import('../clients/sodex');
         const { decryptPrivateKey } = await import('../utils/walletCrypto');
@@ -2139,84 +2165,188 @@ export function createBot(): Bot | null {
         const accID = await userClient.resolveAccountID().catch(() => 0);
         if (accID > 0) {
           sodexStatus = `✅ Registered (ID: ${accID})`;
-          const rawBals: any = await userClient.getAccountBalances().catch(() => null);
-          // SoDEX returns { balances: [...] } or a flat array
-          const bals: any[] = Array.isArray(rawBals)
-            ? rawBals
-            : Array.isArray(rawBals?.balances)
-              ? rawBals.balances
-              : Array.isArray(rawBals?.data)
-                ? rawBals.data
-                : [];
+          const rawBals: any = await userClient.getAccountBalances().catch(() => []);
+          const bals: any[] = Array.isArray(rawBals) ? rawBals
+            : Array.isArray(rawBals?.balances) ? rawBals.balances
+            : Array.isArray(rawBals?.data) ? rawBals.data : [];
           const usdc = bals.find((b: any) =>
-            String(b.coin ?? b.asset ?? b.currency ?? '').toUpperCase().includes('USDC')
+            String(b.coin ?? b.asset ?? '').toUpperCase().includes('USDC')
           );
-          const usdcAmt = usdc
-            ? Number(usdc.available ?? usdc.free ?? usdc.total ?? usdc.amount ?? 0)
-            : 0;
-          const totalUsd = bals.reduce((sum: number, b: any) => {
-            const amt = Number(b.available ?? b.free ?? b.total ?? b.amount ?? 0);
-            return sum + (String(b.coin ?? '').toUpperCase().includes('USDC') ? amt : 0);
-          }, 0);
-          balance = usdcAmt > 0
-            ? `✅ ${usdcAmt.toFixed(2)} USDC (${bals.length} asset${bals.length !== 1 ? 's' : ''})`
+          const usdcAmt = usdc ? Number(usdc.available ?? usdc.free ?? usdc.total ?? 0) : 0;
+          balanceLine = usdcAmt > 0
+            ? `✅ ${usdcAmt.toFixed(2)} USDC`
             : bals.length > 0
-              ? `⚠️ ${bals.length} assets (0 USDC — transfer from Funding)`
-              : '❌ Empty — claim faucet & transfer to Spot';
+              ? `⚠️ ${bals.length} assets — transfer Funding → Spot`
+              : '❌ Empty — claim faucet then transfer to Spot';
         } else {
-          sodexStatus = '❌ Not registered yet';
-          balance = '❌ Not registered yet';
+          sodexStatus = '❌ Not yet registered';
+          balanceLine = '❌ Complete Step 3 first';
         }
       } catch {
-        sodexStatus = '⏳ Checking…';
+        sodexStatus = '⏳ Could not connect'; balanceLine = '⏳';
       }
     }
 
-    const walletAddr = wallet?.wallet_address ?? 'Not created';
-    const short = wallet ? `${walletAddr.slice(0, 6)}…${walletAddr.slice(-4)}` : '?';
-
+    const addr = wallet?.wallet_address ?? '—';
     const text =
       `📋 <b>SosoMind Setup Guide</b>\n\n` +
-      `<b>Your Wallet:</b> <code>${walletAddr}</code>\n` +
+      `<b>Wallet:</b> <code>${addr}</code>\n` +
       `<b>SoDEX Account:</b> ${sodexStatus}\n` +
-      `<b>Spot Balance:</b> ${balance}\n\n` +
-      `━━━━━━━━━━━━━━━━━━━━━\n\n` +
-      `<b>Step ① — Export wallet key to MetaMask</b>\n` +
-      `Use /wallet → <i>Export Key</i>\n` +
-      `Copy the key → MetaMask → Import Account\n` +
-      `Add network: ValueChain Testnet\n` +
-      `  • RPC: <code>https://testnet-rpc.sosovalue.org</code>\n` +
-      `  • Chain ID: <code>138565</code>\n` +
-      `  • Symbol: <code>SOSO</code>\n\n` +
-      `<b>Step ② — Get free testnet USDC</b>\n` +
-      `Connect MetaMask to:\n` +
-      `<a href="https://testnet.sodex.com/faucet">testnet.sodex.com/faucet</a>\n` +
-      `Claim <b>100 USDC + SOSO</b> per day (free)\n\n` +
-      `<b>Step ③ — Enable Trading on SoDEX (one-time)</b>\n` +
-      `Go to <a href="https://testnet.sodex.com">testnet.sodex.com</a>\n` +
-      `Connect wallet → click <b>"Enable Trading"</b>\n` +
-      `Sign the MetaMask popup → done!\n` +
-      `Then: Portfolio → <b>Transfer Funding → Spot</b>\n\n` +
-      `<b>Step ④ — Trade from this bot!</b>\n` +
-      `Just say: <i>"buy $10 of BTC"</i> or\n` +
-      `tap any signal → hit Execute\n\n` +
-      `⚡ <i>The bot signs all trades automatically with your wallet. No MetaMask popup needed after setup!</i>`;
+      `<b>Spot Balance:</b> ${balanceLine}\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `<b>4-Step Activation Checklist:</b>\n\n` +
+      `① 📤 Export private key → import to MetaMask\n` +
+      `② 🌐 Add ValueChain Testnet network\n` +
+      `③ 💰 Connect wallet → Claim testnet → Enable Trading\n` +
+      `④ 🚀 Place your first trade from this bot!\n\n` +
+      `<i>Tap any step to jump straight to its instructions.</i>`;
 
     const kb = new InlineKeyboard()
-      .url('🚰 Faucet', 'https://testnet.sodex.com/faucet').url('🌐 SoDEX', 'https://testnet.sodex.com').row()
-      .text('👛 Export My Key', 'wallet:export').text('💰 Check Balance', 'wallet:balance').row()
+      .text('① Wallet & Key', 'setup:step1').text('② Add Network', 'setup:step2').row()
+      .text('③ Claim & Enable', 'setup:step3').text('④ First Trade', 'setup:step4').row()
+      .url('🚰 Faucet', 'https://testnet.sodex.com/faucet').url('📊 Portfolio', 'https://testnet.sodex.com/portfolio').row()
       .text('🔄 Refresh Status', 'setup:start').text('🏠 Main Menu', 'menu:main');
 
     if ((ctx as any).callbackQuery) {
       await (ctx as any).editMessageText(text, { parse_mode: 'HTML', reply_markup: kb, link_preview_options: { is_disabled: true } });
       await (ctx as any).answerCallbackQuery();
     } else {
-      await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb } as any);
+      await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb, link_preview_options: { is_disabled: true } } as any);
     }
   };
 
   bot.command('setup', sendSetupGuide);
   bot.callbackQuery('setup:start', sendSetupGuide);
+
+  // ── Setup Step 1 — Wallet address + export private key ──────────────────────
+  bot.callbackQuery('setup:step1', async (ctx) => {
+    await ctx.answerCallbackQuery();
+    const chatId = String(ctx.chat?.id ?? '');
+    const wallet = chatId
+      ? await getOrCreateTelegramWallet(chatId, ctx.from?.username, ctx.from?.first_name).catch(() => null)
+      : null;
+    const addr = wallet?.wallet_address ?? '—';
+    const text =
+      `<b>● ○ ○ ○  STEP 1 — Your Wallet</b>\n\n` +
+      `📍 <b>Your wallet address:</b>\n<code>${addr}</code>\n\n` +
+      `This wallet signs all your trades automatically — you only need to set it up once in MetaMask to get testnet funds.\n\n` +
+      `<b>What to do:</b>\n` +
+      `① Tap <b>📤 Export Private Key</b> below\n` +
+      `② Copy the key (it appears in the next message)\n` +
+      `③ Open <b>MetaMask</b> → tap your account icon → <b>Import Account</b>\n` +
+      `④ Paste the private key and tap <b>Import</b>\n\n` +
+      `✅ Done? Proceed to Step 2 to add the network.\n\n` +
+      `⚠️ <i>Never share your private key with anyone. Delete the key message after copying.</i>`;
+    const kb = new InlineKeyboard()
+      .text('📤 Export Private Key', 'wallet:export').row()
+      .text('⬅️ Overview', 'setup:start').text('➡️ Step 2: Network', 'setup:step2');
+    await (ctx as any).editMessageText(text, { parse_mode: 'HTML', reply_markup: kb });
+  });
+
+  // ── Setup Step 2 — Add ValueChain Testnet to MetaMask ───────────────────────
+  bot.callbackQuery('setup:step2', async (ctx) => {
+    await ctx.answerCallbackQuery();
+    const text =
+      `<b>○ ● ○ ○  STEP 2 — Add ValueChain Testnet to MetaMask</b>\n\n` +
+      `Your imported wallet needs to be on the right network to interact with SoDEX.\n\n` +
+      `<b>In MetaMask:</b>\n` +
+      `① Tap the network selector at the top\n` +
+      `② Tap <b>Add Network</b> → <b>Add Manually</b>\n` +
+      `③ Fill in these details:\n\n` +
+      `<b>Network Name:</b>\n<code>ValueChain Testnet</code>\n\n` +
+      `<b>RPC URL:</b>\n<code>https://testnet-rpc.sosovalue.org</code>\n\n` +
+      `<b>Chain ID:</b>\n<code>138565</code>\n\n` +
+      `<b>Currency Symbol:</b>\n<code>SOSO</code>\n\n` +
+      `<b>Block Explorer:</b>\n<code>https://testnet.sodex.com/explorer</code>\n\n` +
+      `④ Tap <b>Save</b> — you are now on ValueChain Testnet!\n\n` +
+      `✅ Done? Proceed to Step 3 to claim your free testnet funds.`;
+    const kb = new InlineKeyboard()
+      .text('⬅️ Step 1', 'setup:step1').text('➡️ Step 3: Claim Funds', 'setup:step3');
+    await (ctx as any).editMessageText(text, { parse_mode: 'HTML', reply_markup: kb });
+  });
+
+  // ── Setup Step 3 — Portfolio: connect, claim, enable trading ────────────────
+  bot.callbackQuery('setup:step3', async (ctx) => {
+    await ctx.answerCallbackQuery();
+    const text =
+      `<b>○ ○ ● ○  STEP 3 — Claim Testnet Funds &amp; Enable Trading</b>\n\n` +
+      `Now open the SoDEX Portfolio page and complete 3 quick actions:\n\n` +
+      `<b>① Connect Your Wallet</b>\n` +
+      `Go to 👉 <a href="https://testnet.sodex.com/portfolio">testnet.sodex.com/portfolio</a>\n` +
+      `Tap <b>Connect Wallet</b> → choose <b>MetaMask</b>\n` +
+      `Select your imported account and approve.\n\n` +
+      `<b>② Claim Testnet Funds (free!)</b>\n` +
+      `Go to 👉 <a href="https://testnet.sodex.com/faucet">testnet.sodex.com/faucet</a>\n` +
+      `Tap <b>Claim</b> — you receive <b>100 USDC + SOSO gas</b> free per day.\n\n` +
+      `<b>③ Enable Trading (one-time)</b>\n` +
+      `Back on the portfolio page, click <b>"Enable Trading"</b>\n` +
+      `Sign the MetaMask popup (this authorises the bot to place orders).\n\n` +
+      `<b>④ Transfer to Spot</b>\n` +
+      `Portfolio → Balances → find USDC → tap <b>Transfer</b>\n` +
+      `Move funds from <b>Funding → Spot</b> so they are available to trade.\n\n` +
+      `✅ Done? You are fully set up. Tap Step 4 to place your first trade!`;
+    const kb = new InlineKeyboard()
+      .url('📊 Open Portfolio', 'https://testnet.sodex.com/portfolio').row()
+      .url('🚰 Open Faucet', 'https://testnet.sodex.com/faucet').row()
+      .text('⬅️ Step 2', 'setup:step2').text('➡️ Step 4: Trade!', 'setup:step4');
+    await (ctx as any).editMessageText(text, { parse_mode: 'HTML', reply_markup: kb, link_preview_options: { is_disabled: true } });
+  });
+
+  // ── Setup Step 4 — You're ready! First trade guide ──────────────────────────
+  bot.callbackQuery('setup:step4', async (ctx) => {
+    await ctx.answerCallbackQuery();
+    const chatId = String(ctx.chat?.id ?? '');
+    const wallet = chatId
+      ? await getOrCreateTelegramWallet(chatId, ctx.from?.username, ctx.from?.first_name).catch(() => null)
+      : null;
+
+    let balanceLine = '⏳ Checking…';
+    if (wallet?.encrypted_key) {
+      try {
+        const { SoDEXClient } = await import('../clients/sodex');
+        const { decryptPrivateKey } = await import('../utils/walletCrypto');
+        const userClient = new SoDEXClient({
+          chainId: parseInt(process.env.SODEX_CHAIN_ID || '138565', 10),
+          privateKey: decryptPrivateKey(wallet.encrypted_key),
+          isTestnet: true,
+        });
+        const rawBals: any = await userClient.getAccountBalances().catch(() => []);
+        const bals: any[] = Array.isArray(rawBals) ? rawBals
+          : Array.isArray(rawBals?.balances) ? rawBals.balances
+          : Array.isArray(rawBals?.data) ? rawBals.data : [];
+        const nonZero = bals.filter((b: any) => Number(b.available ?? b.free ?? 0) > 0);
+        balanceLine = nonZero.length > 0
+          ? nonZero.map((b: any) => `<b>${b.coin ?? b.asset}</b> ${Number(b.available ?? b.free ?? 0).toFixed(2)}`).join(' · ')
+          : '⚠️ No spot balance — complete Step 3 first';
+      } catch {
+        balanceLine = '⏳ Could not load';
+      }
+    }
+
+    const text =
+      `<b>○ ○ ○ ●  STEP 4 — You're Ready to Trade! 🎉</b>\n\n` +
+      `💳 <b>Spot Balance:</b> ${balanceLine}\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `<b>How to trade from this bot:</b>\n\n` +
+      `💬 <b>Natural language</b> — just type:\n` +
+      `  <i>"buy $50 of BTC"</i>\n` +
+      `  <i>"short ETH with $100"</i>\n` +
+      `  <i>"close my BTC position"</i>\n\n` +
+      `📊 <b>Inline buttons</b> — tap ⚡ Signal → pick asset → Execute\n\n` +
+      `🎙️ <b>Voice messages</b> — send a voice note to trade hands-free\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `<b>Other things you can do:</b>\n` +
+      `🔬 Research — AI deep analysis of any coin\n` +
+      `🐋 Whales — track smart money flows\n` +
+      `📊 Briefing — daily ETF &amp; macro summary\n` +
+      `🏆 Leaderboard — paper trading competition\n\n` +
+      `<i>⚡ The bot signs all orders automatically with your wallet. Zero MetaMask popups needed!</i>`;
+    const kb = new InlineKeyboard()
+      .text('⚡ Pick a Signal', 'menu:signal').text('🔬 Research Coin', 'menu:research').row()
+      .text('💼 My Portfolio', 'menu:portfolio').text('👛 My Wallet', 'menu:wallet').row()
+      .text('🏠 Main Menu', 'menu:main').text('⬅️ Back', 'setup:step3');
+    await (ctx as any).editMessageText(text, { parse_mode: 'HTML', reply_markup: kb });
+  });
 
   // ── Wallet Management (/wallet) ─────────────────────────────────────────────
   // Map of chatId → what we're awaiting from that user (conversation state)

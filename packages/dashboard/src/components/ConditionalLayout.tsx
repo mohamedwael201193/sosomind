@@ -5,7 +5,7 @@ import { MobileNav } from './MobileNav';
 import { StatusBar } from './StatusBar';
 import { PageTransition } from './PageTransition';
 
-const STANDALONE_ROUTES = ['/landing', '/trade/sign'];
+const STANDALONE_ROUTES = ['/', '/landing', '/docs', '/trade/sign'];
 
 export function ConditionalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

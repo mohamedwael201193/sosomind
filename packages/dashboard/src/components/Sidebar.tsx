@@ -24,7 +24,7 @@ const navSections: NavSection[] = [
   {
     label: "TRADE",
     items: [
-      { href: "/", label: "Dashboard", icon: LayoutDashboard, count: 1 },
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, count: 1 },
       { href: "/trade", label: "Trade", icon: CandlestickChart, count: 1 },
       { href: "/strategies", label: "Strategies", icon: Layers, badge: true, count: 1 },
       { href: "/signals", label: "Signals", icon: Zap, badge: true, count: 3 },

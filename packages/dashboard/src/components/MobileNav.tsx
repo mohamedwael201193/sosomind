@@ -6,7 +6,7 @@ import { LayoutDashboard, Zap, PieChart, Search, Trophy, Waves } from "lucide-re
 import { cn } from "@/lib/utils";
 
 const items = [
-  { href: "/", label: "Home", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Home", icon: LayoutDashboard },
   { href: "/signals", label: "Signals", icon: Zap },
   { href: "/portfolio", label: "Portfolio", icon: PieChart },
   { href: "/research", label: "Research", icon: Search },
@@ -17,8 +17,8 @@ const items = [
 export function MobileNav() {
   const pathname = usePathname();
 
-  // Hide on landing page
-  if (pathname === "/landing") return null;
+  // Hide on standalone pages
+  if (pathname === "/" || pathname === "/landing" || pathname?.startsWith("/docs")) return null;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 md:hidden z-50 border-t border-[var(--glass-border)] bg-[var(--bg-card)] backdrop-blur-xl">
