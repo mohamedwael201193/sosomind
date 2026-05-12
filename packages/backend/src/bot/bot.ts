@@ -43,7 +43,7 @@ function assetMenu(prefix: string) {
 
 function mainMenuMsg() {
   return (
-    `<b>🧠 SosoMind</b> — AI Crypto Intelligence (15 Unique Features)\n` +
+    `<b>🧠 SosoMind</b> — AI Crypto Intelligence (17 Unique Features)\n` +
     `<i>⛓️ Powered by SoSoValue + SoDEX · DeFi-native · AI-driven</i>\n\n` +
     `<b>📊 Market Intelligence:</b>\n` +
     `🔬 <b>Research</b> — Deep AI analysis (13+ sources)\n` +
@@ -51,7 +51,9 @@ function mainMenuMsg() {
     `📊 <b>Briefing</b> — ETF/Macro/Sectors daily brief\n` +
     `🐋 <b>Whales</b> — Smart money: ETF flows, treasuries, VC\n` +
     `🔄 <b>Arb</b> — Cross-exchange arbitrage scanner\n` +
-    `📡 <b>Funding</b> — Perps funding rate contrarian signals\n\n` +
+    `📡 <b>Funding</b> — Perps funding rate contrarian signals\n` +
+    `🧺 <b>Basket</b> — Top-3 assets for any SSI sector + execute\n` +
+    `📐 <b>Methodology</b> — Signal scoring formula (S1·S2·S3)\n\n` +
     `<b>� SSI Indexes (SoSoValue Protocol):</b>\n` +
     `📈 <b>SSI Indexes</b> — Live baskets: MAG7.ssi, DEFI.ssi, MEME.ssi, USSI\n` +
     `📰 <b>Newsletter</b> — Smart-money daily brief with provenance\n\n` +
@@ -106,6 +108,7 @@ export function createBot(): Bot | null {
       .text('🤝 Subscribe', 'subscribe:btc,macro,etf').text('⚙️ Settings', 'settings:view').row()
       .text('📈 SSI Indexes', 'ssi:view').text('📰 Newsletter', 'newsletter:latest').row()
       .text('🧠 Intel', 'intel:view').text('📊 Track Record', 'track_record:view').row()
+      .text('🧺 Basket', 'basket:menu').text('📐 Methodology', 'methodology:full').row()
       .text('💎👛 My Wallet', 'menu:wallet');
 
     const text = mainMenuMsg();
@@ -2366,6 +2369,20 @@ export function createBot(): Bot | null {
       );
     }
     await runBasket(ctx, ticker);
+  });
+
+  bot.callbackQuery('basket:menu', async (ctx) => {
+    await ctx.answerCallbackQuery();
+    const kb = new InlineKeyboard()
+      .text('ssiAI', 'basket:ssiAI').text('ssiDeFi', 'basket:ssiDeFi').text('ssiLayer1', 'basket:ssiLayer1').row()
+      .text('ssiLayer2', 'basket:ssiLayer2').text('ssiGaming', 'basket:ssiGaming').text('ssiInfra', 'basket:ssiInfra').row()
+      .text('ssiMeme', 'basket:ssiMeme').text('ssiRWA', 'basket:ssiRWA').text('ssiDePIN', 'basket:ssiDePIN').row()
+      .text('ssiCEX', 'basket:ssiCEX').text('ssiDEX', 'basket:ssiDEX').text('ssiNFT', 'basket:ssiNFT').row()
+      .text('⬅️ Back', 'menu:main');
+    await (ctx as any).editMessageText(
+      `🧺 <b>Sector Basket Builder</b>\n\n<i>Pick a sector to see top-3 assets by momentum score with execute buttons:</i>`,
+      { parse_mode: 'HTML', reply_markup: kb }
+    );
   });
 
   bot.callbackQuery(/^basket:(.+)$/, async (ctx) => {
