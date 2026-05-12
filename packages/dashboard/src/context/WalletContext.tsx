@@ -112,8 +112,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       if (!accounts.length) throw new Error('No accounts returned from MetaMask');
       const addr = accounts[0].toLowerCase();
 
-      // 1b. Auto-switch to SoDEX chain (chainId 138565 = 0x21d85)
-      //     Handles 'ValueChain Testnet' duplicate-RPC case transparently
+      // 1b. Auto-switch to ValueChain Testnet (chainId 138565 = 0x21d45)
+      //     RPC: https://testnet.valuechain.xyz — adds the chain if not yet in MetaMask
       try {
         await ensureSoDEXChain(ethereum, 138565);
       } catch (chainErr: any) {

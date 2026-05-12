@@ -83,10 +83,10 @@ export async function ensureSoDEXChain(eth: any, targetChainId: number): Promise
           method: 'wallet_addEthereumChain',
           params: [{
             chainId: targetHex,
-            chainName: `SoDEX ${targetChainId === 138565 ? 'Testnet' : 'Mainnet'}`,
-            nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-            rpcUrls: [targetChainId === 138565 ? 'https://testnet-rpc.sodex.dev' : 'https://rpc.sodex.dev'],
-            blockExplorerUrls: [targetChainId === 138565 ? 'https://testnet-explorer.sodex.dev' : 'https://explorer.sodex.dev'],
+            chainName: targetChainId === 138565 ? 'ValueChain Testnet' : 'ValueChain',
+            nativeCurrency: { name: 'SOSO', symbol: 'SOSO', decimals: 18 },
+            rpcUrls: [targetChainId === 138565 ? 'https://testnet.valuechain.xyz' : 'https://mainnet.valuechain.xyz'],
+            blockExplorerUrls: [targetChainId === 138565 ? 'https://testnet-scan.valuechain.xyz' : 'https://main-scan.valuechain.xyz'],
           }],
         });
       } catch (addErr: any) {
@@ -106,7 +106,7 @@ export async function ensureSoDEXChain(eth: any, targetChainId: number): Promise
       }
     } else {
       throw new Error(
-        `Please switch your MetaMask network to SoDEX ${targetChainId === 138565 ? 'Testnet' : 'Mainnet'} (chainId ${targetChainId}) and retry.`
+        `Please switch your MetaMask network to ${targetChainId === 138565 ? 'ValueChain Testnet' : 'ValueChain'} (chainId ${targetChainId}) and retry.`
       );
     }
   }
