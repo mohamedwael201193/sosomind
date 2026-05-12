@@ -16,7 +16,7 @@ import { useEffect, useMemo, useRef, useState, useCallback, Suspense } from 'rea
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { fetcher } from '@/lib/api';
+import { fetcher, api } from '@/lib/api';
 import { placeSpotOrder, getRelayInfo } from '@/lib/sodex-client';
 import { useWallet } from '@/context/WalletContext';
 import { GlassCard } from '@/components/GlassCard';
@@ -230,8 +230,17 @@ function TradeInner() {
   // ── Strategy-specific loaded data ─────────────────────────────────────────
   const [copySignalData, setCopySignalData] = useState<any>(null);
   const [ssiBasketData, setSsiBasketData] = useState<{ sector: any; basket: any } | null>(null);
+  const [ssiProxyAsset, setSsiProxyAsset] = useState<string | null>(null);
   const [strategyLoading, setStrategyLoading] = useState(false);
   const autoFilledStrategyRef = useRef<string | null>(null);
+
+  // Sector → best available SoDEX Testnet proxy (BTC or ETH)
+  const SECTOR_PROXY: Record<string, string> = {
+    ssiDeFi: 'ETH', ssiAI: 'ETH', ssiLayer1: 'BTC', ssiLayer2: 'ETH',
+    ssiRWA: 'BTC', ssiNFT: 'ETH', ssiMeme: 'ETH', ssiGameFi: 'ETH',
+    ssiMAG7: 'BTC', ssiPayFi: 'BTC', ssiCeFi: 'BTC',
+    ssiSocialFi: 'ETH', ssiDePIN: 'ETH',
+  };
 
   const symbols = useQuery<SodexSymbol[]>({
     queryKey: ['sodex', 'spot', 'symbols'],
@@ -374,29 +383,46 @@ function TradeInner() {
     }
   }, [strategy, copySignalData, ssiBasketData, activeSymbol, usdcBalance, bestAsk]);
 
-  // Reset auto-fill flag when user switches strategy so it can re-fill on next load
+  // Reset auto-fill flag and proxy when user switches strategy
   useEffect(() => {
     autoFilledStrategyRef.current = null;
+    setSsiProxyAsset(null);
   }, [strategy]);
 
   async function handleStrategyProceed() {
     setStrategyLoading(true);
     try {
       if (strategy === 'copy') {
-        const sigs: any[] = (await fetcher('/api/agents/signals?limit=5')) ?? [];
-        const sig = Array.isArray(sigs) ? sigs[0] : null;
+        // 1. Try stored signals first
+        let sigs: any[] = (await fetcher('/api/agents/signals?limit=5')) ?? [];
+        let sig = Array.isArray(sigs) ? sigs[0] : null;
+
+        // 2. If table empty, generate a live signal from the research agent
+        if (!sig) {
+          const researchAsset = activeSymbol?.baseCoin?.replace(/^v/, '') ?? 'ETH';
+          try {
+            const res = await api.post(`/api/agents/research/${researchAsset}`);
+            sig = res?.data?.signal ?? null;
+          } catch (e) {
+            console.warn('[Copy Signal] research agent failed:', e);
+          }
+        }
+
         if (sig) {
           setCopySignalData(sig);
           const assetName = String(sig.asset ?? sig.symbol ?? '').replace(/USDT|USDC|\/.*/, '').toUpperCase();
+          // Try to match by exact base coin; fall back to current market
           const matchSym = (symbols.data ?? []).find(
             (s) => s.baseCoin === `v${assetName}` || s.baseCoin === assetName,
-          );
+          ) ?? (symbols.data ?? []).find((s) => s.id === symbolId);
           if (matchSym) setSymbolId(matchSym.id);
           const dir = String(sig.direction ?? sig.side ?? '').toLowerCase();
           setSide(dir.includes('short') || dir === 'sell' ? 'sell' : 'buy');
           if (sig.entry && Number(sig.entry) > 0) {
             setOrderType('limit');
             setPrice(String(Number(sig.entry).toFixed(2)));
+          } else {
+            setOrderType('market');
           }
         }
       } else if (strategy === 'ssi') {
@@ -408,13 +434,28 @@ function TradeInner() {
         if (top?.ticker) {
           const basketData: any = await fetcher(`/api/sectors/intel/${top.ticker}/basket`);
           setSsiBasketData({ sector: top, basket: basketData });
-          const topAsset: string | undefined = basketData?.basket?.[0]?.asset;
-          if (topAsset) {
-            const matchSym = (symbols.data ?? []).find(
-              (s) => s.baseCoin === `v${topAsset}` || s.baseCoin === topAsset,
+
+          // Try basket assets first
+          const basketAssets: string[] = (basketData?.basket ?? []).map((b: any) => String(b.asset));
+          let matchSym = basketAssets
+            .map((asset) => (symbols.data ?? []).find(
+              (s) => s.baseCoin === `v${asset}` || s.baseCoin === asset,
+            ))
+            .find(Boolean);
+
+          // Fallback: use sector proxy (ETH or BTC) when basket assets not on SoDEX Testnet
+          if (!matchSym) {
+            const proxyBase = SECTOR_PROXY[top.ticker] ?? 'ETH';
+            matchSym = (symbols.data ?? []).find(
+              (s) => s.baseCoin === `v${proxyBase}` || s.baseCoin === proxyBase ||
+                     s.name.includes(proxyBase),
             );
-            if (matchSym) setSymbolId(matchSym.id);
+            if (matchSym) setSsiProxyAsset(proxyBase);
+          } else {
+            setSsiProxyAsset(null);
           }
+
+          if (matchSym) setSymbolId(matchSym.id);
           setSide('buy');
           setOrderType('market');
         }
@@ -805,8 +846,8 @@ function TradeInner() {
                   <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Choose Strategy</h3>
                   <div className="space-y-2">
                     {([
-                      { id: 'copy' as Strategy, icon: <Zap className="w-4 h-4" />, label: 'Copy Signal', desc: 'Mirror the latest AI-generated trade signal from the Signal Hub' },
-                      { id: 'ssi' as Strategy, icon: <BarChart2 className="w-4 h-4" />, label: 'Follow SSI Basket', desc: 'Execute based on SoSoValue Sector Sentiment Index momentum' },
+                      { id: 'copy' as Strategy, icon: <Zap className="w-4 h-4" />, label: 'Copy Signal', desc: 'Mirror the latest AI-generated trade signal — fetched live from the research agent if none are cached' },
+                      { id: 'ssi' as Strategy, icon: <BarChart2 className="w-4 h-4" />, label: 'Follow SSI Basket', desc: 'Execute based on SoSoValue Sector Sentiment Index momentum — uses BTC/ETH proxy when basket assets aren\'t on SoDEX Testnet' },
                       { id: 'manual' as Strategy, icon: <SlidersHorizontal className="w-4 h-4" />, label: 'Manual Order', desc: 'Set your own price, size, and order type' },
                     ] as const).map(({ id, icon, label, desc }) => (
                       <button
@@ -957,8 +998,9 @@ function TradeInner() {
                   )}
                   {strategy === 'copy' && !copySignalData && (
                     <div className="mb-3 p-3 rounded-xl border text-[11px]"
-                      style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-elevated)' }}>
-                      <p style={{ color: 'var(--text-muted)' }}>No active signal found — fill the order manually or wait for next research cycle.</p>
+                      style={{ borderColor: 'rgba(249,115,22,0.2)', background: 'rgba(249,115,22,0.04)' }}>
+                      <p className="font-semibold mb-0.5" style={{ color: '#f97316' }}>No stored signal — research agent was called live.</p>
+                      <p style={{ color: 'var(--text-muted)' }}>If the signal still didn&apos;t load, fill in the order fields below manually or go back and retry.</p>
                     </div>
                   )}
 
@@ -1003,9 +1045,16 @@ function TradeInner() {
                       {(ssiBasketData.basket?.basket ?? []).every((item: any) =>
                         !(symbols.data ?? []).find((s) => s.baseCoin === `v${item.asset}` || s.baseCoin === item.asset)
                       ) && (
-                        <p className="mt-2 text-[10px] italic" style={{ color: 'var(--text-muted)' }}>
-                          These assets aren&apos;t on SoDEX Testnet yet — use the market selector above to trade the sector theme with BTC or ETH.
-                        </p>
+                        <div className="mt-2 px-2.5 py-1.5 rounded-lg text-[10px]" style={{ background: 'rgba(0,255,127,0.06)', border: '1px solid rgba(0,255,127,0.18)' }}>
+                          {ssiProxyAsset ? (
+                            <span>
+                              <span className="font-bold" style={{ color: 'var(--accent)' }}>Proxy: {ssiProxyAsset}</span>
+                              <span style={{ color: 'var(--text-muted)' }}> selected as sector theme proxy — basket assets not yet listed on SoDEX Testnet.</span>
+                            </span>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)' }}>Basket assets not on SoDEX Testnet — use BTC or ETH to trade this sector theme.</span>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
