@@ -1,6 +1,5 @@
 ﻿import { Bot, InlineKeyboard, InputFile, Keyboard, Context } from 'grammy';
 import { runResearchAgent } from '../agents/research';
-import { runExecutionAgent } from '../agents/execution';
 import { sosovalue } from '../clients/sosovalue';
 import { supabase } from '../db/supabase';
 import { upsertSubscriber, getSignals, getUserPreference, setUserPreference, getOrCreateTelegramWallet, replaceTelegramWallet } from '../db/supabase';
@@ -743,30 +742,21 @@ export function createBot(): Bot | null {
         }
       }
 
-      // Fallback: house execution agent
+      // No embedded wallet available — surface a clear error instead of using house account
       if (!sodexResult) {
-        const result = await runExecutionAgent({
-          market,
-          side: side as 'buy' | 'sell',
-          amount: Number(qtyStr),
-          orderType: 'market',
-        });
-        const statusIcon = result.status === 'submitted' ? '✅' : '⚠️';
-        const text =
-          `${statusIcon} <b>Execution Result</b>\n\n` +
-          `📊 Status: <b>${result.status}</b>\n` +
-          `🛡️ Risk: <b>${result.risk?.verdict}</b>\n` +
-          `📋 ${(result.risk?.reasons || []).join(' · ')}\n` +
-          `🪙 Trade ID: <code>${result.trade?.id || 'n/a'}</code>\n` +
-          (result.status === 'failed' && (result as any).error
-            ? `\n❌ Error: <code>${String((result as any).error).slice(0, 200)}</code>\n`
-            : '') +
-          `\n<i>⛓️ House account · SoDEX Testnet</i>`;
         const kb = new InlineKeyboard()
-          .text('💼 View Portfolio', 'menu:portfolio')
-          .text('🔄 Trade Again', `trade_quick:${market.split('_')[0]}:${side}:${qtyStr}`).row()
+          .text('🔄 Retry', `trade_quick:${market.split('_')[0]}:${side}:${qtyStr}`).row()
+          .text('📋 Setup Guide', 'setup:start').row()
           .text('🏠 Main Menu', 'menu:main');
-        return await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: kb });
+        return await ctx.editMessageText(
+          `❌ <b>Wallet Not Available</b>\n\n` +
+          `Could not load your embedded wallet (database error).\n\n` +
+          `<b>To fix:</b>\n` +
+          `• Tap <b>Retry</b> to try again\n` +
+          `• If the issue persists, run /start to re-initialise your wallet\n\n` +
+          `<i>Your funds are safe — no order was sent.</i>`,
+          { parse_mode: 'HTML', reply_markup: kb }
+        );
       }
 
       // Embedded wallet execution result

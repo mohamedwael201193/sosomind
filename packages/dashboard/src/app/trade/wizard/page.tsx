@@ -14,7 +14,7 @@ import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { fetchWithMeta, fetcher, api } from "@/lib/api";
+import { fetchWithMeta, fetcher } from "@/lib/api";
 import { placeSpotOrder } from "@/lib/sodex-client";
 import { useWallet } from "@/context/WalletContext";
 import { GlassCard } from "@/components/GlassCard";
@@ -180,11 +180,6 @@ function WizardInner() {
         price: orderType === 'limit' ? Number(Number(limitPx).toFixed(symbol.pricePrecision ?? 2)) : undefined,
       });
       setSubmitResult(result);
-      // Persist best-effort audit log
-      api.post('/api/trades', {
-        symbol: symbol.name, side, qty, price: px, orderType,
-        signalId: signal?.id ?? null, source: 'wizard',
-      }).catch(() => {});
     } catch (e: any) {
       setSubmitError(e?.message ?? 'Submission failed');
     } finally { setSubmitting(false); }
