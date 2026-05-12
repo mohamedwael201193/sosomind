@@ -85,6 +85,51 @@ function mainMenuMsg() {
   );
 }
 
+// ─── Tradeable assets cache ───────────────────────────────────────────────────
+// Dynamically queries SoDEX symbol list and caches which assets are in TRADING
+// status (not CANCEL_ONLY / HALT / SUSPENDED). Refreshed every 10 minutes.
+const _NON_TRADING_ST = ['CANCEL_ONLY', 'HALT', 'SUSPENDED', 'BREAK', 'DISABLED', 'INACTIVE', 'CLOSED'];
+let _tradeableCacheExpiry = 0;
+let _tradeableAssetNames: string[] = [];
+
+async function getTradeableAssets(): Promise<string[]> {
+  if (Date.now() < _tradeableCacheExpiry && _tradeableAssetNames.length > 0) return _tradeableAssetNames;
+  try {
+    const { sodex: _houseSodex } = await import('../clients/sodex');
+    const raw: any = await _houseSodex.getSpotSymbols().catch(() => null);
+    const arr: any[] = Array.isArray(raw) ? raw : raw?.data ?? raw?.symbols ?? [];
+    const tradeable = arr
+      .filter((s: any) => {
+        const st = String(s?.status ?? '').toUpperCase();
+        // Empty status → assume tradeable (don't block unknown states)
+        return !st || !_NON_TRADING_ST.some(x => st.includes(x));
+      })
+      .map((s: any) => {
+        // Strip v/TEST prefixes from baseCoin → clean symbol (e.g. "vBTC" → "BTC", "TESTBTC" → "BTC")
+        const base = String(s?.baseCoin ?? s?.base_coin ?? '').toUpperCase();
+        return base.replace(/^V/, '').replace(/^TEST/, '');
+      })
+      .filter(Boolean);
+    const unique = [...new Set(tradeable)] as string[];
+    if (unique.length > 0) {
+      _tradeableAssetNames = unique;
+      _tradeableCacheExpiry = Date.now() + 10 * 60 * 1000; // 10 min TTL
+    }
+  } catch { /* keep stale cache on error */ }
+  return _tradeableAssetNames.length > 0 ? _tradeableAssetNames : ['BTC', 'ETH', 'SOL', 'XRP', 'DOGE', 'SUI'];
+}
+
+// Build an InlineKeyboard row from the first N tradeable assets (for error suggestions)
+async function tradeableSuggestionKb(n = 6): Promise<InlineKeyboard> {
+  const assets = (await getTradeableAssets()).slice(0, n);
+  const kb = new InlineKeyboard();
+  for (let i = 0; i < assets.length; i++) {
+    kb.text(assets[i], `trade_amount:${assets[i]}:buy`);
+    if ((i + 1) % 3 === 0 && i < assets.length - 1) kb.row();
+  }
+  return kb.row().text('⬅️ Back', 'menu:signal');
+}
+
 export function createBot(): Bot | null {
   if (!TOKEN) {
     console.warn('TELEGRAM_BOT_TOKEN not set. Bot disabled.');
@@ -405,22 +450,23 @@ export function createBot(): Bot | null {
     const side = ctx.match[2] as 'buy' | 'sell';
     await ctx.answerCallbackQuery();
 
-    // Early tradeability check — read-only SoDEX client, no private key needed
+    // Early tradeability check — use cached tradeable list from SoDEX
     try {
       const { SoDEXClient } = await import('../clients/sodex');
       const pubClient = new SoDEXClient({ chainId: parseInt(process.env.SODEX_CHAIN_ID || '138565', 10), isTestnet: true });
       const symMeta: any = await pubClient.findMarketForAsset(asset).catch(() => null);
       if (symMeta) {
         const st = String(symMeta?.status ?? '').toUpperCase();
-        const NON_TRADING = ['CANCEL_ONLY', 'HALT', 'SUSPENDED', 'BREAK', 'DISABLED', 'INACTIVE', 'CLOSED'];
-        if (st && NON_TRADING.some(s => st.includes(s))) {
-          const kb = new InlineKeyboard()
-            .text('₿ BTC', 'trade_amount:BTC:buy').text('Ξ ETH', 'trade_amount:ETH:buy').text('◎ SOL', 'trade_amount:SOL:buy').row()
-            .text('⬅️ Back', 'menu:signal');
+        if (st && _NON_TRADING_ST.some(s => st.includes(s))) {
+          const tradeable = await getTradeableAssets();
+          const kb = await tradeableSuggestionKb();
+          const tradeList = tradeable.slice(0, 10).join(' · ');
           await (ctx as any).editMessageText(
-            `⛔ <b>${asset} is in ${st} mode</b>\n\n` +
-            `New orders for <b>${asset}</b> are blocked on SoDEX Testnet right now.\n\n` +
-            `<b>Available to trade:</b>\n₿ BTC · Ξ ETH · ◎ SOL · ⚡ XRP · 🐕 DOGE · 🌊 SUI`,
+            `⛔ <b>${asset} is in ${st} mode on SoDEX Testnet</b>\n\n` +
+            `New orders for <b>${asset}</b> are currently blocked by the exchange.\n\n` +
+            `<b>Tokens accepting orders right now:</b>\n` +
+            `<code>${tradeList}</code>\n\n` +
+            `<i>Tap any asset below to trade it, or use /trade LONG BTC</i>`,
             { parse_mode: 'HTML', reply_markup: kb }
           );
           return;
@@ -732,12 +778,12 @@ export function createBot(): Bot | null {
           // Pre-flight: reject if market is in cancel-only / halt / suspended mode
           // SoDEX returns status: "TRADING" for active markets; other values block new orders.
           const rawStatus = String(symMeta?.status ?? '').toUpperCase();
-          const NON_TRADING = ['CANCEL_ONLY', 'HALT', 'SUSPENDED', 'BREAK', 'DISABLED', 'INACTIVE', 'CLOSED'];
-          if (rawStatus && NON_TRADING.some(s => rawStatus.includes(s))) {
+          if (rawStatus && _NON_TRADING_ST.some(s => rawStatus.includes(s))) {
             const assetName = market.split('_')[0].replace(/^v/i, '').replace(/^TEST/i, '');
+            const tradeable = await getTradeableAssets();
             throw new Error(
-              `${assetName} is in <b>${rawStatus}</b> mode on SoDEX Testnet — new orders are not accepted.\n\n` +
-              `Try an active asset: BTC · ETH · SOL · XRP · DOGE · SUI`
+              `${assetName} is in ${rawStatus} mode on SoDEX Testnet — new orders are not accepted. ` +
+              `Active tokens: ${tradeable.slice(0, 8).join(', ')}`
             );
           }
 
@@ -904,19 +950,25 @@ export function createBot(): Bot | null {
       const errMsg = (e as Error).message ?? '';
       const isCancelOnly = /cancel.?only/i.test(errMsg) || /not.?trading/i.test(errMsg) || /halt/i.test(errMsg);
       const assetHint = market ? market.split('_')[0].replace(/^v/i, '').replace(/^TEST/i, '') : '';
-      const userMsg = isCancelOnly
-        ? `⛔ <b>${assetHint || 'Asset'} Not Tradeable</b>\n\n` +
+      if (isCancelOnly) {
+        const tradeable = await getTradeableAssets();
+        const tradeList = tradeable.slice(0, 10).join(' · ');
+        const kb = await tradeableSuggestionKb();
+        kb.text('⬅️ Back', 'menu:main');
+        await ctx.editMessageText(
+          `⛔ <b>${assetHint || 'Asset'} Not Tradeable</b>\n\n` +
           `This asset is in <b>cancel-only mode</b> on SoDEX Testnet — new orders are blocked by the exchange.\n\n` +
-          `<b>Active assets to try:</b>\n` +
-          `₿ BTC · Ξ ETH · ◎ SOL · ⚡ XRP · 🐕 DOGE · 🌊 SUI\n\n` +
-          `<i>Use /trade LONG BTC 0.001 to trade BTC directly</i>`
-        : `❌ <b>Execution Error</b>\n<code>${errMsg}</code>`;
-      const kb = isCancelOnly
-        ? new InlineKeyboard()
-            .text('₿ BTC', 'trade_amount:BTC:buy').text('Ξ ETH', 'trade_amount:ETH:buy').text('◎ SOL', 'trade_amount:SOL:buy').row()
-            .text('⬅️ Back', 'menu:main')
-        : new InlineKeyboard().text('⬅️ Back', 'menu:main');
-      await ctx.editMessageText(userMsg, { parse_mode: 'HTML', reply_markup: kb });
+          `<b>Tokens accepting orders right now:</b>\n` +
+          `<code>${tradeList}</code>\n\n` +
+          `<i>Tap any asset below to trade it</i>`,
+          { parse_mode: 'HTML', reply_markup: kb }
+        );
+      } else {
+        await ctx.editMessageText(
+          `❌ <b>Execution Error</b>\n<code>${errMsg}</code>`,
+          { parse_mode: 'HTML', reply_markup: new InlineKeyboard().text('⬅️ Back', 'menu:main') }
+        );
+      }
     }
   });
 
@@ -2867,32 +2919,23 @@ export function createBot(): Bot | null {
       const score = Number(d.score ?? 0);
       const verdictIcon = verdict === 'STRONG_BUY' ? '🟢🟢' : verdict === 'BUY' ? '🟢' : verdict === 'NEUTRAL' ? '⚪' : '🔴';
 
-      // Filter basket to only assets with tradeable SoDEX markets (skip CANCEL_ONLY etc.)
-      const NON_TRADING_ST = ['CANCEL_ONLY', 'HALT', 'SUSPENDED', 'BREAK', 'DISABLED', 'INACTIVE', 'CLOSED'];
-      let tradeableBasket = basket;
-      try {
-        const { SoDEXClient } = await import('../clients/sodex');
-        const pubClient = new SoDEXClient({ chainId: parseInt(process.env.SODEX_CHAIN_ID || '138565', 10), isTestnet: true });
-        const checked = await Promise.all(basket.map(async (item) => {
-          try {
-            const meta: any = await pubClient.findMarketForAsset(item.asset);
-            const st = String(meta?.status ?? '').toUpperCase();
-            const isBlocked = st && NON_TRADING_ST.some(s => st.includes(s));
-            return { ...item, _blocked: isBlocked, _status: st };
-          } catch { return { ...item, _blocked: false, _status: '' }; }
-        }));
-        tradeableBasket = checked.filter((i: any) => !i._blocked);
-      } catch { /* non-fatal — show all if check fails */ }
+      // Filter basket to only assets currently in TRADING status on SoDEX
+      // (uses cached list — no per-symbol round trips)
+      const tradeableSet = new Set(await getTradeableAssets().catch(() => [] as string[]));
+      const annotated = basket.map(item => ({
+        ...item,
+        _blocked: tradeableSet.size > 0 && !tradeableSet.has(item.asset.toUpperCase()),
+      }));
+      const tradeableBasket = annotated.filter(i => !i._blocked);
 
       const lines = [
         `🧺 <b>${d.sector ?? cleanTicker} Basket</b>\n`,
         `${verdictIcon} Sector Verdict: <b>${verdict}</b> | Score: <b>${score.toFixed(0)}/100</b>\n`,
         `<b>Top Assets:</b>`,
       ];
-      for (const item of basket) {
-        const blocked = (item as any)._blocked;
+      for (const item of annotated) {
         const bar = '█'.repeat(Math.round(item.weight / 5));
-        lines.push(`  ${blocked ? '⚫' : '💎'} <b>${item.asset}</b> — ${item.weight}% weight [${bar}]${blocked ? ' <i>(cancel-only)</i>' : ''}`);
+        lines.push(`  ${item._blocked ? '⚫' : '💎'} <b>${item.asset}</b> — ${item.weight}% weight [${bar}]${item._blocked ? ' <i>(cancel-only)</i>' : ''}`);
         if (item.rationale) lines.push(`     <i>${item.rationale}</i>`);
       }
       lines.push('');
