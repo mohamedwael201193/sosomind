@@ -231,6 +231,7 @@ function TradeInner() {
   const [copySignalData, setCopySignalData] = useState<any>(null);
   const [ssiBasketData, setSsiBasketData] = useState<{ sector: any; basket: any } | null>(null);
   const [strategyLoading, setStrategyLoading] = useState(false);
+  const autoFilledStrategyRef = useRef<string | null>(null);
 
   const symbols = useQuery<SodexSymbol[]>({
     queryKey: ['sodex', 'spot', 'symbols'],
@@ -353,11 +354,36 @@ function TradeInner() {
     setPrice(String(side === 'buy' ? bestAsk : bestBid));
   }, [side, bestAsk, bestBid]);
 
+  // Auto-fill qty when strategy data + price/balance converge (runs once per strategy load)
+  useEffect(() => {
+    if (!activeSymbol || !strategy || autoFilledStrategyRef.current === strategy) return;
+    if (strategy === 'copy' && copySignalData && usdcBalance > 0 && bestAsk > 0) {
+      const confPct = Math.min(0.25, Math.max(0.05, ((copySignalData.confidence as number) || 50) / 400));
+      const entryPx = Number(copySignalData.entry) > 0 ? Number(copySignalData.entry) : bestAsk;
+      const autoQty = (usdcBalance * confPct) / entryPx;
+      if (autoQty > 0) {
+        setQuantity(autoQty.toFixed(activeSymbol.quantityPrecision ?? 4));
+        autoFilledStrategyRef.current = strategy;
+      }
+    } else if (strategy === 'ssi' && ssiBasketData && usdcBalance > 0 && bestAsk > 0) {
+      const autoQty = (usdcBalance * 0.10) / bestAsk;
+      if (autoQty > 0) {
+        setQuantity(autoQty.toFixed(activeSymbol.quantityPrecision ?? 4));
+        autoFilledStrategyRef.current = strategy;
+      }
+    }
+  }, [strategy, copySignalData, ssiBasketData, activeSymbol, usdcBalance, bestAsk]);
+
+  // Reset auto-fill flag when user switches strategy so it can re-fill on next load
+  useEffect(() => {
+    autoFilledStrategyRef.current = null;
+  }, [strategy]);
+
   async function handleStrategyProceed() {
     setStrategyLoading(true);
     try {
       if (strategy === 'copy') {
-        const sigs: any[] = (await fetcher('/api/agents/signals?status=active&limit=3')) ?? [];
+        const sigs: any[] = (await fetcher('/api/agents/signals?limit=5')) ?? [];
         const sig = Array.isArray(sigs) ? sigs[0] : null;
         if (sig) {
           setCopySignalData(sig);
@@ -960,19 +986,27 @@ function TradeInner() {
                           const isActive = activeSymbol?.baseCoin === `v${item.asset}` || activeSymbol?.baseCoin === item.asset;
                           return (
                             <button key={item.asset} type="button" disabled={!sym}
-                              onClick={() => { if (sym) setSymbolId(sym.id); }}
+                              onClick={() => { if (sym) { setSymbolId(sym.id); autoFilledStrategyRef.current = null; } }}
+                              title={!sym ? 'Not listed on SoDEX Testnet' : undefined}
                               className="px-2.5 py-1 rounded-lg font-bold border transition-all"
                               style={{
                                 borderColor: isActive ? 'var(--accent)' : 'var(--border-default)',
                                 background: isActive ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'var(--bg-elevated)',
                                 color: isActive ? 'var(--accent)' : sym ? 'var(--text-primary)' : 'var(--text-muted)',
-                                opacity: sym ? 1 : 0.5,
+                                opacity: sym ? 1 : 0.4,
                               }}>
                               {item.asset} {item.weight}%
                             </button>
                           );
                         })}
                       </div>
+                      {(ssiBasketData.basket?.basket ?? []).every((item: any) =>
+                        !(symbols.data ?? []).find((s) => s.baseCoin === `v${item.asset}` || s.baseCoin === item.asset)
+                      ) && (
+                        <p className="mt-2 text-[10px] italic" style={{ color: 'var(--text-muted)' }}>
+                          These assets aren&apos;t on SoDEX Testnet yet — use the market selector above to trade the sector theme with BTC or ETH.
+                        </p>
+                      )}
                     </div>
                   )}
                   {strategy === 'ssi' && !ssiBasketData && (

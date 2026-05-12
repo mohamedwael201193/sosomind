@@ -174,6 +174,54 @@ export function createBot(): Bot | null {
   bot.hears('ℹ️ Help', sendMainMenu);
   bot.callbackQuery('menu:main', sendMainMenu);
 
+  // ── Wallet Reset (when embedded wallet decryption fails) ─────────────────
+  bot.callbackQuery('wallet:reset:confirm', async (ctx) => {
+    await ctx.answerCallbackQuery();
+    await ctx.editMessageText(
+      `⚠️ <b>Reset Embedded Wallet?</b>\n\n` +
+      `This will generate a <b>new wallet address</b>.\n` +
+      `Your old wallet address will be replaced.\n\n` +
+      `<b>Make sure your old wallet holds no funds before continuing.</b>`,
+      {
+        parse_mode: 'HTML',
+        reply_markup: new InlineKeyboard()
+          .text('✅ Yes, Reset Now', 'wallet:reset:execute').row()
+          .text('❌ Cancel', 'menu:main'),
+      }
+    );
+  });
+
+  bot.callbackQuery('wallet:reset:execute', async (ctx) => {
+    await ctx.answerCallbackQuery({ text: '🔄 Resetting wallet…' });
+    const chatId = String((ctx as any).chat?.id ?? '');
+    try {
+      const { ethers } = await import('ethers');
+      const { encryptPrivateKey } = await import('../utils/walletCrypto');
+      const { replaceTelegramWallet } = await import('../db/supabase');
+      const newWallet = ethers.Wallet.createRandom();
+      const newEncKey = encryptPrivateKey(newWallet.privateKey);
+      const updated = await replaceTelegramWallet(chatId, newWallet.address, newEncKey);
+      if (!updated) throw new Error('DB update failed');
+      await ctx.editMessageText(
+        `✅ <b>Wallet Reset Complete</b>\n\n` +
+        `New wallet address:\n<code>${newWallet.address}</code>\n\n` +
+        `Your new wallet is ready. Use it on SoDEX Testnet.\n` +
+        `<i>Fund it with testnet tokens before trading.</i>`,
+        {
+          parse_mode: 'HTML',
+          reply_markup: new InlineKeyboard()
+            .text('💼 My Wallet', 'menu:wallet')
+            .text('🏠 Main Menu', 'menu:main'),
+        }
+      );
+    } catch (err) {
+      await ctx.editMessageText(
+        `❌ <b>Reset Failed</b>\n<code>${(err as Error).message}</code>`,
+        { parse_mode: 'HTML', reply_markup: new InlineKeyboard().text('⬅️ Back', 'menu:main') }
+      );
+    }
+  });
+
   // ── Hide / Show bottom keyboard ──────────────────────────────────────────
   bot.hears('✖ Hide Menu', async (ctx) => {
     await ctx.reply(
@@ -478,11 +526,36 @@ export function createBot(): Bot | null {
       if (chatId) {
         const embWallet = await getOrCreateTelegramWallet(chatId, ctx.from?.username, ctx.from?.first_name).catch(() => null);
         if (embWallet) {
-          const { decryptPrivateKey } = await import('../utils/walletCrypto');
+          let privKey: string;
+          try {
+            const { decryptPrivateKey } = await import('../utils/walletCrypto');
+            privKey = decryptPrivateKey(embWallet.encrypted_key);
+          } catch (decryptErr: any) {
+            // AES-256-GCM auth-tag mismatch — encryption key changed in environment.
+            // Redirect to browser signing and offer a wallet reset.
+            const dashboardUrl = (process.env.DASHBOARD_URL || '').replace(/\/$/, '');
+            const isPublic = dashboardUrl.startsWith('https://');
+            const kb = new InlineKeyboard();
+            if (isPublic) {
+              kb.url('🦊 Sign in Browser', `${dashboardUrl}/trade?m=${market}&s=${side}&q=${qtyStr}`).row();
+            }
+            kb.text('🔑 Reset Wallet', `wallet:reset:confirm`).row()
+              .text('⬅️ Back', 'menu:main');
+            await ctx.editMessageText(
+              `🔑 <b>Wallet Key Error</b>\n\n` +
+              `Your embedded wallet could not be unlocked.\n` +
+              `This usually happens after a server update.\n\n` +
+              (isPublic ? `• Tap <b>Sign in Browser</b> to trade via MetaMask\n` : '') +
+              `• Tap <b>Reset Wallet</b> to generate a fresh wallet\n` +
+              `  ⚠️ <i>Only reset if your current wallet holds no funds</i>`,
+              { parse_mode: 'HTML', reply_markup: kb }
+            );
+            return;
+          }
           const { SoDEXClient } = await import('../clients/sodex');
           const userClient = new SoDEXClient({
             chainId: parseInt(process.env.SODEX_CHAIN_ID || '138565', 10),
-            privateKey: decryptPrivateKey(embWallet.encrypted_key),
+            privateKey: privKey!,
             isTestnet: true,
           });
           // Resolve symbolID and accountID from SoDEX
