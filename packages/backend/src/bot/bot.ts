@@ -218,7 +218,9 @@ export function createBot(): Bot | null {
   async function runResearch(ctx: Context, asset: string) {
     try {
       const signal = await runResearchAgent(asset, { saveToDb: true });
-      const report = formatResearchReport(signal);
+      const signalId: string | undefined = (signal as any).id;
+      const signalUrl = signalId ? `\n\n🔗 <a href="https://sosomind.vercel.app/signals/${signalId}">View Full Signal</a>` : '';
+      const report = formatResearchReport(signal) + signalUrl;
       const kb = new InlineKeyboard()
         .text('⚡ Quick Signal', `signal:${asset}`)
         .text('📈 Trade LONG', `trade_amount:${asset}:buy`).row()
@@ -2295,6 +2297,149 @@ export function createBot(): Bot | null {
     } catch (e) {
       await (ctx as any).editMessageText(`❌ ${(e as Error).message}`, { parse_mode: 'HTML' });
     }
+  });
+
+  // ── Sector Basket (/basket <sector>) ─────────────────────────────────────────
+  const SECTOR_TICKERS = ['ssiAI', 'ssiDeFi', 'ssiLayer1', 'ssiLayer2', 'ssiGaming', 'ssiInfra', 'ssiMeme', 'ssiRWA', 'ssiDePIN', 'ssiSocial', 'ssiNFT', 'ssiCEX', 'ssiDEX'];
+
+  async function runBasket(ctx: Context, ticker: string) {
+    const cleanTicker = ticker.trim().toLowerCase().startsWith('ssi') ? ticker.trim() : `ssi${ticker.trim()}`;
+    const loadMsg = `🧺 <b>Building ${cleanTicker} Basket…</b>\n\n<i>Fetching top assets and live sector score…</i>`;
+    if ((ctx as any).callbackQuery) {
+      await (ctx as any).editMessageText(loadMsg, { parse_mode: 'HTML' });
+      await (ctx as any).answerCallbackQuery({ text: 'Loading basket…' });
+    } else {
+      await ctx.reply(loadMsg, { parse_mode: 'HTML' });
+    }
+    try {
+      const resp = await fetch(`http://localhost:${process.env.PORT || 10000}/api/sectors/intel/${cleanTicker}/basket`);
+      if (!resp.ok) throw new Error(`Sector "${cleanTicker}" not found. Try: ${SECTOR_TICKERS.slice(0, 5).join(', ')}…`);
+      const json = await resp.json() as any;
+      const d = json.data ?? {};
+      const basket: Array<{ asset: string; weight: number; rationale?: string }> = d.basket ?? [];
+      const verdict = d.verdict ?? 'NEUTRAL';
+      const score = Number(d.score ?? 0);
+      const verdictIcon = verdict === 'STRONG_BUY' ? '🟢🟢' : verdict === 'BUY' ? '🟢' : verdict === 'NEUTRAL' ? '⚪' : '🔴';
+      const lines = [
+        `🧺 <b>${d.sector ?? cleanTicker} Basket</b>\n`,
+        `${verdictIcon} Sector Verdict: <b>${verdict}</b> | Score: <b>${score.toFixed(0)}/100</b>\n`,
+        `<b>Top Assets:</b>`,
+      ];
+      for (const item of basket) {
+        const bar = '█'.repeat(Math.round(item.weight / 5));
+        lines.push(`  💎 <b>${item.asset}</b> — ${item.weight}% weight [${bar}]`);
+        if (item.rationale) lines.push(`     <i>${item.rationale}</i>`);
+      }
+      lines.push('');
+      lines.push(`<i>⚖️ Equal-weight basket · Execute each position via SoDEX</i>`);
+      const kb = new InlineKeyboard();
+      if (basket[0]) kb.text(`🚀 ${basket[0].asset}`, `trade_amount:${basket[0].asset}:buy`);
+      if (basket[1]) kb.text(`🚀 ${basket[1].asset}`, `trade_amount:${basket[1].asset}:buy`);
+      if (basket[2]) kb.text(`🚀 ${basket[2].asset}`, `trade_amount:${basket[2].asset}:buy`).row();
+      kb.text('🧠 Sector Intel', 'intel:view').text('⬅️ Back', 'menu:main');
+      const text = lines.join('\n');
+      if ((ctx as any).callbackQuery) {
+        await (ctx as any).editMessageText(text, { parse_mode: 'HTML', reply_markup: kb });
+      } else {
+        await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
+      }
+    } catch (e) {
+      const errMsg = `❌ <b>Basket Error</b>\n<code>${(e as Error).message}</code>\n\n<i>Available sectors: ${SECTOR_TICKERS.join(', ')}</i>`;
+      const kb = new InlineKeyboard().text('🧠 Intel', 'intel:view').text('🏠 Menu', 'menu:main');
+      if ((ctx as any).callbackQuery) await (ctx as any).editMessageText(errMsg, { parse_mode: 'HTML', reply_markup: kb });
+      else await ctx.reply(errMsg, { parse_mode: 'HTML', reply_markup: kb });
+    }
+  }
+
+  bot.command('basket', async (ctx) => {
+    const ticker = (ctx.match || '').toString().trim();
+    if (!ticker) {
+      const kb = new InlineKeyboard()
+        .text('ssiAI', 'basket:ssiAI').text('ssiDeFi', 'basket:ssiDeFi').text('ssiLayer1', 'basket:ssiLayer1').row()
+        .text('ssiLayer2', 'basket:ssiLayer2').text('ssiGaming', 'basket:ssiGaming').text('ssiInfra', 'basket:ssiInfra').row()
+        .text('ssiMeme', 'basket:ssiMeme').text('ssiRWA', 'basket:ssiRWA').text('ssiDePIN', 'basket:ssiDePIN').row()
+        .text('ssiCEX', 'basket:ssiCEX').text('ssiDEX', 'basket:ssiDEX').text('ssiNFT', 'basket:ssiNFT').row()
+        .text('⬅️ Back', 'menu:main');
+      return ctx.reply(
+        `🧺 <b>Sector Basket Builder</b>\n\n<i>Select a sector to see top-3 assets by momentum score, or use:</i>\n<code>/basket ssiAI</code>`,
+        { parse_mode: 'HTML', reply_markup: kb }
+      );
+    }
+    await runBasket(ctx, ticker);
+  });
+
+  bot.callbackQuery(/^basket:(.+)$/, async (ctx) => {
+    await runBasket(ctx, ctx.match[1]);
+  });
+
+  bot.hears(/\b(basket|sector basket|build basket)\b/i, async (ctx) => {
+    const match = ctx.message?.text?.match(/\b(ssi\w+)\b/i);
+    if (match) return runBasket(ctx, match[1]);
+    return ctx.reply(`🧺 Use <code>/basket ssiAI</code> to build a sector basket.\n\nAvailable: ${SECTOR_TICKERS.join(', ')}`, { parse_mode: 'HTML' });
+  });
+
+  // ── Methodology (/methodology) ────────────────────────────────────────────────
+  bot.command('methodology', async (ctx) => {
+    const text =
+      `📐 <b>SosoMind Signal Methodology</b>\n\n` +
+      `<b>Composite Score Formula:</b>\n` +
+      `<code>S = (S1 × 0.30) + (S2 × 0.35) + (S3 × 0.35)</code>\n\n` +
+      `📊 <b>S1 — Market Momentum (30%)</b>\n` +
+      `   Price action, ETF flows, volume, 24h change, BTC dominance\n\n` +
+      `🤖 <b>S2 — AI Sentiment (35%)</b>\n` +
+      `   6-provider AI chain: Cerebras → SambaNova → Together → OpenRouter → Groq → Gemini\n` +
+      `   News NLP, social signals, fear/greed index\n\n` +
+      `📈 <b>S3 — On-chain Fundamentals (35%)</b>\n` +
+      `   Macro events, sector rotation, fundraising, crypto stocks, whale flows\n\n` +
+      `<b>Verdicts:</b>\n` +
+      `🟢🟢 <b>STRONG_BUY</b>  ≥ 75/100\n` +
+      `🟢 <b>BUY</b>          55 – 74\n` +
+      `⚪ <b>NEUTRAL</b>      35 – 54\n` +
+      `🔴 <b>SELL</b>         &lt; 35\n\n` +
+      `⏱️ <b>Outcome Evaluation:</b> 72h window — HIT / STOP / DRIFT tracked automatically\n\n` +
+      `⛓️ <b>Execution:</b> EIP-712 signed orders on SoDEX (testnet v2)\n\n` +
+      `🌐 <a href="https://sosomind.vercel.app/methodology">Full Methodology →</a>`;
+    const kb = new InlineKeyboard()
+      .text('📊 Track Record', 'track_record:view').text('🧠 Intel', 'intel:view').row()
+      .text('⚡ Run Signal', 'menu:signal').text('🏠 Menu', 'menu:main');
+    await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
+  });
+
+  bot.hears(/\b(methodology|scoring formula|how signals work|signal formula)\b/i, async (ctx) => {
+    const text =
+      `📐 <b>Signal Scoring: Quick Reference</b>\n\n` +
+      `<code>Score = (S1×0.30) + (S2×0.35) + (S3×0.35)</code>\n\n` +
+      `S1 Market · S2 AI Sentiment · S3 On-chain\n\n` +
+      `🟢🟢 STRONG_BUY ≥75 · 🟢 BUY 55–74 · ⚪ NEUTRAL 35–54 · 🔴 SELL &lt;35\n\n` +
+      `🌐 <a href="https://sosomind.vercel.app/methodology">Full docs →</a>`;
+    const kb = new InlineKeyboard().text('📐 Full Methodology', 'methodology:full').text('🏠 Menu', 'menu:main');
+    await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
+  });
+
+  bot.callbackQuery('methodology:full', async (ctx) => {
+    await ctx.answerCallbackQuery();
+    const text =
+      `📐 <b>SosoMind Signal Methodology</b>\n\n` +
+      `<b>Composite Score Formula:</b>\n` +
+      `<code>S = (S1 × 0.30) + (S2 × 0.35) + (S3 × 0.35)</code>\n\n` +
+      `📊 <b>S1 — Market Momentum (30%)</b>\n` +
+      `   Price action, ETF flows, volume, 24h change, BTC dominance\n\n` +
+      `🤖 <b>S2 — AI Sentiment (35%)</b>\n` +
+      `   6-provider AI chain: Cerebras → SambaNova → Together → OpenRouter → Groq → Gemini\n` +
+      `   News NLP, social signals, fear/greed index\n\n` +
+      `📈 <b>S3 — On-chain Fundamentals (35%)</b>\n` +
+      `   Macro events, sector rotation, fundraising, crypto stocks, whale flows\n\n` +
+      `<b>Verdicts:</b>\n` +
+      `🟢🟢 <b>STRONG_BUY</b>  ≥ 75/100\n` +
+      `🟢 <b>BUY</b>          55 – 74\n` +
+      `⚪ <b>NEUTRAL</b>      35 – 54\n` +
+      `🔴 <b>SELL</b>         &lt; 35\n\n` +
+      `⏱️ <b>Outcome:</b> 72h window — HIT / STOP / DRIFT\n\n` +
+      `🌐 <a href="https://sosomind.vercel.app/methodology">Full Methodology →</a>`;
+    const kb = new InlineKeyboard()
+      .text('📊 Track Record', 'track_record:view').text('🧠 Intel', 'intel:view').row()
+      .text('🏠 Menu', 'menu:main');
+    await (ctx as any).editMessageText(text, { parse_mode: 'HTML', reply_markup: kb });
   });
 
   // ── Signal Track Record (/track_record) ─────────────────────────────────────

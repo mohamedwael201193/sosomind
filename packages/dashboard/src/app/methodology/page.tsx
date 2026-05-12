@@ -1,5 +1,5 @@
 "use client";
-import { motion } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
 import {
   Brain, TrendingUp, Target, Activity, ShieldCheck, Zap,
   BarChart3, DollarSign, Globe2, CheckCircle2, ArrowRight,
@@ -9,7 +9,7 @@ import Link from "next/link";
 // ─── Design tokens ────────────────────────────────────────────────────────────
 // Colors: var(--accent), var(--green), var(--yellow), var(--red), var(--text-primary), etc.
 
-const fadeUp = {
+const fadeUp: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: (i: number) => ({
     opacity: 1,
