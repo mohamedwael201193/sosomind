@@ -369,7 +369,7 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <a href="https://t.me/sosomind_bot" target="_blank" rel="noopener noreferrer"
+          <a href="https://t.me/SosoMindbot" target="_blank" rel="noopener noreferrer"
             className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all"
             style={{ borderColor: "rgba(0,136,204,0.35)", color: "#0088cc", background: "rgba(0,136,204,0.08)" }}
             onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = "rgba(0,136,204,0.15)"; }}
@@ -546,7 +546,7 @@ export default function LandingPage() {
                   Explore Research <ArrowRight className="w-4 h-4" />
                 </motion.button>
               </Link>
-              <a href="https://t.me/sosomind_bot" target="_blank" rel="noopener noreferrer">
+              <a href="https://t.me/SosoMindbot" target="_blank" rel="noopener noreferrer">
                 <motion.button
                   whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                   className="flex items-center gap-2 px-7 py-3.5 rounded-[14px] font-medium text-sm border transition-colors"
@@ -1807,7 +1807,7 @@ export default function LandingPage() {
             {[
               {
                 step: "01", title: "Start the Bot",
-                desc: "Open @sosomind_bot on Telegram. A secure EVM wallet is auto-generated — no seed phrases, no setup.",
+                desc: "Open @SosoMindbot on Telegram. A secure EVM wallet is auto-generated — no seed phrases, no setup.",
                 icon: Send, color: "#0088cc",
               },
               {
@@ -1844,7 +1844,7 @@ export default function LandingPage() {
             })}
           </div>
           <div className="text-center">
-            <a href="https://t.me/sosomind_bot" target="_blank" rel="noopener noreferrer">
+            <a href="https://t.me/SosoMindbot" target="_blank" rel="noopener noreferrer">
               <MagneticButton
                 className="inline-flex items-center gap-2 px-8 py-4 rounded-[20px] font-bold text-white text-base"
                 style={{ background: "linear-gradient(135deg,#0088cc 0%,#0066aa 100%)" }}
@@ -2136,7 +2136,7 @@ export default function LandingPage() {
               {[
                 { Icon: X,     href: "#",                              label: "X / Twitter"    },
                 { Icon: Code2, href: "#",                              label: "GitHub"          },
-                { Icon: Send,  href: "https://t.me/sosomind_bot",      label: "Telegram Bot"    },
+                { Icon: Send,  href: "https://t.me/SosoMindbot",      label: "Telegram Bot"    },
               ].map(({ Icon, href, label }) => (
                 <a key={label} href={href}
                   target={href.startsWith("https") ? "_blank" : undefined}

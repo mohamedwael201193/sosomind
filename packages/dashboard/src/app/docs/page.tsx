@@ -240,10 +240,10 @@ export default function DocsPage() {
         </Link>
         <SidebarContent />
         <div className="mt-auto px-3 pt-6">
-          <a href="https://t.me/sosomind_bot" target="_blank" rel="noopener noreferrer"
+          <a href="https://t.me/SosoMindbot" target="_blank" rel="noopener noreferrer"
             className="flex items-center gap-2 text-xs py-2 px-3 rounded-[6px]"
             style={{ color: "#0088cc", background: "rgba(0,136,204,0.08)", border: "1px solid rgba(0,136,204,0.2)" }}>
-            <Bot className="w-3.5 h-3.5" /> @sosomind_bot
+            <Bot className="w-3.5 h-3.5" /> @SosoMindbot
           </a>
         </div>
       </aside>
@@ -286,7 +286,7 @@ export default function DocsPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
                 {[
                   { label: "Dashboard", value: "sosomind.vercel.app", href: "https://sosomind.vercel.app", color: "#f97316", status: "LIVE" as StatusType },
-                  { label: "Telegram Bot", value: "@sosomind_bot", href: "https://t.me/sosomind_bot", color: "#0088cc", status: "LIVE" as StatusType },
+                  { label: "Telegram Bot", value: "@SosoMindbot", href: "https://t.me/SosoMindbot", color: "#0088cc", status: "LIVE" as StatusType },
                   { label: "Backend", value: "Render.com port 10000", href: "#deployment", color: "#22c55e", status: "LIVE" as StatusType },
                 ].map(item => (
                   <a key={item.label} href={item.href} target={item.href.startsWith("http") ? "_blank" : undefined}
@@ -305,7 +305,7 @@ export default function DocsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {[
                     { n: "01", title: "Connect Wallet", desc: "Visit sosomind.vercel.app, connect MetaMask or WalletConnect." },
-                    { n: "02", title: "Start the Bot", desc: "Open @sosomind_bot on Telegram. An embedded EVM wallet is created automatically." },
+                    { n: "02", title: "Start the Bot", desc: "Open @SosoMindbot on Telegram. An embedded EVM wallet is created automatically." },
                     { n: "03", title: "Request a Signal", desc: "Send /research BTC in Telegram or use the Trade page to trigger the full agent pipeline." },
                   ].map(s => (
                     <div key={s.n} className="rounded-[8px] p-4" style={{ border: "1px solid var(--glass-border)", background: "var(--bg-card)" }}>
@@ -459,7 +459,7 @@ export default function DocsPage() {
           <section data-section id="telegram">
             <SectionTitle id="telegram" status="LIVE">Telegram Bot</SectionTitle>
             <p className="text-sm leading-relaxed mb-6" style={{ color: "var(--text-secondary)" }}>
-              @sosomind_bot is the primary user interface. Built with grammY, it handles research requests, wallet management, signal delivery, and live trading alerts.
+              @SosoMindbot is the primary user interface. Built with grammY, it handles research requests, wallet management, signal delivery, and live trading alerts.
             </p>
             <SubTitle id="tg-commands">Bot Commands</SubTitle>
             <Table headers={["Command","Description","Status"]} rows={[

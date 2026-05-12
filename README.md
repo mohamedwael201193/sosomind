@@ -5,7 +5,7 @@
 **The Agentic Finance OS for Serious Crypto Traders**
 
 [![Live](https://img.shields.io/badge/dashboard-sosomind.vercel.app-f97316?style=flat-square)](https://sosomind.vercel.app)
-[![Bot](https://img.shields.io/badge/telegram-%40sosomind__bot-0088cc?style=flat-square&logo=telegram)](https://t.me/sosomind_bot)
+[![Bot](https://img.shields.io/badge/telegram-%40SosoMindbot-0088cc?style=flat-square&logo=telegram)](https://t.me/SosoMindbot)
 [![Backend](https://img.shields.io/badge/backend-render.com-46e3b7?style=flat-square)](https://render.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?style=flat-square&logo=typescript)](https://www.typescriptlang.org)
 [![Next.js](https://img.shields.io/badge/Next.js-14-000000?style=flat-square&logo=nextdotjs)](https://nextjs.org)
@@ -20,7 +20,7 @@ Multi-agent AI research · Real-time sector intelligence · EIP-712 DEX executio
 
 SoSoMind is an agentic finance intelligence platform that synthesises live market data from 13 sources, runs it through a coordinated system of specialist AI agents, surfaces high-confidence trading signals, and executes orders directly on SoDEX via EIP-712 non-custodial signing — all accessible from a Next.js dashboard, a Telegram bot, or an AI assistant via MCP tools.
 
-**Current deployment status:** Active testnet (SoDEX Testnet, chainId=138565). Backend live on Render, dashboard live on Vercel. Bot is reachable at [@sosomind\_bot](https://t.me/sosomind_bot).
+**Current deployment status:** Active testnet (SoDEX Testnet, chainId=138565). Backend live on Render, dashboard live on Vercel. Bot is reachable at [@SosoMindbot](https://t.me/SosoMindbot).
 
 ---
 
@@ -31,7 +31,7 @@ SoSoMind is an agentic finance intelligence platform that synthesises live marke
 │                            CLIENT SURFACES                                   │
 │                                                                              │
 │   Next.js Dashboard          MCP Clients           Telegram App              │
-│   sosomind.vercel.app        (Claude / Cursor)      @sosomind_bot            │
+│   sosomind.vercel.app        (Claude / Cursor)      @SosoMindbot             │
 │   React 19 + TypeScript      stdio transport        grammY + EIP-712         │
 └────────┬──────────────────────────┬─────────────────────────┬───────────────┘
          │ HTTPS/REST               │ MCP stdio               │ Bot Webhook
@@ -315,7 +315,7 @@ ws.onmessage = (e) => console.log(JSON.parse(e.data))
 
 ## Telegram Bot
 
-**[@sosomind\_bot](https://t.me/sosomind_bot)** — full trading interface from any device.
+**[@SosoMindbot](https://t.me/SosoMindbot)** — full trading interface from any device.
 
 ### Commands
 
@@ -539,5 +539,5 @@ Private — all rights reserved. Contact the SoSoMind team for licensing.
 
 <div align="center">
 Built with precision for the serious crypto trader.<br>
-<a href="https://sosomind.vercel.app">Dashboard</a> · <a href="https://t.me/sosomind_bot">Telegram Bot</a> · <a href="ARCHITECTURE.md">Full Architecture</a>
+<a href="https://sosomind.vercel.app">Dashboard</a> · <a href="https://t.me/SosoMindbot">Telegram Bot</a> · <a href="ARCHITECTURE.md">Full Architecture</a>
 </div>
