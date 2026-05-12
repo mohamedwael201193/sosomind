@@ -512,8 +512,9 @@ export function createBot(): Bot | null {
     const dashboardUrl = process.env.DASHBOARD_URL || '';
     const isPublicUrl = dashboardUrl.startsWith('https://') && !dashboardUrl.includes('localhost');
 
-    const activeWallet = linkedWallet ?? embeddedWallet?.wallet_address ?? null;
-    const isEmbedded = !linkedWallet && !!embeddedWallet;
+    // tx: handler always executes with the embedded wallet — show it as the signing wallet.
+    // MetaMask-linked wallet is shown separately (used only for browser sign button).
+    const signingWallet = embeddedWallet?.wallet_address ?? null;
 
     const text =
       `🔐 <b>Trade Confirmation</b>\n\n` +
@@ -523,9 +524,10 @@ export function createBot(): Bot | null {
       `📦 Quantity: <b>${qty}</b>\n` +
       `💰 Est. Price: $${price.toLocaleString()}\n` +
       `💵 Est. Value: $${estValue}\n` +
-      (activeWallet
-        ? `👛 Wallet: <code>${activeWallet.slice(0, 6)}…${activeWallet.slice(-4)}</code>${isEmbedded ? ' <i>(auto)</i>' : ' <i>(MetaMask)</i>'}\n`
+      (signingWallet
+        ? `👛 Wallet: <code>${signingWallet.slice(0, 6)}…${signingWallet.slice(-4)}</code> <i>(auto-sign)</i>\n`
         : '') +
+      (linkedWallet ? `🦊 MetaMask: <code>${linkedWallet.slice(0, 6)}…${linkedWallet.slice(-4)}</code> also linked\n` : '') +
       `\n<i>EIP-712 signed · SoDEX Testnet</i>`;
 
     const kb = new InlineKeyboard();
@@ -720,40 +722,44 @@ export function createBot(): Bot | null {
 
           // Apply precision — use at least 1 decimal place to keep valid format
           const safePrecision = (isFinite(precision) && precision >= 0) ? precision : 4;
-          const qtyFormatted = finalQty.toFixed(safePrecision);
+          // SoDEX REJECTS trailing zeros (e.g. "0.0110" → must be "0.011") — strip them
+          const qtyFormatted = finalQty.toFixed(safePrecision).replace(/\.?0+$/, '');
           if (parseFloat(qtyFormatted) <= 0) {
             throw new Error(`Order size rounds to zero for ${market} (precision=${safePrecision}). Please choose a larger USD amount.`);
           }
-          console.log(`[Bot] Placing order: market=${market} symbolID=${symbolID} accountID=${accountID} qty=${qtyFormatted} precision=${safePrecision}`);
 
-          // Submit order — if SoDEX still rejects qty, retry once with doubled quantity
-          let placeErr: any = null;
-          for (let attempt = 1; attempt <= 2; attempt++) {
-            try {
-              const attemptQty = attempt === 1 ? qtyFormatted : (finalQty * 2).toFixed(safePrecision);
-              sodexResult = await userClient.placeSpotOrder({
-                accountID,
-                symbolID,
-                clOrdID: `bot-${Date.now()}`,
-                side: (side === 'buy' ? 1 : 2) as 1 | 2,
-                type: 2 as 1 | 2, // market
-                timeInForce: 3 as 1 | 2 | 3,
-                quantity: attemptQty,
-              });
-              console.log(`[Bot] placeSpotOrder attempt ${attempt} qty=${attemptQty} → success`);
-              placeErr = null;
-              break;
-            } catch (err: any) {
-              placeErr = err;
-              const msg = String(err?.message || err?.response?.data || '').toLowerCase();
-              if (attempt === 1 && (msg.includes('quantity') || msg.includes('invalid') || msg.includes('minimum'))) {
-                console.warn(`[Bot] placeSpotOrder attempt 1 failed (qty issue), retrying doubled qty: ${(finalQty * 2).toFixed(safePrecision)}`);
-                continue;
-              }
-              break;
+          // Fetch live best price for limit-IOC order.
+          // Market orders (type:2) fail on SoDEX testnet with "MissingOraclePrice".
+          // Limit-IOC (type:1, timeInForce:3) with a 0.5% buffer fills like a market order.
+          const pricePrecision = Number(symMeta?.pricePrecision ?? 0);
+          const priceMultiplier = Math.pow(10, pricePrecision);
+          let limitPriceStr: string | undefined;
+          try {
+            const ob2: any = await userClient.getSpotOrderbook(market, 1);
+            const bestRaw = side === 'buy'
+              ? parseFloat(ob2?.asks?.[0]?.[0] ?? ob2?.asks?.[0]?.price ?? '0')
+              : parseFloat(ob2?.bids?.[0]?.[0] ?? ob2?.bids?.[0]?.price ?? '0');
+            const bestWithBuffer = side === 'buy' ? bestRaw * 1.005 : bestRaw * 0.995;
+            if (bestWithBuffer > 0) {
+              limitPriceStr = (Math.round(bestWithBuffer * priceMultiplier) / priceMultiplier)
+                .toFixed(pricePrecision).replace(/\.?0+$/, '');
             }
-          }
-          if (placeErr) throw placeErr;
+          } catch { /* non-fatal — will throw below */ }
+          if (!limitPriceStr) throw new Error(`Cannot fetch price for ${market} — please try again.`);
+
+          console.log(`[Bot] Placing order: market=${market} symbolID=${symbolID} accountID=${accountID} side=${side} qty=${qtyFormatted} price=${limitPriceStr}`);
+
+          sodexResult = await userClient.placeSpotOrder({
+            accountID,
+            symbolID,
+            clOrdID: `bot${Date.now()}`,
+            side: (side === 'buy' ? 1 : 2) as 1 | 2,
+            type: 1 as 1 | 2,        // 1=limit (market type:2 fails with MissingOraclePrice on testnet)
+            timeInForce: 3 as 1 | 2 | 3, // 3=IOC: fill immediately or cancel (market-like)
+            price: limitPriceStr,
+            quantity: qtyFormatted,
+          });
+          if (!sodexResult) throw new Error('No response from SoDEX — order may not have been placed.');
           walletUsed = `${embWallet.wallet_address.slice(0, 6)}…${embWallet.wallet_address.slice(-4)}`;
         }
       }
@@ -2427,17 +2433,18 @@ export function createBot(): Bot | null {
           : Array.isArray(rawBals?.balances) ? rawBals.balances
           : Array.isArray(rawBals?.data) ? rawBals.data : [];
         const nonZero = bals.filter((b: any) => {
-          const avail = Number(b.available ?? b.free ?? 0);
+          // SoDEX /balances returns "total" and "locked" (not "available"/"free")
+          const total = Number(b.total ?? b.available ?? b.free ?? 0);
           const locked = Number(b.locked ?? b.frozen ?? b.hold ?? 0);
-          return (avail + locked) > 0;
+          return (total + locked) > 0;
         });
         if (nonZero.length === 0) {
           balanceLine = '💳 Balance: <i>0 (claim faucet → transfer Funding → Spot)</i>';
         } else {
           const parts = nonZero.map((b: any) => {
             const coin = String(b.coin ?? b.asset ?? '?');
-            const avail = Number(b.available ?? b.free ?? 0);
-            return `<b>${coin}</b> ${avail.toFixed(4)}`;
+            const total = Number(b.total ?? b.available ?? b.free ?? 0);
+            return `<b>${coin}</b> ${total.toFixed(4)}`;
           });
           balanceLine = `💳 Balance: ${parts.join(' · ')}`;
         }
