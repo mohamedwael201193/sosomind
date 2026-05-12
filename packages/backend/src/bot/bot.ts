@@ -2189,7 +2189,7 @@ export function createBot(): Bot | null {
           privateKey: pk,
           isTestnet: true,
         });
-        const rawBals: any[] = await userClient.getAccountBalances().catch(() => []);
+        const rawBals: any = await userClient.getAccountBalances().catch(() => []);
         const bals: any[] = Array.isArray(rawBals) ? rawBals
           : Array.isArray(rawBals?.balances) ? rawBals.balances
           : Array.isArray(rawBals?.data) ? rawBals.data : [];
