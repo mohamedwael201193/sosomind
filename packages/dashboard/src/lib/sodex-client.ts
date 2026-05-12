@@ -67,7 +67,7 @@ async function signTypedDataV4(address: string, typedData: unknown): Promise<str
 }
 
 /** Switch MetaMask to the SoDEX chain, adding it if not yet known. */
-async function ensureSoDEXChain(eth: any, targetChainId: number): Promise<void> {
+export async function ensureSoDEXChain(eth: any, targetChainId: number): Promise<void> {
   const currentHex: string = await eth.request({ method: 'eth_chainId' });
   const current = parseInt(currentHex, 16);
   if (current === targetChainId) return; // already on the right chain
@@ -76,18 +76,34 @@ async function ensureSoDEXChain(eth: any, targetChainId: number): Promise<void> 
   try {
     await eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: targetHex }] });
   } catch (switchErr: any) {
-    // 4902 = chain not registered in MetaMask yet → add it
+    // 4902 = chain not registered in MetaMask yet → try to add it
     if (switchErr.code === 4902 || switchErr.code === -32603) {
-      await eth.request({
-        method: 'wallet_addEthereumChain',
-        params: [{
-          chainId: targetHex,
-          chainName: `SoDEX ${targetChainId === 138565 ? 'Testnet' : 'Mainnet'}`,
-          nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-          rpcUrls: [targetChainId === 138565 ? 'https://testnet-rpc.sodex.dev' : 'https://rpc.sodex.dev'],
-          blockExplorerUrls: [targetChainId === 138565 ? 'https://testnet-explorer.sodex.dev' : 'https://explorer.sodex.dev'],
-        }],
-      });
+      try {
+        await eth.request({
+          method: 'wallet_addEthereumChain',
+          params: [{
+            chainId: targetHex,
+            chainName: `SoDEX ${targetChainId === 138565 ? 'Testnet' : 'Mainnet'}`,
+            nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+            rpcUrls: [targetChainId === 138565 ? 'https://testnet-rpc.sodex.dev' : 'https://rpc.sodex.dev'],
+            blockExplorerUrls: [targetChainId === 138565 ? 'https://testnet-explorer.sodex.dev' : 'https://explorer.sodex.dev'],
+          }],
+        });
+      } catch (addErr: any) {
+        // MetaMask error -32602: "Could not add network that points to same RPC endpoint
+        // as existing network" — chain is already registered under a different name
+        // (e.g. 'ValueChain Testnet'). Just switch to it.
+        const msg: string = addErr?.message ?? '';
+        if (
+          addErr?.code === -32602 ||
+          msg.toLowerCase().includes('same rpc') ||
+          msg.toLowerCase().includes('already')
+        ) {
+          await eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: targetHex }] });
+        } else {
+          throw addErr;
+        }
+      }
     } else {
       throw new Error(
         `Please switch your MetaMask network to SoDEX ${targetChainId === 138565 ? 'Testnet' : 'Mainnet'} (chainId ${targetChainId}) and retry.`

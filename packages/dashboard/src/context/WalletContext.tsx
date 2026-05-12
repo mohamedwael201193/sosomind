@@ -18,6 +18,7 @@ import React, {
   useEffect,
   useState,
 } from 'react';
+import { ensureSoDEXChain } from '@/lib/sodex-client';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:10000';
 const TOKEN_KEY = 'sosomind_token';
@@ -110,6 +111,16 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const accounts: string[] = await ethereum.request({ method: 'eth_requestAccounts' });
       if (!accounts.length) throw new Error('No accounts returned from MetaMask');
       const addr = accounts[0].toLowerCase();
+
+      // 1b. Auto-switch to SoDEX chain (chainId 138565 = 0x21d85)
+      //     Handles 'ValueChain Testnet' duplicate-RPC case transparently
+      try {
+        await ensureSoDEXChain(ethereum, 138565);
+      } catch (chainErr: any) {
+        // Non-fatal: if user rejects chain switch, continue — they will be
+        // prompted again when they actually try to sign a trade
+        console.warn('[WalletContext] chain switch skipped:', chainErr?.message);
+      }
 
       // 2. Get nonce message from server
       const nonceRes = await fetch(`${API_URL}/api/auth/nonce`, {
