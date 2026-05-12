@@ -227,6 +227,11 @@ function TradeInner() {
   } | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // ── Strategy-specific loaded data ─────────────────────────────────────────
+  const [copySignalData, setCopySignalData] = useState<any>(null);
+  const [ssiBasketData, setSsiBasketData] = useState<{ sector: any; basket: any } | null>(null);
+  const [strategyLoading, setStrategyLoading] = useState(false);
+
   const symbols = useQuery<SodexSymbol[]>({
     queryKey: ['sodex', 'spot', 'symbols'],
     queryFn: () => fetcher('/api/sodex/spot/symbols'),
@@ -347,6 +352,54 @@ function TradeInner() {
   const setBestPrice = useCallback(() => {
     setPrice(String(side === 'buy' ? bestAsk : bestBid));
   }, [side, bestAsk, bestBid]);
+
+  async function handleStrategyProceed() {
+    setStrategyLoading(true);
+    try {
+      if (strategy === 'copy') {
+        const sigs: any[] = (await fetcher('/api/agents/signals?status=active&limit=3')) ?? [];
+        const sig = Array.isArray(sigs) ? sigs[0] : null;
+        if (sig) {
+          setCopySignalData(sig);
+          const assetName = String(sig.asset ?? sig.symbol ?? '').replace(/USDT|USDC|\/.*/, '').toUpperCase();
+          const matchSym = (symbols.data ?? []).find(
+            (s) => s.baseCoin === `v${assetName}` || s.baseCoin === assetName,
+          );
+          if (matchSym) setSymbolId(matchSym.id);
+          const dir = String(sig.direction ?? sig.side ?? '').toLowerCase();
+          setSide(dir.includes('short') || dir === 'sell' ? 'sell' : 'buy');
+          if (sig.entry && Number(sig.entry) > 0) {
+            setOrderType('limit');
+            setPrice(String(Number(sig.entry).toFixed(2)));
+          }
+        }
+      } else if (strategy === 'ssi') {
+        const sectors: any[] = (await fetcher('/api/sectors/intel')) ?? [];
+        const list = Array.isArray(sectors) ? sectors : [];
+        const top = list.find((s: any) => s.verdict === 'STRONG_BUY')
+                 ?? list.find((s: any) => s.verdict === 'BUY')
+                 ?? list[0];
+        if (top?.ticker) {
+          const basketData: any = await fetcher(`/api/sectors/intel/${top.ticker}/basket`);
+          setSsiBasketData({ sector: top, basket: basketData });
+          const topAsset: string | undefined = basketData?.basket?.[0]?.asset;
+          if (topAsset) {
+            const matchSym = (symbols.data ?? []).find(
+              (s) => s.baseCoin === `v${topAsset}` || s.baseCoin === topAsset,
+            );
+            if (matchSym) setSymbolId(matchSym.id);
+          }
+          setSide('buy');
+          setOrderType('market');
+        }
+      }
+    } catch (e) {
+      console.error('[Strategy] load failed:', e);
+    } finally {
+      setStrategyLoading(false);
+    }
+    setWizardStep(2);
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -751,11 +804,14 @@ function TradeInner() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setWizardStep(2)}
-                    className="mt-4 w-full py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5"
+                    onClick={handleStrategyProceed}
+                    disabled={strategyLoading}
+                    className="mt-4 w-full py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 disabled:opacity-60"
                     style={{ background: 'var(--accent)', color: '#0a0a0a' }}
                   >
-                    Continue <ChevronRight className="w-4 h-4" />
+                    {strategyLoading
+                      ? <><Loader2 className="w-4 h-4 animate-spin" /> Loading…</>
+                      : <>Continue <ChevronRight className="w-4 h-4" /></>}
                   </button>
                 </motion.div>
               )}
@@ -763,7 +819,10 @@ function TradeInner() {
               {/* ── Step 2: Risk Preflight ──────────────────────────────── */}
               {wizardStep === 2 && (
                 <motion.div key="step2" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }}>
-                  <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Risk Preflight</h3>
+                  <h3 className="text-sm font-bold mb-1" style={{ color: 'var(--text-primary)' }}>Risk Preflight</h3>
+                  <p className="text-[10px] mb-3" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                    {strategy === 'copy' ? 'Copy Signal · mirroring latest AI signal' : strategy === 'ssi' ? 'SSI Basket · momentum execution' : 'Manual Order · custom parameters'}
+                  </p>
                   <div className="space-y-2 mb-4">
                     {[
                       {
@@ -814,7 +873,7 @@ function TradeInner() {
                     ))}
                   </div>
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => setWizardStep(1)}
+                    <button type="button" onClick={() => { setWizardStep(1); setCopySignalData(null); setSsiBasketData(null); }}
                       className="px-3 py-2.5 rounded-xl border text-xs font-semibold flex items-center gap-1"
                       style={{ borderColor: 'var(--border-default)', color: 'var(--text-muted)' }}>
                       <ChevronLeft className="w-3.5 h-3.5" /> Back
@@ -837,6 +896,91 @@ function TradeInner() {
                     {strategy === 'copy' ? 'Copy Signal — ' : strategy === 'ssi' ? 'SSI Basket — ' : ''}
                     Sign &amp; Submit
                   </h3>
+
+                  {/* ── Copy Signal context card ── */}
+                  {strategy === 'copy' && copySignalData && (
+                    <div className="mb-3 p-3 rounded-xl border text-[11px]"
+                      style={{ borderColor: 'rgba(0,255,127,0.2)', background: 'rgba(0,255,127,0.04)' }}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] uppercase tracking-widest font-bold"
+                          style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
+                          AI Signal · Auto-filled
+                        </span>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                          String(copySignalData.direction ?? '').toLowerCase().includes('short')
+                            ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'
+                        }`}>
+                          {String(copySignalData.direction ?? copySignalData.side ?? 'LONG').toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="font-bold" style={{ color: 'var(--text-primary)' }}>
+                        {String(copySignalData.asset ?? copySignalData.symbol ?? '').toUpperCase()}/USDC
+                      </div>
+                      <div className="flex gap-3 mt-1" style={{ color: 'var(--text-muted)' }}>
+                        <span>Confidence: <strong style={{ color: 'var(--text-primary)' }}>{copySignalData.confidence ?? '—'}%</strong></span>
+                        {copySignalData.entry && (
+                          <span>Entry: <strong style={{ color: 'var(--text-primary)' }}>${Number(copySignalData.entry).toLocaleString()}</strong></span>
+                        )}
+                      </div>
+                      {copySignalData.reasoning && (
+                        <p className="mt-1 line-clamp-2" style={{ color: 'var(--text-muted)' }}>
+                          {String(copySignalData.reasoning).slice(0, 130)}…
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {strategy === 'copy' && !copySignalData && (
+                    <div className="mb-3 p-3 rounded-xl border text-[11px]"
+                      style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-elevated)' }}>
+                      <p style={{ color: 'var(--text-muted)' }}>No active signal found — fill the order manually or wait for next research cycle.</p>
+                    </div>
+                  )}
+
+                  {/* ── SSI Basket context card ── */}
+                  {strategy === 'ssi' && ssiBasketData && (
+                    <div className="mb-3 p-3 rounded-xl border text-[11px]"
+                      style={{ borderColor: 'rgba(249,115,22,0.25)', background: 'rgba(249,115,22,0.04)' }}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] uppercase tracking-widest font-bold"
+                          style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
+                          SSI Basket · {ssiBasketData.sector.sector}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400">
+                          {ssiBasketData.sector.verdict}
+                        </span>
+                      </div>
+                      <p className="mb-2" style={{ color: 'var(--text-muted)' }}>
+                        Score {Number(ssiBasketData.sector.score ?? 0).toFixed(0)}/100 · tap an asset to trade it:
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(ssiBasketData.basket?.basket ?? []).map((item: any) => {
+                          const sym = (symbols.data ?? []).find(
+                            (s) => s.baseCoin === `v${item.asset}` || s.baseCoin === item.asset,
+                          );
+                          const isActive = activeSymbol?.baseCoin === `v${item.asset}` || activeSymbol?.baseCoin === item.asset;
+                          return (
+                            <button key={item.asset} type="button" disabled={!sym}
+                              onClick={() => { if (sym) setSymbolId(sym.id); }}
+                              className="px-2.5 py-1 rounded-lg font-bold border transition-all"
+                              style={{
+                                borderColor: isActive ? 'var(--accent)' : 'var(--border-default)',
+                                background: isActive ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'var(--bg-elevated)',
+                                color: isActive ? 'var(--accent)' : sym ? 'var(--text-primary)' : 'var(--text-muted)',
+                                opacity: sym ? 1 : 0.5,
+                              }}>
+                              {item.asset} {item.weight}%
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {strategy === 'ssi' && !ssiBasketData && (
+                    <div className="mb-3 p-3 rounded-xl border text-[11px]"
+                      style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-elevated)' }}>
+                      <p style={{ color: 'var(--text-muted)' }}>Sector data unavailable — fill the order manually.</p>
+                    </div>
+                  )}
                   <form onSubmit={onSubmit} className="space-y-3">
                     <div className="flex gap-2">
                       {(['buy', 'sell'] as const).map((s) => (
