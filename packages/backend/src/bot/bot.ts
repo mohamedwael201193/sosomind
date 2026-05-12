@@ -432,8 +432,33 @@ export function createBot(): Bot | null {
       price = Number(s?.price ?? s?.last_price ?? 0);
     } catch {}
     const estValue = (price * qty).toFixed(2);
-    const market = `v${asset}_vUSDC`;
     const chatId = String((ctx as any).chat?.id ?? '');
+
+    // Resolve the real SoDEX market for this asset (testnet uses TESTBTC_vUSDC, etc.)
+    let market: string;
+    let resolvedAssetLabel = asset;
+    try {
+      const { sodex: houseSodex } = await import('../clients/sodex');
+      const symMeta = await houseSodex.findMarketForAsset(asset);
+      market = symMeta.name;  // e.g. "TESTBTC_vUSDC"
+      resolvedAssetLabel = symMeta.displayName ?? symMeta.name;
+    } catch {
+      // Asset not listed on SoDEX Testnet — inform user and abort
+      const notFoundText =
+        `⚠️ <b>${asset} Not on SoDEX Testnet</b>\n\n` +
+        `This asset isn't listed on SoDEX Testnet yet.\n` +
+        `Available assets include <b>BTC</b> and <b>ETH</b>.\n\n` +
+        `<i>Tap Trade from the main menu and pick BTC or ETH to continue.</i>`;
+      const kb = new InlineKeyboard()
+        .text('₿ Trade BTC', 'trade_amount:BTC:buy').text('Ξ Trade ETH', 'trade_amount:ETH:buy').row()
+        .text('⬅️ Back', 'menu:main');
+      if ((ctx as any).callbackQuery) {
+        await (ctx as any).editMessageText(notFoundText, { parse_mode: 'HTML', reply_markup: kb });
+      } else {
+        await ctx.reply(notFoundText, { parse_mode: 'HTML', reply_markup: kb });
+      }
+      return;
+    }
 
     // Resolve user's embedded wallet (always available — created on first contact)
     let embeddedWallet: { wallet_address: string; encrypted_key: string } | null = null;
@@ -461,7 +486,7 @@ export function createBot(): Bot | null {
     const text =
       `🔐 <b>Trade Confirmation</b>\n\n` +
       `⛓️ Network: SoDEX ${process.env.SODEX_CHAIN_ID === '286623' ? 'Mainnet' : 'Testnet'} (chainId ${process.env.SODEX_CHAIN_ID || '138565'})\n` +
-      `🪙 Asset: <b>${asset}</b>\n` +
+      `🪙 Asset: <b>${resolvedAssetLabel}</b>${resolvedAssetLabel !== asset ? ` <i>(${asset})</i>` : ''}\n` +
       `${side === 'buy' ? '📈' : '📉'} Direction: <b>${side === 'buy' ? 'LONG (Buy)' : 'SHORT (Sell)'}</b>\n` +
       `📦 Quantity: <b>${qty}</b>\n` +
       `💰 Est. Price: $${price.toLocaleString()}\n` +
@@ -2149,23 +2174,58 @@ export function createBot(): Bot | null {
     } catch {}
 
     const addr = wallet?.wallet_address ?? '—';
-    const short = addr !== '—' ? `${addr.slice(0, 10)}…${addr.slice(-6)}` : '—';
     const dashboardUrl = process.env.DASHBOARD_URL || '';
     const isPublicDashboard = dashboardUrl.startsWith('https://') && !dashboardUrl.includes('localhost');
+
+    // Fetch live SoDEX balance inline
+    let balanceLine = '<i>Balance: tap 🔄 Refresh Balance to load</i>';
+    if (wallet?.encrypted_key) {
+      try {
+        const { decryptPrivateKey } = await import('../utils/walletCrypto');
+        const { SoDEXClient } = await import('../clients/sodex');
+        const pk = decryptPrivateKey(wallet.encrypted_key);
+        const userClient = new SoDEXClient({
+          chainId: parseInt(process.env.SODEX_CHAIN_ID || '138565', 10),
+          privateKey: pk,
+          isTestnet: true,
+        });
+        const rawBals: any[] = await userClient.getAccountBalances().catch(() => []);
+        const bals: any[] = Array.isArray(rawBals) ? rawBals
+          : Array.isArray(rawBals?.balances) ? rawBals.balances
+          : Array.isArray(rawBals?.data) ? rawBals.data : [];
+        const nonZero = bals.filter((b: any) => {
+          const avail = Number(b.available ?? b.free ?? 0);
+          const locked = Number(b.locked ?? b.frozen ?? b.hold ?? 0);
+          return (avail + locked) > 0;
+        });
+        if (nonZero.length === 0) {
+          balanceLine = '💳 Balance: <i>0 (claim faucet → transfer Funding → Spot)</i>';
+        } else {
+          const parts = nonZero.map((b: any) => {
+            const coin = String(b.coin ?? b.asset ?? '?');
+            const avail = Number(b.available ?? b.free ?? 0);
+            return `<b>${coin}</b> ${avail.toFixed(4)}`;
+          });
+          balanceLine = `💳 Balance: ${parts.join(' · ')}`;
+        }
+      } catch {
+        balanceLine = '<i>Balance: unavailable (tap 🔄 to retry)</i>';
+      }
+    }
 
     const text =
       `👛 <b>Your SosoMind Wallet</b>\n\n` +
       `📍 Address:\n<code>${addr}</code>\n\n` +
-      (linkedMetaMask
-        ? `🦊 <b>MetaMask Linked:</b> <code>${linkedMetaMask.slice(0, 10)}…${linkedMetaMask.slice(-6)}</code>\n<i>Trades via dashboard will use your MetaMask wallet.</i>\n\n`
-        : '') +
+      `${balanceLine}\n` +
       `🌐 Network: ValueChain Testnet (chainId 138565)\n` +
-      `🔗 Explorer: <a href="https://testnet.sodex.com/explorer">testnet.sodex.com/explorer</a>\n\n` +
-      `<b>Options:</b>\n` +
-      `• <b>Export Key</b> — view private key (import to MetaMask)\n` +
-      `• <b>Import Key</b> — replace bot wallet with your MetaMask wallet\n` +
-      `• <b>Faucet Guide</b> — get free 100 USDC testnet tokens\n` +
-      (isPublicDashboard ? `• <b>Link MetaMask</b> — connect via ${dashboardUrl}\n` : '');
+      (linkedMetaMask
+        ? `🦊 MetaMask: <code>${linkedMetaMask.slice(0, 10)}…${linkedMetaMask.slice(-6)}</code>\n`
+        : '') +
+      `🔗 <a href="https://testnet.sodex.com/explorer">View on Explorer</a>\n\n` +
+      `• <b>Export Key</b> — import into MetaMask\n` +
+      `• <b>Import Key</b> — use your own wallet\n` +
+      `• <b>Faucet Guide</b> — free 100 USDC/day\n` +
+      (isPublicDashboard ? `• <a href="${dashboardUrl}/profile">Link MetaMask</a> via dashboard\n` : '');
 
     const kb = new InlineKeyboard()
       .text('🔑 Export Key', 'wallet:export').text('📥 Import Key', 'wallet:import').row()
