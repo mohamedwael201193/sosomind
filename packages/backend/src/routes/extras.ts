@@ -96,12 +96,26 @@ router.get('/edge/wallet/:address', asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'invalid_address', message: 'Address must be a valid 0x EVM address (42 chars)' });
   }
 
-  const { data: trades } = await supabase
+  // Step 1: Look up user_id linked to this wallet address in user_profiles
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('id')
+    .ilike('wallet_address', address)
+    .maybeSingle();
+
+  // Step 2: Query trades by user_id OR confirmed_by (house wallet uses confirmed_by='system')
+  let tradesQuery = supabase
     .from('trades')
     .select('market, side, price, amount, status, created_at')
-    .eq('status', 'filled')
-    .ilike('confirmed_by', `%${address.toLowerCase()}%`)
-    .limit(200);
+    .eq('status', 'filled');
+
+  if (profile?.id) {
+    tradesQuery = tradesQuery.or(`user_id.eq.${profile.id},confirmed_by.ilike.%${address.toLowerCase()}%`);
+  } else {
+    tradesQuery = tradesQuery.ilike('confirmed_by', `%${address.toLowerCase()}%`);
+  }
+
+  const { data: trades } = await tradesQuery.limit(200);
 
   if (!trades || trades.length === 0) {
     return res.json(wrapMeta({ address, trades: 0, source: 'empty' }, { ttlMs: 60_000, source: 'live' }));

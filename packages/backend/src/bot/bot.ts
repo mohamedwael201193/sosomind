@@ -1,4 +1,4 @@
-import { Bot, InlineKeyboard, InputFile, Keyboard, Context } from 'grammy';
+﻿import { Bot, InlineKeyboard, InputFile, Keyboard, Context } from 'grammy';
 import { runResearchAgent } from '../agents/research';
 import { runExecutionAgent } from '../agents/execution';
 import { sosovalue } from '../clients/sosovalue';
@@ -104,8 +104,9 @@ export function createBot(): Bot | null {
       .text('🎯 Persona', 'persona:view').text('📄 Tax Report', 'tax:cmd').row()
       .text('🔔 Alerts', 'menu:alerts').text('📓 Journal', 'journal:view').row()
       .text('🤝 Subscribe', 'subscribe:btc,macro,etf').text('⚙️ Settings', 'settings:view').row()
-      .text('� SSI Indexes', 'ssi:view').text('📰 Newsletter', 'newsletter:latest').row()
-      .text('�👛 My Wallet', 'menu:wallet');
+      .text('📈 SSI Indexes', 'ssi:view').text('📰 Newsletter', 'newsletter:latest').row()
+      .text('🧠 Intel', 'intel:view').text('📊 Track Record', 'track_record:view').row()
+      .text('💎👛 My Wallet', 'menu:wallet');
 
     const text = mainMenuMsg();
     if ((ctx as any).callbackQuery) {
@@ -2273,6 +2274,7 @@ export function createBot(): Bot | null {
   bot.command('intel', sendSectorIntel);
   bot.hears('🧠 Intel', sendSectorIntel);
   bot.callbackQuery('intel:refresh', sendSectorIntel);
+  bot.callbackQuery('intel:view', sendSectorIntel);
   bot.hears(/\b(intel|sector intel|intelligence|sector score)\b/i, sendSectorIntel);
 
   bot.callbackQuery('intel:all', async (ctx) => {
@@ -2350,6 +2352,7 @@ export function createBot(): Bot | null {
 
   bot.command('track_record', sendTrackRecord);
   bot.callbackQuery('track_record:refresh', sendTrackRecord);
+  bot.callbackQuery('track_record:view', sendTrackRecord);
   bot.hears(/\b(track record|hit rate|signal accuracy|win rate)\b/i, sendTrackRecord);
 
   // ── Error handler ─────────────────────────────────────────────────────────────
