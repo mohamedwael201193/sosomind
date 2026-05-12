@@ -641,20 +641,39 @@ export function createBot(): Bot | null {
           if (!isFinite(qtyNum) || qtyNum <= 0) {
             throw new Error(`Invalid quantity "${qtyStr}". Please select an amount from the menu.`);
           }
-          // Enforce SoDEX minimums: quantityPrecision, marketMinQuantity, minNotional
-          const symMeta = await userClient.getSymbolMeta(market, 'spot').catch(() => null);
-          const precision = symMeta?.quantityPrecision ?? 4;
-          const minMarketQty = parseFloat(symMeta?.marketMinQuantity || symMeta?.minQuantity || '0') || 0;
-          const minNotional = parseFloat(symMeta?.minNotional || '0') || 0;
+          // Fetch symbol meta with multiple field-name fallbacks
+          // (SoDEX API field names may differ from the TypeScript interface — store raw item)
+          const symMeta: any = await userClient.getSymbolMeta(market, 'spot').catch(() => null);
+          console.log(`[Bot] symMeta for ${market}:`, JSON.stringify(symMeta));
+
+          // Precision: try all known SoDEX field names, default to 4
+          const precision = Number(
+            symMeta?.quantityPrecision ?? symMeta?.qty_precision ?? symMeta?.qtyPrecision ??
+            symMeta?.quantity_precision ?? symMeta?.baseAssetPrecision ?? 4
+          );
+
+          // Min market qty: try all known field names
+          const minMarketQtyRaw =
+            symMeta?.marketMinQuantity ?? symMeta?.market_min_quantity ?? symMeta?.marketMinQty ??
+            symMeta?.market_min_qty ?? symMeta?.minQty ?? symMeta?.minQuantity ??
+            symMeta?.min_quantity ?? symMeta?.min_qty ?? '0';
+          const minMarketQty = parseFloat(String(minMarketQtyRaw)) || 0;
+
+          // Min notional: try all known field names
+          const minNotionalRaw =
+            symMeta?.minNotional ?? symMeta?.min_notional ?? symMeta?.minNotionalFilter ??
+            symMeta?.minOrderValue ?? '0';
+          const minNotional = parseFloat(String(minNotionalRaw)) || 0;
 
           let finalQty = qtyNum;
-          // Bump up to the market-order minimum quantity (e.g. 0.001 TESTBTC)
+
+          // Bump up to market-order minimum quantity (e.g. 0.001 TESTBTC, 0.1 AAVE)
           if (minMarketQty > 0 && finalQty < minMarketQty) {
             console.log(`[Bot] qty bumped ${finalQty} → ${minMarketQty} (marketMinQty for ${market})`);
             finalQty = minMarketQty;
           }
-          // Bump up to meet minNotional if we can estimate the price from qtyStr vs usd
-          // (minNotional is in quote currency e.g. $5 USDC — enforce via qty * livePrice)
+
+          // Bump up to meet minNotional (e.g. $5 USDC minimum order value)
           if (minNotional > 0) {
             try {
               const ob: any = await userClient.getSpotOrderbook(market, 1);
@@ -666,23 +685,45 @@ export function createBot(): Bot | null {
                 console.log(`[Bot] qty bumped ${finalQty} → ${bumpedQty} (minNotional=${minNotional} for ${market})`);
                 finalQty = bumpedQty;
               }
-            } catch { /* non-fatal — proceed without notional check */ }
+            } catch { /* non-fatal */ }
           }
 
-          const qtyFormatted = finalQty.toFixed(precision);
+          // Apply precision — use at least 1 decimal place to keep valid format
+          const safePrecision = (isFinite(precision) && precision >= 0) ? precision : 4;
+          const qtyFormatted = finalQty.toFixed(safePrecision);
           if (parseFloat(qtyFormatted) <= 0) {
-            throw new Error(`Order size rounds to zero for ${market} (precision=${precision}). Please choose a larger USD amount.`);
+            throw new Error(`Order size rounds to zero for ${market} (precision=${safePrecision}). Please choose a larger USD amount.`);
           }
+          console.log(`[Bot] Placing order: market=${market} symbolID=${symbolID} accountID=${accountID} qty=${qtyFormatted} precision=${safePrecision}`);
 
-          sodexResult = await userClient.placeSpotOrder({
-            accountID,
-            symbolID,
-            clOrdID: `bot-${Date.now()}`,
-            side: (side === 'buy' ? 1 : 2) as 1 | 2,
-            type: 2 as 1 | 2, // market
-            timeInForce: 3 as 1 | 2 | 3,
-            quantity: qtyFormatted,
-          });
+          // Submit order — if SoDEX still rejects qty, retry once with doubled quantity
+          let placeErr: any = null;
+          for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+              const attemptQty = attempt === 1 ? qtyFormatted : (finalQty * 2).toFixed(safePrecision);
+              sodexResult = await userClient.placeSpotOrder({
+                accountID,
+                symbolID,
+                clOrdID: `bot-${Date.now()}`,
+                side: (side === 'buy' ? 1 : 2) as 1 | 2,
+                type: 2 as 1 | 2, // market
+                timeInForce: 3 as 1 | 2 | 3,
+                quantity: attemptQty,
+              });
+              console.log(`[Bot] placeSpotOrder attempt ${attempt} qty=${attemptQty} → success`);
+              placeErr = null;
+              break;
+            } catch (err: any) {
+              placeErr = err;
+              const msg = String(err?.message || err?.response?.data || '').toLowerCase();
+              if (attempt === 1 && (msg.includes('quantity') || msg.includes('invalid') || msg.includes('minimum'))) {
+                console.warn(`[Bot] placeSpotOrder attempt 1 failed (qty issue), retrying doubled qty: ${(finalQty * 2).toFixed(safePrecision)}`);
+                continue;
+              }
+              break;
+            }
+          }
+          if (placeErr) throw placeErr;
           walletUsed = `${embWallet.wallet_address.slice(0, 6)}…${embWallet.wallet_address.slice(-4)}`;
         }
       }
