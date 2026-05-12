@@ -252,18 +252,41 @@ export class SoDEXClient {
     return meta;
   }
 
-  // Find the best spot market for a plain asset symbol (e.g. "BTC" → TESTBTC_vUSDC on testnet)
+  // Find the best spot market for a plain asset symbol (e.g. "BTC" → vBTC_vUSDC on testnet)
+  // Priority order prevents TEST* prefix markets from shadowing canonical v* markets.
   async findMarketForAsset(asset: string): Promise<SodexSymbol> {
     // Ensure symbols are loaded
     await this.resolveSymbolID("__probe__", "spot").catch(() => {});
     const needle = asset.toUpperCase();
     const byBase = this.symbolCache.spotByBase;
-    // Try exact base match: "BTC" → "BTC" key, or "VBTC", "TESTBTC"
+
+    // Priority 1: exact key match (e.g. "TESTBTC" → TESTBTC_vUSDC)
+    const exact = byBase.get(needle);
+    if (exact) return exact;
+
+    // Priority 2: V-prefixed exact (e.g. "BTC" → "VBTC" key → vBTC_vUSDC)
+    const vPrefixed = byBase.get(`V${needle}`);
+    if (vPrefixed) return vPrefixed;
+
+    // Priority 3: W-prefixed exact (e.g. "SOSO" → "WSOSO" key → WSOSO_vUSDC)
+    const wPrefixed = byBase.get(`W${needle}`);
+    if (wPrefixed) return wPrefixed;
+
+    // Priority 4: dot-stripped V-prefixed (e.g. "MAG7SSI" → "VMAG7.SSI" → vMAG7ssi_vUSDC)
     for (const [base, meta] of byBase.entries()) {
-      if (base === needle || base === `V${needle}` || base.endsWith(needle) || base.includes(needle)) {
-        return meta;
-      }
+      if (base.replace(/\./g, '') === `V${needle}`) return meta;
     }
+
+    // Priority 5: endsWith fallback (last resort for alias patterns)
+    for (const [base, meta] of byBase.entries()) {
+      if (base.endsWith(needle)) return meta;
+    }
+
+    // Priority 6: includes last resort
+    for (const [base, meta] of byBase.entries()) {
+      if (base.includes(needle)) return meta;
+    }
+
     throw new Error(`No SoDEX spot market found for asset: ${asset}. Available: ${[...byBase.keys()].join(', ')}`);
   }
 

@@ -234,12 +234,21 @@ function TradeInner() {
   const [strategyLoading, setStrategyLoading] = useState(false);
   const autoFilledStrategyRef = useRef<string | null>(null);
 
-  // Sector → best available SoDEX Testnet proxy (BTC or ETH)
+  // Sector → best available SoDEX Testnet spot proxy (all pairs now live)
   const SECTOR_PROXY: Record<string, string> = {
-    ssiDeFi: 'ETH', ssiAI: 'ETH', ssiLayer1: 'BTC', ssiLayer2: 'ETH',
-    ssiRWA: 'BTC', ssiNFT: 'ETH', ssiMeme: 'ETH', ssiGameFi: 'ETH',
-    ssiMAG7: 'BTC', ssiPayFi: 'BTC', ssiCeFi: 'BTC',
-    ssiSocialFi: 'ETH', ssiDePIN: 'ETH',
+    ssiDeFi: 'LINK',    // DeFi oracle / on-chain liquidity exposure
+    ssiAI: 'ETH',       // AI infra primarily on Ethereum ecosystem
+    ssiLayer1: 'SOL',   // L1 competition — SOL is strongest L1 proxy
+    ssiLayer2: 'ETH',   // L2 rollups settle to ETH
+    ssiRWA: 'LINK',     // RWA depends on Chainlink data feeds
+    ssiNFT: 'ETH',      // NFTs overwhelmingly on Ethereum
+    ssiMeme: 'DOGE',    // Meme coins — DOGE is OG benchmark
+    ssiGameFi: 'AVAX',  // GameFi / Avalanche subnet ecosystem
+    ssiMAG7: 'BTC',     // MAG7 = macro risk-on, tracks BTC
+    ssiPayFi: 'XRP',    // Payments / cross-border settlements
+    ssiCeFi: 'BNB',     // CeFi / exchange tokens — BNB is proxy
+    ssiSocialFi: 'SOL', // SocialFi primarily on Solana
+    ssiDePIN: 'SOL',    // DePIN infrastructure on Solana ecosystem
   };
 
   const symbols = useQuery<SodexSymbol[]>({

@@ -34,9 +34,21 @@ const MAIN_KB = new Keyboard()
 // ─── Inline asset picker ─────────────────────────────────────────────────────
 function assetMenu(prefix: string) {
   return new InlineKeyboard()
+    // ── Core Crypto ──
     .text('₿ BTC', `${prefix}:BTC`).text('Ξ ETH', `${prefix}:ETH`).text('◎ SOL', `${prefix}:SOL`).row()
-    .text('🔴 AVAX', `${prefix}:AVAX`).text('🔗 LINK', `${prefix}:LINK`).text('🐶 DOGE', `${prefix}:DOGE`).row()
-    .text('🟣 ARB', `${prefix}:ARB`).text('🔵 OP', `${prefix}:OP`).text('⚡ SUI', `${prefix}:SUI`).row()
+    .text('⚡ XRP', `${prefix}:XRP`).text('🪙 ADA', `${prefix}:ADA`).text('🐶 DOGE', `${prefix}:DOGE`).row()
+    .text('🔗 LINK', `${prefix}:LINK`).text('🔴 AVAX', `${prefix}:AVAX`).text('🟡 BNB', `${prefix}:BNB`).row()
+    .text('🦄 UNI', `${prefix}:UNI`).text('🔵 LTC', `${prefix}:LTC`).text('🔒 ZEC', `${prefix}:ZEC`).row()
+    .text('🔥 HYPE', `${prefix}:HYPE`).text('🐕 SHIB', `${prefix}:SHIB`).text('🏦 AAVE', `${prefix}:AAVE`).row()
+    // ── Commodities & Tokens ──
+    .text('🥇 XAUT', `${prefix}:XAUT`).text('💵 USDT', `${prefix}:USDT`).text('🌊 SOSO', `${prefix}:SOSO`).row()
+    // ── Stocks ──
+    .text('🚗 TSLA', `${prefix}:TSLA`).text('🟢 NVDA', `${prefix}:NVDA`).text('📘 META', `${prefix}:META`).row()
+    .text('🍎 AAPL', `${prefix}:AAPL`).text('📦 AMZN', `${prefix}:AMZN`).text('🔍 GOOGL', `${prefix}:GOOGL`).row()
+    .text('🪟 MSFT', `${prefix}:MSFT`).row()
+    // ── SSI Indexes ──
+    .text('📊 MAG7ssi', `${prefix}:MAG7SSI`).text('😂 MEMEssi', `${prefix}:MEMESSI`).row()
+    .text('💎 DEFIssi', `${prefix}:DEFISSI`).text('🏛️ USSI', `${prefix}:USSI`).row()
     .text('⬅️ Back', 'menu:main');
 }
 
@@ -461,12 +473,16 @@ export function createBot(): Bot | null {
     } catch {
       // Asset not listed on SoDEX Testnet — inform user and abort
       const notFoundText =
-        `⚠️ <b>${asset} Not on SoDEX Testnet</b>\n\n` +
-        `This asset isn't listed on SoDEX Testnet yet.\n` +
-        `Available assets include <b>BTC</b> and <b>ETH</b>.\n\n` +
-        `<i>Tap Trade from the main menu and pick BTC or ETH to continue.</i>`;
+        `⚠️ <b>${asset} not found on SoDEX Testnet</b>\n\n` +
+        `Available spot assets:\n` +
+        `<b>BTC · ETH · SOL · XRP · ADA · DOGE · LINK · AVAX · BNB</b>\n` +
+        `<b>UNI · LTC · ZEC · HYPE · SHIB · AAVE · XAUT · USDT · SOSO</b>\n` +
+        `<b>TSLA · NVDA · META · AAPL · AMZN · GOOGL · MSFT</b>\n` +
+        `<b>MAG7ssi · MEMEssi · DEFIssi · USSI</b>\n\n` +
+        `<i>Use /trade ASSET or tap below to pick another asset.</i>`;
       const kb = new InlineKeyboard()
-        .text('₿ Trade BTC', 'trade_amount:BTC:buy').text('Ξ Trade ETH', 'trade_amount:ETH:buy').row()
+        .text('₿ BTC', 'trade_amount:BTC:buy').text('Ξ ETH', 'trade_amount:ETH:buy').text('◎ SOL', 'trade_amount:SOL:buy').row()
+        .text('⚡ XRP', 'trade_amount:XRP:buy').text('🪙 ADA', 'trade_amount:ADA:buy').text('🐶 DOGE', 'trade_amount:DOGE:buy').row()
         .text('⬅️ Back', 'menu:main');
       if ((ctx as any).callbackQuery) {
         await (ctx as any).editMessageText(notFoundText, { parse_mode: 'HTML', reply_markup: kb });
@@ -1638,7 +1654,7 @@ export function createBot(): Bot | null {
     await (ctx as any).editMessageText(text, { parse_mode: 'HTML', reply_markup: kb });
   });
 
-  bot.callbackQuery(/^papertrade:([A-Z]+)$/, async (ctx) => {
+  bot.callbackQuery(/^papertrade:([A-Z0-9]+)$/, async (ctx) => {
     const asset = ctx.match[1];
     await ctx.answerCallbackQuery();
     const text = `📄 <b>Paper Trade ${asset}</b>\nSelect direction:`;
@@ -1915,12 +1931,13 @@ export function createBot(): Bot | null {
                     `⚠️ <b>${asset} Not Tradeable on SoDEX Testnet</b>\n\n` +
                     `<b>${symMeta.name}</b> is currently in <b>${symMeta.status}</b> mode.\n` +
                     `New orders are not accepted for this symbol.\n\n` +
-                    `<b>Available now:</b> BTC · ETH\n` +
-                    `<i>Try: "buy $10 BTC" or "buy $10 ETH"</i>`,
+                    `<b>Available now:</b> BTC · ETH · SOL · XRP · ADA · DOGE · LINK · AVAX · BNB · UNI · LTC · ZEC · HYPE · SHIB · AAVE · XAUT · SOSO · TSLA · NVDA · META · AAPL · AMZN · GOOGL · MSFT\n` +
+                    `<i>Try: "buy $10 SOL" or tap below</i>`,
                     {
                       parse_mode: 'HTML',
                       reply_markup: new InlineKeyboard()
-                        .text('₿ Trade BTC', 'trade_amount:BTC:buy').text('Ξ Trade ETH', 'trade_amount:ETH:buy').row()
+                        .text('₿ BTC', 'trade_amount:BTC:buy').text('Ξ ETH', 'trade_amount:ETH:buy').text('◎ SOL', 'trade_amount:SOL:buy').row()
+                        .text('⚡ XRP', 'trade_amount:XRP:buy').text('🪙 ADA', 'trade_amount:ADA:buy').text('🐶 DOGE', 'trade_amount:DOGE:buy').row()
                         .text('🏠 Main Menu', 'menu:main'),
                     }
                   );
@@ -1929,14 +1946,15 @@ export function createBot(): Bot | null {
               } catch {
                 // Asset not found on SoDEX Testnet
                 await ctx.reply(
-                  `⚠️ <b>${asset} Not on SoDEX Testnet</b>\n\n` +
-                  `This asset isn't listed on SoDEX Testnet.\n\n` +
-                  `<b>Available now:</b> BTC · ETH\n` +
-                  `<i>Try: "buy $10 BTC" or "buy $10 ETH"</i>`,
+                  `⚠️ <b>${asset} not found on SoDEX Testnet</b>\n\n` +
+                  `Available spot assets:\n` +
+                  `<b>BTC · ETH · SOL · XRP · ADA · DOGE · LINK · AVAX · BNB · UNI · LTC · ZEC · HYPE · SHIB · AAVE · XAUT · SOSO · TSLA · NVDA · META · AAPL · AMZN · GOOGL · MSFT</b>\n\n` +
+                  `<i>Try: "buy $50 SOL" or tap below</i>`,
                   {
                     parse_mode: 'HTML',
                     reply_markup: new InlineKeyboard()
-                      .text('₿ Trade BTC', 'trade_amount:BTC:buy').text('Ξ Trade ETH', 'trade_amount:ETH:buy').row()
+                      .text('₿ BTC', 'trade_amount:BTC:buy').text('Ξ ETH', 'trade_amount:ETH:buy').text('◎ SOL', 'trade_amount:SOL:buy').row()
+                      .text('⚡ XRP', 'trade_amount:XRP:buy').text('🪙 ADA', 'trade_amount:ADA:buy').text('🐶 DOGE', 'trade_amount:DOGE:buy').row()
                       .text('🏠 Main Menu', 'menu:main'),
                   }
                 );
