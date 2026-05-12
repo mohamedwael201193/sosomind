@@ -14,6 +14,7 @@ import { getUserPersona, setUserPersona, getPersonaQuiz, inferPersonaFromQuiz, P
 import { generateRebalanceRecommendation } from '../rebalance/engine';
 import { getStrategies, PRESET_STRATEGIES } from '../strategies/playbook';
 import { formatMevWarning } from '../utils/mev';
+import { getBinanceTicker } from '../clients/market';
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 // Admin chat IDs — used only for privileged commands, not to block regular users
@@ -454,10 +455,36 @@ export function createBot(): Bot | null {
   });
 
   async function showTradeConfirm(ctx: Context, asset: string, side: 'buy' | 'sell', qty: number) {
+    // Price fetch: 3-source fallback for display (est. price in confirmation)
+    // 1. Binance (free, real-time, no key — most reliable for crypto)
+    // 2. SoDEX ticker lastPx (covers stocks & niche tokens not on Binance)
+    // 3. SosoValue market-snapshot (last resort)
     let price = 0;
     try {
-      const s: any = await sosovalue.getMarketSnapshot(asset);
-      price = Number(s?.price ?? s?.last_price ?? 0);
+      const binTicker = await getBinanceTicker(asset).catch(() => null);
+      if (binTicker && binTicker.price > 0) {
+        price = binTicker.price;
+      } else {
+        // SoDEX ticker fallback (stocks, indices, niche tokens)
+        try {
+          const { sodex: houseSodex2 } = await import('../clients/sodex');
+          const tickers: any = await houseSodex2.getSpotTickers().catch(() => null);
+          const tickerArr: any[] = Array.isArray(tickers) ? tickers : Array.isArray(tickers?.data) ? tickers.data : [];
+          const cleanAsset = asset.toUpperCase().replace(/^V/, '');
+          const t = tickerArr.find((x: any) =>
+            x.symbol === `v${cleanAsset}_vUSDC` ||
+            x.symbol === `${cleanAsset}_vUSDC` ||
+            x.symbol?.startsWith(cleanAsset + '_')
+          );
+          const lastPx = parseFloat(t?.lastPx ?? '0');
+          if (lastPx > 0) price = lastPx;
+        } catch {}
+        // SosoValue last resort
+        if (!price) {
+          const s: any = await sosovalue.getMarketSnapshot(asset).catch(() => null);
+          price = Number(s?.price ?? s?.last_price ?? s?.current_price ?? 0);
+        }
+      }
     } catch {}
     const estValue = (price * qty).toFixed(2);
     const chatId = String((ctx as any).chat?.id ?? '');
@@ -731,6 +758,9 @@ export function createBot(): Bot | null {
           // Fetch live best price for limit-IOC order.
           // Market orders (type:2) fail on SoDEX testnet with "MissingOraclePrice".
           // Limit-IOC (type:1, timeInForce:3) with a 0.5% buffer fills like a market order.
+          // Fallback chain: orderbook best ask/bid → ticker lastPx → throw.
+          // Some pairs have empty asks (no sellers) or empty bids (no buyers) on testnet —
+          // in that case we use lastPx from the ticker as the reference price.
           const pricePrecision = Number(symMeta?.pricePrecision ?? 0);
           const priceMultiplier = Math.pow(10, pricePrecision);
           let limitPriceStr: string | undefined;
@@ -739,13 +769,43 @@ export function createBot(): Bot | null {
             const bestRaw = side === 'buy'
               ? parseFloat(ob2?.asks?.[0]?.[0] ?? ob2?.asks?.[0]?.price ?? '0')
               : parseFloat(ob2?.bids?.[0]?.[0] ?? ob2?.bids?.[0]?.price ?? '0');
-            const bestWithBuffer = side === 'buy' ? bestRaw * 1.005 : bestRaw * 0.995;
-            if (bestWithBuffer > 0) {
+            if (bestRaw > 0) {
+              const bestWithBuffer = side === 'buy' ? bestRaw * 1.005 : bestRaw * 0.995;
               limitPriceStr = (Math.round(bestWithBuffer * priceMultiplier) / priceMultiplier)
                 .toFixed(pricePrecision).replace(/\.?0+$/, '');
             }
-          } catch { /* non-fatal — will throw below */ }
-          if (!limitPriceStr) throw new Error(`Cannot fetch price for ${market} — please try again.`);
+          } catch { /* non-fatal — fall through to ticker */ }
+          // Ticker fallback: use lastPx when orderbook side is empty (e.g. no asks on testnet)
+          if (!limitPriceStr) {
+            try {
+              const tickers: any = await userClient.getSpotTickers();
+              const tickerArr: any[] = Array.isArray(tickers) ? tickers
+                : Array.isArray(tickers?.data) ? tickers.data : [];
+              const t = tickerArr.find((x: any) => x.symbol === market);
+              const lastPx = parseFloat(t?.lastPx ?? t?.askPx ?? t?.bidPx ?? '0');
+              if (lastPx > 0) {
+                const withBuffer = side === 'buy' ? lastPx * 1.01 : lastPx * 0.99; // wider buffer for stale price
+                limitPriceStr = (Math.round(withBuffer * priceMultiplier) / priceMultiplier)
+                  .toFixed(pricePrecision).replace(/\.?0+$/, '');
+                console.log(`[Bot] orderbook empty for ${market} ${side} — using ticker lastPx=${lastPx} limitPrice=${limitPriceStr}`);
+              }
+            } catch { /* non-fatal */ }
+          }
+          // Binance real-market price as final fallback
+          if (!limitPriceStr) {
+            try {
+              const cleanAsset2 = market.split('_')[0].replace(/^v/i, '');
+              const binT = await getBinanceTicker(cleanAsset2).catch(() => null);
+              const binPrice = binT?.price ?? 0;
+              if (binPrice > 0) {
+                const withBuffer = side === 'buy' ? binPrice * 1.01 : binPrice * 0.99;
+                limitPriceStr = (Math.round(withBuffer * priceMultiplier) / priceMultiplier)
+                  .toFixed(pricePrecision).replace(/\.?0+$/, '');
+                console.log(`[Bot] using Binance fallback price for ${market}: ${binPrice} → limit=${limitPriceStr}`);
+              }
+            } catch { /* non-fatal */ }
+          }
+          if (!limitPriceStr) throw new Error(`Cannot fetch price for ${market} — orderbook, ticker, and Binance all unavailable. Try again shortly.`);
 
           console.log(`[Bot] Placing order: market=${market} symbolID=${symbolID} accountID=${accountID} side=${side} qty=${qtyFormatted} price=${limitPriceStr}`);
 

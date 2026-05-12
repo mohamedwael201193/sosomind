@@ -17,6 +17,9 @@ const BINANCE_BASE = 'https://api.binance.com';
 const binanceHttp = axios.create({ baseURL: BINANCE_BASE, timeout: 8000 });
 
 // Map SosoMind/SoSoValue asset names → Binance symbol
+// Covers all 32 SoDEX testnet spot pairs + common extras.
+// Stocks (TSLA, NVDA, etc.), indices (MAG7ssi), and niche tokens (HYPE, SOSO)
+// are NOT on Binance — those fall back to SoDEX ticker or SosoValue.
 const BINANCE_SYMBOL_MAP: Record<string, string> = {
   BTC: 'BTCUSDT', ETH: 'ETHUSDT', SOL: 'SOLUSDT', BNB: 'BNBUSDT',
   AVAX: 'AVAXUSDT', LINK: 'LINKUSDT', DOGE: 'DOGEUSDT', ARB: 'ARBUSDT',
@@ -24,6 +27,10 @@ const BINANCE_SYMBOL_MAP: Record<string, string> = {
   ADA: 'ADAUSDT', XRP: 'XRPUSDT', LTC: 'LTCUSDT', ATOM: 'ATOMUSDT',
   UNI: 'UNIUSDT', AAVE: 'AAVEUSDT', INJ: 'INJUSDT', TIA: 'TIAUSDT',
   JUP: 'JUPUSDT', WIF: 'WIFUSDT', PEPE: 'PEPEUSDT', SHIB: 'SHIBUSDT',
+  // SoDEX testnet extras
+  ZEC: 'ZECUSDT', XAUT: 'XAUTUSDT', USDT: 'USDTUSDC',
+  // HYPE, SOSO, TSLA, NVDA, META, AAPL, AMZN, GOOGL, MSFT, MAG7ssi, MEMEssi, DEFIssi, USSI
+  // — not on Binance; handled by SoDEX ticker / SosoValue fallback
 };
 
 function toBinanceSymbol(asset: string): string {
