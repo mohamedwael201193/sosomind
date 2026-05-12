@@ -251,11 +251,24 @@ function TradeInner() {
     ssiDePIN: 'SOL',    // DePIN infrastructure on Solana ecosystem
   };
 
+  // Non-trading status values — mirrors the bot's _NON_TRADING_ST constant
+  const NON_TRADING_ST = ['CANCEL_ONLY', 'HALT', 'SUSPENDED', 'BREAK', 'DISABLED', 'INACTIVE', 'CLOSED'];
+
   const symbols = useQuery<SodexSymbol[]>({
     queryKey: ['sodex', 'spot', 'symbols'],
     queryFn: () => fetcher('/api/sodex/spot/symbols'),
     staleTime: 60_000,
   });
+
+  // Symbols that are currently accepting new orders on SoDEX
+  const tradeableSymbols = useMemo(
+    () => (symbols.data ?? []).filter((s) => {
+      const st = s.status.toUpperCase();
+      return !NON_TRADING_ST.some((x) => st.includes(x));
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [symbols.data],
+  );
 
   const info = useQuery({
     queryKey: ['sodex', 'relay', 'info'],
@@ -343,15 +356,17 @@ function TradeInner() {
   useEffect(() => {
     if (symbolId == null && symbols.data?.length) {
       // Pre-select asset from NLP query param (e.g. asset=ETH → vETH_vUSDC)
+      // Always prefer TRADING-status symbols — never pre-select cancel-only assets
+      const pool = tradeableSymbols.length > 0 ? tradeableSymbols : symbols.data;
       const fromParam = initAsset
-        ? symbols.data.find((s) => s.baseCoin === `v${initAsset}` || s.baseCoin === initAsset || s.name.startsWith(`v${initAsset}_`) || s.name.startsWith(`${initAsset}_`))
+        ? pool.find((s) => s.baseCoin === `v${initAsset}` || s.baseCoin === initAsset || s.name.startsWith(`v${initAsset}_`) || s.name.startsWith(`${initAsset}_`))
         : null;
-      const eth = symbols.data.find((s) => s.name === 'vETH_vUSDC');
-      const btc = symbols.data.find((s) => s.name === 'vBTC_vUSDC');
-      const first = fromParam ?? eth ?? btc ?? symbols.data.find((s) => /TRADING/i.test(s.status)) ?? symbols.data[0];
+      const eth = pool.find((s) => s.name === 'vETH_vUSDC');
+      const btc = pool.find((s) => s.name === 'vBTC_vUSDC');
+      const first = fromParam ?? eth ?? btc ?? pool[0];
       if (first) setSymbolId(first.id);
     }
-  }, [symbols.data, symbolId, initAsset]);
+  }, [symbols.data, symbolId, initAsset, tradeableSymbols]);
 
   const handlePct = useCallback(
     (pct: number) => {
@@ -420,10 +435,10 @@ function TradeInner() {
         if (sig) {
           setCopySignalData(sig);
           const assetName = String(sig.asset ?? sig.symbol ?? '').replace(/USDT|USDC|\/.*/, '').toUpperCase();
-          // Try to match by exact base coin; fall back to current market
-          const matchSym = (symbols.data ?? []).find(
+          // Try to match by exact base coin among TRADING symbols only; fall back to current market
+          const matchSym = tradeableSymbols.find(
             (s) => s.baseCoin === `v${assetName}` || s.baseCoin === assetName,
-          ) ?? (symbols.data ?? []).find((s) => s.id === symbolId);
+          ) ?? tradeableSymbols.find((s) => s.id === symbolId);
           if (matchSym) setSymbolId(matchSym.id);
           const dir = String(sig.direction ?? sig.side ?? '').toLowerCase();
           setSide(dir.includes('short') || dir === 'sell' ? 'sell' : 'buy');
@@ -444,18 +459,18 @@ function TradeInner() {
           const basketData: any = await fetcher(`/api/sectors/intel/${top.ticker}/basket`);
           setSsiBasketData({ sector: top, basket: basketData });
 
-          // Try basket assets first
+          // Try basket assets first — only TRADING-status symbols
           const basketAssets: string[] = (basketData?.basket ?? []).map((b: any) => String(b.asset));
           let matchSym = basketAssets
-            .map((asset) => (symbols.data ?? []).find(
+            .map((asset) => tradeableSymbols.find(
               (s) => s.baseCoin === `v${asset}` || s.baseCoin === asset,
             ))
             .find(Boolean);
 
-          // Fallback: use sector proxy (ETH or BTC) when basket assets not on SoDEX Testnet
+          // Fallback: use sector proxy when basket assets not on SoDEX Testnet or cancel-only
           if (!matchSym) {
             const proxyBase = SECTOR_PROXY[top.ticker] ?? 'ETH';
-            matchSym = (symbols.data ?? []).find(
+            matchSym = tradeableSymbols.find(
               (s) => s.baseCoin === `v${proxyBase}` || s.baseCoin === proxyBase ||
                      s.name.includes(proxyBase),
             );
@@ -540,8 +555,15 @@ function TradeInner() {
               className="bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-lg px-3 py-2 text-sm font-semibold focus:outline-none focus:border-emerald-500/60 min-w-[140px]"
             >
               {symbols.isLoading && <option>Loading…</option>}
-              {(symbols.data ?? []).map((s) => (
+              {tradeableSymbols.map((s) => (
                 <option key={s.id} value={s.id}>{s.displayName}</option>
+              ))}
+              {/* Show cancel-only symbols disabled so users can see but not select */}
+              {(symbols.data ?? []).filter((s) => {
+                const st = s.status.toUpperCase();
+                return NON_TRADING_ST.some((x) => st.includes(x));
+              }).map((s) => (
+                <option key={s.id} value={s.id} disabled>{s.displayName} (restricted)</option>
               ))}
             </select>
           </div>
@@ -920,6 +942,16 @@ function TradeInner() {
                         detail: activeSymbol?.displayName ?? 'None',
                       },
                       {
+                        label: 'Market status',
+                        pass: !activeSymbol || !NON_TRADING_ST.some((x) => activeSymbol.status.toUpperCase().includes(x)),
+                        warn: false,
+                        detail: activeSymbol
+                          ? NON_TRADING_ST.some((x) => activeSymbol.status.toUpperCase().includes(x))
+                            ? `${activeSymbol.displayName} is ${activeSymbol.status} — new orders are blocked`
+                            : `${activeSymbol.displayName} is TRADING`
+                          : 'No market selected',
+                      },
+                      {
                         label: 'Network',
                         pass: Boolean(info.data),
                         warn: info.data?.isTestnet,
@@ -1031,14 +1063,18 @@ function TradeInner() {
                       </p>
                       <div className="flex flex-wrap gap-1.5">
                         {(ssiBasketData.basket?.basket ?? []).map((item: any) => {
-                          const sym = (symbols.data ?? []).find(
+                          const sym = tradeableSymbols.find(
                             (s) => s.baseCoin === `v${item.asset}` || s.baseCoin === item.asset,
                           );
                           const isActive = activeSymbol?.baseCoin === `v${item.asset}` || activeSymbol?.baseCoin === item.asset;
+                          // Check if the asset exists on SoDEX at all (even if cancel-only)
+                          const existsButBlocked = !sym && (symbols.data ?? []).some(
+                            (s) => s.baseCoin === `v${item.asset}` || s.baseCoin === item.asset,
+                          );
                           return (
                             <button key={item.asset} type="button" disabled={!sym}
                               onClick={() => { if (sym) { setSymbolId(sym.id); autoFilledStrategyRef.current = null; } }}
-                              title={!sym ? 'Not listed on SoDEX Testnet' : undefined}
+                              title={existsButBlocked ? `${item.asset} is listed but in cancel-only mode` : !sym ? 'Not listed on SoDEX Testnet' : undefined}
                               className="px-2.5 py-1 rounded-lg font-bold border transition-all"
                               style={{
                                 borderColor: isActive ? 'var(--accent)' : 'var(--border-default)',
@@ -1046,7 +1082,7 @@ function TradeInner() {
                                 color: isActive ? 'var(--accent)' : sym ? 'var(--text-primary)' : 'var(--text-muted)',
                                 opacity: sym ? 1 : 0.4,
                               }}>
-                              {item.asset} {item.weight}%
+                              {item.asset} {item.weight}%{existsButBlocked ? ' ⚫' : ''}
                             </button>
                           );
                         })}
