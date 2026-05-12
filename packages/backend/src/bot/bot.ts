@@ -558,21 +558,77 @@ export function createBot(): Bot | null {
             privateKey: privKey!,
             isTestnet: true,
           });
-          // Resolve symbolID and accountID from SoDEX
+          // Resolve symbolID from SoDEX market list
           const symbolID = await userClient.resolveSymbolID(market, 'spot').catch(() => 0);
-          const accountID = await userClient.resolveAccountID().catch(() => 0);
-          if (symbolID > 0) {
-            sodexResult = await userClient.placeSpotOrder({
-              accountID,
-              symbolID,
-              clOrdID: `bot-${Date.now()}`,
-              side: (side === 'buy' ? 1 : 2) as 1 | 2,
-              type: 2 as 1 | 2, // market
-              timeInForce: 3 as 1 | 2 | 3,
-              quantity: String(qtyStr),
-            });
-            walletUsed = `${embWallet.wallet_address.slice(0, 6)}…${embWallet.wallet_address.slice(-4)}`;
+          if (symbolID <= 0) {
+            throw new Error(`Market ${market} not found on SoDEX Testnet. Try BTC or ETH.`);
           }
+
+          // Resolve accountID — auto-register wallet on SoDEX if this is first-time use
+          let accountID = await userClient.resolveAccountID().catch(() => 0);
+          if (accountID === 0) {
+            await ctx.editMessageText(
+              `⏳ <b>First-time Setup…</b>\n\n🔗 Registering your wallet on SoDEX…\n<i>This only happens once.</i>`,
+              { parse_mode: 'HTML' }
+            );
+            try {
+              const reg = await userClient.registerApiKey({
+                name: `sosomind-${chatId.slice(-6)}`,
+                expiresInDays: 365,
+              });
+              accountID = reg.accountID;
+              console.log(`[Bot] Auto-registered SoDEX account for ${chatId}: accountID=${accountID}`);
+            } catch (regErr: any) {
+              console.warn(`[Bot] SoDEX registerApiKey failed:`, (regErr as Error).message);
+              // Inform user they need to set up manually
+              await ctx.editMessageText(
+                `⚙️ <b>SoDEX Account Not Activated</b>\n\n` +
+                `Your wallet (<code>${embWallet.wallet_address.slice(0, 6)}…${embWallet.wallet_address.slice(-4)}</code>) ` +
+                `isn't registered on SoDEX yet.\n\n` +
+                `<b>One-time setup required:</b>\n` +
+                `1. Export your key → <code>/wallet</code> → Export Key\n` +
+                `2. Import into MetaMask\n` +
+                `3. Go to <a href="https://testnet.sodex.com">testnet.sodex.com</a>\n` +
+                `4. Connect wallet → click <b>Enable Trading</b>\n` +
+                `5. Come back and trade!\n\n` +
+                `<i>Or tap Setup Guide below.</i>`,
+                {
+                  parse_mode: 'HTML',
+                  reply_markup: new InlineKeyboard()
+                    .url('🌐 SoDEX Testnet', 'https://testnet.sodex.com').row()
+                    .text('📋 Setup Guide', 'setup:start').row()
+                    .text('⬅️ Back', 'menu:main'),
+                  link_preview_options: { is_disabled: true },
+                }
+              );
+              return;
+            }
+            await ctx.editMessageText(
+              `⏳ <b>Executing Trade…</b>\n\n✅ Wallet registered!\n🔐 Signing EIP-712…\n📡 Sending to SoDEX…`,
+              { parse_mode: 'HTML' }
+            );
+          }
+
+          // Sanitize quantity — ensure it's a valid positive decimal string
+          const qtyNum = parseFloat(qtyStr);
+          if (!qtyNum || qtyNum <= 0 || !isFinite(qtyNum)) {
+            throw new Error(`Invalid quantity "${qtyStr}". Please select an amount from the menu.`);
+          }
+          // Round to symbol's quantityPrecision to avoid "quantity is invalid" from SoDEX
+          const symMeta = await userClient.getSymbolMeta(market, 'spot').catch(() => null);
+          const precision = symMeta?.quantityPrecision ?? 4;
+          const qtyFormatted = qtyNum.toFixed(precision);
+
+          sodexResult = await userClient.placeSpotOrder({
+            accountID,
+            symbolID,
+            clOrdID: `bot-${Date.now()}`,
+            side: (side === 'buy' ? 1 : 2) as 1 | 2,
+            type: 2 as 1 | 2, // market
+            timeInForce: 3 as 1 | 2 | 3,
+            quantity: qtyFormatted,
+          });
+          walletUsed = `${embWallet.wallet_address.slice(0, 6)}…${embWallet.wallet_address.slice(-4)}`;
         }
       }
 
