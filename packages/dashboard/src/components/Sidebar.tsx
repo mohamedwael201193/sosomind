@@ -11,7 +11,7 @@ import {
   Grid3X3, BarChart3, Bell, Settings, ChevronLeft,
   ChevronRight, Sun, Moon, Zap, Wallet, LogOut, User,
   Waves, ArrowLeftRight, BookOpen, Trophy, Scale, UserCircle2,
-  CandlestickChart, Activity, Layers, Newspaper, Code2, Map,
+  CandlestickChart, Activity, Layers, Newspaper, Code2, Map, FlaskConical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -65,6 +65,7 @@ const navSections: NavSection[] = [
     items: [
       { href: "/docs", label: "API Docs", icon: Code2, count: 1 },
       { href: "/roadmap", label: "Roadmap", icon: Map, count: 1 },
+      { href: "/methodology", label: "Methodology", icon: FlaskConical, count: 1 },
     ],
   },
 ];

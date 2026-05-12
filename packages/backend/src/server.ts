@@ -68,6 +68,34 @@ export async function startServer() {
 
   app.use('/api/health', health);
 
+  // ─── Public (unauthenticated) endpoints ─────────────────────────────────────
+  // GET /api/public/signals — latest 10 resolved signals with outcome stats
+  // Used by og:image metadata and external embeds — no auth required
+  app.get('/api/public/signals', async (_req, res) => {
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const sb = createClient(
+        process.env.SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_KEY!
+      );
+      const { data, error } = await sb
+        .from('signals')
+        .select('id, asset, direction, confidence, outcome, outcome_price, created_at, outcome_resolved_at')
+        .not('outcome', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      const hits = (data ?? []).filter((s: any) => s.outcome === 'HIT').length;
+      const total = (data ?? []).length;
+      res.json({
+        data,
+        meta: { total, hits, hit_rate: total > 0 ? Math.round((hits / total) * 100) : null, source: 'live' },
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message ?? 'Failed to fetch signals' });
+    }
+  });
+
   app.use('/api/currencies', currencies);
   app.use('/api/etf', etf);
   app.use('/api/indices', indexApi);
