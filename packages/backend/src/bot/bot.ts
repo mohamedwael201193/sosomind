@@ -412,7 +412,9 @@ export function createBot(): Bot | null {
     let price = 0;
     try { const s: any = await sosovalue.getMarketSnapshot(asset); price = Number(s?.price ?? 0); } catch {}
     if (!price) { try { const { getBinancePrice } = await import('../clients/market'); price = (await getBinancePrice(asset)) ?? 0; } catch {} }
-    const qty = price > 0 ? Math.max(parseFloat((usd / price).toFixed(5)), 0.00001) : 0.01;
+    // Compute base qty from USD amount; will be enforced against SoDEX minimums in tx: handler
+    const rawQty = price > 0 ? usd / price : 0.001;
+    const qty = Math.max(parseFloat(rawQty.toFixed(8)), 0.00000001);
     await showTradeConfirm(ctx, asset, side, qty);
   });
 
@@ -636,13 +638,41 @@ export function createBot(): Bot | null {
 
           // Sanitize quantity — ensure it's a valid positive decimal string
           const qtyNum = parseFloat(qtyStr);
-          if (!qtyNum || qtyNum <= 0 || !isFinite(qtyNum)) {
+          if (!isFinite(qtyNum) || qtyNum <= 0) {
             throw new Error(`Invalid quantity "${qtyStr}". Please select an amount from the menu.`);
           }
-          // Round to symbol's quantityPrecision to avoid "quantity is invalid" from SoDEX
+          // Enforce SoDEX minimums: quantityPrecision, marketMinQuantity, minNotional
           const symMeta = await userClient.getSymbolMeta(market, 'spot').catch(() => null);
           const precision = symMeta?.quantityPrecision ?? 4;
-          const qtyFormatted = qtyNum.toFixed(precision);
+          const minMarketQty = parseFloat(symMeta?.marketMinQuantity || symMeta?.minQuantity || '0') || 0;
+          const minNotional = parseFloat(symMeta?.minNotional || '0') || 0;
+
+          let finalQty = qtyNum;
+          // Bump up to the market-order minimum quantity (e.g. 0.001 TESTBTC)
+          if (minMarketQty > 0 && finalQty < minMarketQty) {
+            console.log(`[Bot] qty bumped ${finalQty} → ${minMarketQty} (marketMinQty for ${market})`);
+            finalQty = minMarketQty;
+          }
+          // Bump up to meet minNotional if we can estimate the price from qtyStr vs usd
+          // (minNotional is in quote currency e.g. $5 USDC — enforce via qty * livePrice)
+          if (minNotional > 0) {
+            try {
+              const ob: any = await userClient.getSpotOrderbook(market, 1);
+              const bestAsk = parseFloat(
+                ob?.asks?.[0]?.[0] ?? ob?.asks?.[0]?.price ?? ob?.data?.asks?.[0]?.[0] ?? '0'
+              ) || 0;
+              if (bestAsk > 0 && finalQty * bestAsk < minNotional) {
+                const bumpedQty = minNotional / bestAsk;
+                console.log(`[Bot] qty bumped ${finalQty} → ${bumpedQty} (minNotional=${minNotional} for ${market})`);
+                finalQty = bumpedQty;
+              }
+            } catch { /* non-fatal — proceed without notional check */ }
+          }
+
+          const qtyFormatted = finalQty.toFixed(precision);
+          if (parseFloat(qtyFormatted) <= 0) {
+            throw new Error(`Order size rounds to zero for ${market} (precision=${precision}). Please choose a larger USD amount.`);
+          }
 
           sodexResult = await userClient.placeSpotOrder({
             accountID,
