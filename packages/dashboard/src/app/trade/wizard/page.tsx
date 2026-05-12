@@ -92,6 +92,18 @@ function WizardInner() {
     enabled: !!address,
     refetchInterval: 15_000,
   });
+
+  // Resolve real SoDEX accountID for this wallet
+  const { data: accountIDData } = useQuery<number>({
+    queryKey: ['wizard', 'accountid', address],
+    queryFn: async () => {
+      const j = await fetcher(`/api/sodex/user/${address}/accountid`);
+      return (j as any)?.accountID ?? 0;
+    },
+    enabled: !!address,
+    staleTime: 5 * 60_000,
+  });
+  const wizardAccountID = accountIDData ?? 0;
   const usdc = useMemo(() => {
     const list = (balData as any)?.balances ?? [];
     const u = list.find((b: any) => b.coin === 'vUSDC' || b.coin === 'USDC');
@@ -170,14 +182,25 @@ function WizardInner() {
     setSubmitting(true);
     setSubmitError(null);
     try {
+      // For market orders: pass livePx so placeSpotOrder can apply the ±0.5% taker buffer.
+      // placeSpotOrder always converts to a limit order internally (SoDEX testnet requirement).
+      const effectivePrice = orderType === 'limit'
+        ? Number(Number(limitPx).toFixed(symbol.pricePrecision ?? 2))
+        : livePx;
+      if (!effectivePrice || effectivePrice <= 0) {
+        setSubmitError('No price available — wait for price data or use limit order');
+        return;
+      }
       const result = await placeSpotOrder({
-        accountID: 0,
+        accountID: wizardAccountID,
         symbolID: Number(symbol.id),
         market: symbol.name,
         side,
         orderType,
         quantity: Number(qty.toFixed(symbol.quantityPrecision ?? 4)),
-        price: orderType === 'limit' ? Number(Number(limitPx).toFixed(symbol.pricePrecision ?? 2)) : undefined,
+        price: effectivePrice,
+        pricePrecision: symbol.pricePrecision ?? 2,
+        quantityPrecision: symbol.quantityPrecision ?? 4,
       });
       setSubmitResult(result);
     } catch (e: any) {

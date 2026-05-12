@@ -175,14 +175,43 @@ export interface PlaceSpotOrderArgs {
   side: 'buy' | 'sell';
   orderType: 'limit' | 'market';
   quantity: number;
-  price?: number;             // omit for market
-  timeInForce?: 1 | 2 | 3;    // default 3 (GTC) for limit, 1 (IOC) for market
+  price?: number;             // required for limit; for market pass bestAsk/bestBid (buffer applied internally)
+  timeInForce?: 1 | 2 | 3;    // always coerced to 3 (IOC) — only valid value on SoDEX testnet
+  pricePrecision?: number;    // decimal places for price (from symbol metadata)
+  quantityPrecision?: number; // decimal places for quantity (from symbol metadata)
 }
 
 export async function placeSpotOrder(args: PlaceSpotOrderArgs): Promise<RelayResult> {
   const sideCode = args.side === 'buy' ? 1 : 2;
-  const typeCode = args.orderType === 'market' ? 2 : 1;
-  const tif = args.timeInForce ?? (args.orderType === 'market' ? 1 : 3);
+
+  // CRITICAL: always use limit orders — market orders (type:2) fail with
+  // "MissingOraclePrice" on SoDEX testnet. Mirror the bot's execution agent.
+  const typeCode = 1;
+
+  // CRITICAL: SoDEX testnet only accepts timeInForce:3 (IOC — fill or cancel).
+  // Values 1 and 2 are rejected with "timeInForce is invalid".
+  const tif = 3 as const;
+
+  // For "market" orders: apply ±0.5% taker slippage buffer so the limit
+  // acts like a market (aggressive taker — matches immediately or cancels).
+  const pp = args.pricePrecision ?? 2;
+  const qp = args.quantityPrecision ?? 5;
+  const mult = Math.pow(10, pp);
+
+  let effectivePrice: number | undefined;
+  if (args.price !== undefined && args.price > 0) {
+    const rawPrice = args.orderType === 'market'
+      ? (args.side === 'buy' ? args.price * 1.005 : args.price * 0.995)
+      : args.price;
+    effectivePrice = Math.round(rawPrice * mult) / mult;
+  }
+
+  // Format strings: toFixed(precision) + strip trailing zeros (SoDEX rejects "0.01000")
+  const priceStr = effectivePrice !== undefined
+    ? effectivePrice.toFixed(pp).replace(/\.?0+$/, '')
+    : undefined;
+  const qtyStr = args.quantity.toFixed(qp).replace(/\.?0+$/, '');
+
   const clOrdID = `dash-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const body = buildSpotBatchNewOrderBody(args.accountID, [{
     symbolID: args.symbolID,
@@ -190,8 +219,8 @@ export async function placeSpotOrder(args: PlaceSpotOrderArgs): Promise<RelayRes
     side: sideCode,
     type: typeCode,
     timeInForce: tif,
-    price: args.price !== undefined ? String(args.price) : undefined,
-    quantity: String(args.quantity),
+    price: priceStr,
+    quantity: qtyStr,
   }]);
   return signAndSubmit({
     scope: 'spot',
@@ -200,7 +229,7 @@ export async function placeSpotOrder(args: PlaceSpotOrderArgs): Promise<RelayRes
     market: args.market,
     side: args.side,
     quantity: args.quantity,
-    price: args.price,
+    price: effectivePrice,
     orderType: args.orderType,
   });
 }
@@ -212,9 +241,23 @@ export interface PlacePerpsOrderArgs extends PlaceSpotOrderArgs {
 
 export async function placePerpsOrder(args: PlacePerpsOrderArgs): Promise<RelayResult> {
   const sideCode = args.side === 'buy' ? 1 : 2;
-  const typeCode = args.orderType === 'market' ? 2 : 1;
-  const tif = args.timeInForce ?? (args.orderType === 'market' ? 1 : 3);
+  const typeCode = 1; // always limit (same testnet requirement as spot)
+  const tif = 3 as const; // always IOC on SoDEX testnet
+  const pp = args.pricePrecision ?? 2;
+  const qp = args.quantityPrecision ?? 5;
+  const mult = Math.pow(10, pp);
   const clOrdID = `dash-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+
+  let effectivePrice: number | undefined;
+  if (args.price !== undefined && args.price > 0) {
+    const rawPrice = args.orderType === 'market'
+      ? (args.side === 'buy' ? args.price * 1.005 : args.price * 0.995)
+      : args.price;
+    effectivePrice = Math.round(rawPrice * mult) / mult;
+  }
+  const priceStr = effectivePrice !== undefined ? effectivePrice.toFixed(pp).replace(/\.?0+$/, '') : undefined;
+  const qtyStr = args.quantity.toFixed(qp).replace(/\.?0+$/, '');
+
   const body = buildPerpsNewOrderBody({
     accountID: args.accountID,
     symbolID: args.symbolID,
@@ -222,8 +265,8 @@ export async function placePerpsOrder(args: PlacePerpsOrderArgs): Promise<RelayR
     side: sideCode,
     type: typeCode,
     timeInForce: tif,
-    price: args.price !== undefined ? String(args.price) : undefined,
-    quantity: String(args.quantity),
+    price: priceStr,
+    quantity: qtyStr,
     positionSide: args.positionSide === 'long' ? 1 : 2,
     reduceOnly: args.reduceOnly ?? false,
   });
@@ -234,7 +277,7 @@ export async function placePerpsOrder(args: PlacePerpsOrderArgs): Promise<RelayR
     market: args.market,
     side: args.side,
     quantity: args.quantity,
-    price: args.price,
+    price: effectivePrice,
     orderType: args.orderType,
   });
 }

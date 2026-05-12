@@ -92,9 +92,9 @@ export interface SpotOrderItemArgs {
   symbolID: number;
   clOrdID: string;
   side: 1 | 2;            // 1=buy, 2=sell
-  type: 1 | 2;            // 1=limit, 2=market
-  timeInForce: 1 | 2 | 3; // 1=IOC, 2=FOK, 3=GTC
-  price?: string;         // decimal as string
+  type: 1 | 2;            // 1=limit, 2=market (testnet: always use 1)
+  timeInForce: 1 | 2 | 3; // 3=IOC (only valid value on SoDEX testnet), 1=GTC, 2=FOK
+  price?: string;         // decimal as string; required for limit, taker-buffered for market-style
   quantity: string;
 }
 

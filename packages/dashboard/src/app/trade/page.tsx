@@ -514,6 +514,15 @@ function TradeInner() {
       setResult({ ok: false, message: 'Enter a limit price > 0' });
       return;
     }
+    // For market orders: use best ask (buy) or best bid (sell) as the taker price.
+    // placeSpotOrder will apply ±0.5% buffer and convert to a limit order internally.
+    const marketPrice = side === 'buy'
+      ? (bestAsk > 0 ? bestAsk : bestBid)
+      : (bestBid > 0 ? bestBid : bestAsk);
+    if (orderType === 'market' && !marketPrice) {
+      setResult({ ok: false, message: 'No orderbook price available — try limit order' });
+      return;
+    }
     setSubmitting(true);
     try {
       const r = await placeSpotOrder({
@@ -523,7 +532,9 @@ function TradeInner() {
         side,
         orderType,
         quantity: qtyNum,
-        price: orderType === 'limit' ? Number(price) : undefined,
+        price: orderType === 'limit' ? Number(price) : marketPrice,
+        pricePrecision: activeSymbol.pricePrecision,
+        quantityPrecision: activeSymbol.quantityPrecision,
       });
       if (r.ok) {
         setResult({ ok: true, message: `Submitted — order ID: ${r.orderId ?? 'pending'}` });
