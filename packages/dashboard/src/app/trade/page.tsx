@@ -251,21 +251,23 @@ function TradeInner() {
     ssiDePIN: 'SOL',    // DePIN infrastructure on Solana ecosystem
   };
 
-  // Non-trading status values — mirrors the bot's _NON_TRADING_ST constant
+  // Non-trading status values — mirrors the bot's _NON_TRADING_ST constant.
+  // Normalize separators before comparing (SoDEX may return 'CANCEL_ONLY', 'cancel-only', 'CANCEL ONLY', etc.)
   const NON_TRADING_ST = ['CANCEL_ONLY', 'HALT', 'SUSPENDED', 'BREAK', 'DISABLED', 'INACTIVE', 'CLOSED'];
+  const isNonTrading = (status: string) => {
+    const normalized = status.toUpperCase().replace(/[-\s]/g, '_');
+    return NON_TRADING_ST.some(x => normalized.includes(x));
+  };
 
   const symbols = useQuery<SodexSymbol[]>({
     queryKey: ['sodex', 'spot', 'symbols'],
     queryFn: () => fetcher('/api/sodex/spot/symbols'),
-    staleTime: 60_000,
+    staleTime: 30_000, // 30s — more responsive to cancel-only status changes
   });
 
   // Symbols that are currently accepting new orders on SoDEX
   const tradeableSymbols = useMemo(
-    () => (symbols.data ?? []).filter((s) => {
-      const st = s.status.toUpperCase();
-      return !NON_TRADING_ST.some((x) => st.includes(x));
-    }),
+    () => (symbols.data ?? []).filter((s) => !isNonTrading(s.status ?? '')),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [symbols.data],
   );
@@ -429,16 +431,19 @@ function TradeInner() {
     setStrategyLoading(true);
     try {
       if (strategy === 'copy') {
-        // 1. Try stored signals first
-        let sigs: any[] = (await fetcher('/api/agents/signals?limit=5')) ?? [];
-        let sig = Array.isArray(sigs) ? sigs[0] : null;
+        // 1. Try stored signals first.
+        // NOTE: /api/agents/signals returns { data: [...] } envelope — unwrap before accessing [0].
+        const sigsResp: any = await fetcher('/api/agents/signals?limit=5');
+        const sigsArr: any[] = Array.isArray(sigsResp) ? sigsResp : (sigsResp?.data ?? []);
+        let sig: any = sigsArr[0] ?? null;
 
         // 2. If table empty, generate a live signal from the research agent
         if (!sig) {
           const researchAsset = activeSymbol?.baseCoin?.replace(/^v/, '') ?? 'ETH';
           try {
             const res = await api.post(`/api/agents/research/${researchAsset}`);
-            sig = res?.data?.signal ?? null;
+            // api is axios — res.data = response body = { signal: {...} }
+            sig = res?.data?.signal ?? res?.data ?? null;
           } catch (e) {
             console.warn('[Copy Signal] research agent failed:', e);
           }
@@ -462,6 +467,11 @@ function TradeInner() {
           }
         }
       } else if (strategy === 'ssi') {
+        // Force-refresh symbols so cancel-only statuses are accurate before basket filtering
+        const freshResult = await symbols.refetch();
+        const allFreshSymbols: SodexSymbol[] = freshResult.data ?? symbols.data ?? [];
+        const freshTradeable = allFreshSymbols.filter((s) => !isNonTrading(s.status ?? ''));
+
         const sectors: any[] = (await fetcher('/api/sectors/intel')) ?? [];
         const list = Array.isArray(sectors) ? sectors : [];
         const top = list.find((s: any) => s.verdict === 'STRONG_BUY')
@@ -471,18 +481,18 @@ function TradeInner() {
           const basketData: any = await fetcher(`/api/sectors/intel/${top.ticker}/basket`);
           setSsiBasketData({ sector: top, basket: basketData });
 
-          // Try basket assets first — only TRADING-status symbols
+          // Use freshTradeable (post-refresh) so cancel-only assets are accurately excluded
           const basketAssets: string[] = (basketData?.basket ?? []).map((b: any) => String(b.asset));
           let matchSym = basketAssets
-            .map((asset) => tradeableSymbols.find(
+            .map((asset) => freshTradeable.find(
               (s) => s.baseCoin === `v${asset}` || s.baseCoin === asset,
             ))
             .find(Boolean);
 
-          // Fallback: use sector proxy when basket assets not on SoDEX Testnet or cancel-only
+          // Fallback: use sector proxy when all basket assets are cancel-only or unlisted
           if (!matchSym) {
             const proxyBase = SECTOR_PROXY[top.ticker] ?? 'ETH';
-            matchSym = tradeableSymbols.find(
+            matchSym = freshTradeable.find(
               (s) => s.baseCoin === `v${proxyBase}` || s.baseCoin === proxyBase ||
                      s.name.includes(proxyBase),
             );
@@ -523,6 +533,16 @@ function TradeInner() {
       setResult({ ok: false, message: 'No orderbook price available — try limit order' });
       return;
     }
+    // Pre-flight: block cancel-only assets before MetaMask signature prompt
+    if (activeSymbol && isNonTrading(activeSymbol.status ?? '')) {
+      const alts = tradeableSymbols
+        .filter(s => s.id !== activeSymbol.id)
+        .slice(0, 6)
+        .map(s => s.displayName)
+        .join(' · ');
+      setResult({ ok: false, message: `${activeSymbol.displayName} is in cancel-only mode on SoDEX — orders blocked.\n\nActive markets: ${alts}` });
+      return;
+    }
     setSubmitting(true);
     try {
       const r = await placeSpotOrder({
@@ -553,9 +573,23 @@ function TradeInner() {
         balanceQuery.refetch();
         setWizardStep(4);
       } else {
-        // Show the real SoDEX rejection reason (e.g. "insufficient balance", "invalid quantity")
-        const sodexErr = (r.sodex as any)?.error || (r.sodex as any)?.message;
-        setResult({ ok: false, message: r.error || sodexErr || 'Order rejected by SoDEX' });
+        // Show the real SoDEX rejection reason with friendly cancel-only handling
+        const sodexErr = (r.sodex as any)?.error || (r.sodex as any)?.message || '';
+        const rawErr = r.error || sodexErr || 'Order rejected by SoDEX';
+        // Mirror bot's cancel-only handling: detect the error and suggest alternatives
+        if (/cancel.only|cancel_only/i.test(rawErr) && activeSymbol) {
+          const alts = tradeableSymbols
+            .filter(s => s.id !== activeSymbol.id)
+            .slice(0, 6)
+            .map(s => s.displayName)
+            .join(' · ');
+          setResult({
+            ok: false,
+            message: `${activeSymbol.displayName} is in cancel-only mode on SoDEX — new orders blocked.\n\nActive markets you can trade: ${alts}`,
+          });
+        } else {
+          setResult({ ok: false, message: rawErr });
+        }
       }
     } catch (err: any) {
       setResult({ ok: false, message: err?.message || 'Signing cancelled or rejected' });
@@ -1088,30 +1122,44 @@ function TradeInner() {
                       </p>
                       <div className="flex flex-wrap gap-1.5">
                         {(ssiBasketData.basket?.basket ?? []).map((item: any) => {
-                          const sym = tradeableSymbols.find(
+                          // Find the symbol from the FULL list (not just tradeableSymbols)
+                          // then check status directly — more accurate than relying on cached filter
+                          const rawSym = (symbols.data ?? []).find(
                             (s) => s.baseCoin === `v${item.asset}` || s.baseCoin === item.asset,
                           );
-                          const isActive = activeSymbol?.baseCoin === `v${item.asset}` || activeSymbol?.baseCoin === item.asset;
-                          // Check if the asset exists on SoDEX at all (even if cancel-only)
-                          const existsButBlocked = !sym && (symbols.data ?? []).some(
-                            (s) => s.baseCoin === `v${item.asset}` || s.baseCoin === item.asset,
-                          );
+                          const isTradeable = !!rawSym && !isNonTrading(rawSym.status ?? '');
+                          const isActive = isTradeable && (activeSymbol?.baseCoin === `v${item.asset}` || activeSymbol?.baseCoin === item.asset);
+                          // existsButBlocked: on SoDEX but in cancel-only mode
+                          const existsButBlocked = !!rawSym && isNonTrading(rawSym.status ?? '');
+                          const tooltip = existsButBlocked
+                            ? `${item.asset} is in cancel-only mode on SoDEX — orders blocked`
+                            : !rawSym ? 'Not listed on SoDEX Testnet' : undefined;
                           return (
-                            <button key={item.asset} type="button" disabled={!sym}
-                              onClick={() => { if (sym) { setSymbolId(sym.id); autoFilledStrategyRef.current = null; } }}
-                              title={existsButBlocked ? `${item.asset} is listed but in cancel-only mode` : !sym ? 'Not listed on SoDEX Testnet' : undefined}
+                            <button key={item.asset} type="button" disabled={!isTradeable}
+                              onClick={() => { if (isTradeable && rawSym) { setSymbolId(rawSym.id); autoFilledStrategyRef.current = null; } }}
+                              title={tooltip}
                               className="px-2.5 py-1 rounded-lg font-bold border transition-all"
                               style={{
-                                borderColor: isActive ? 'var(--accent)' : 'var(--border-default)',
-                                background: isActive ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'var(--bg-elevated)',
-                                color: isActive ? 'var(--accent)' : sym ? 'var(--text-primary)' : 'var(--text-muted)',
-                                opacity: sym ? 1 : 0.4,
+                                borderColor: isActive ? 'var(--accent)' : existsButBlocked ? 'rgba(255,80,80,0.3)' : 'var(--border-default)',
+                                background: isActive ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : existsButBlocked ? 'rgba(255,80,80,0.06)' : 'var(--bg-elevated)',
+                                color: isActive ? 'var(--accent)' : existsButBlocked ? 'rgba(255,80,80,0.7)' : isTradeable ? 'var(--text-primary)' : 'var(--text-muted)',
+                                opacity: isTradeable ? 1 : 0.5,
+                                cursor: isTradeable ? 'pointer' : 'not-allowed',
                               }}>
-                              {item.asset} {item.weight}%{existsButBlocked ? ' ⚫' : ''}
+                              {item.asset} {item.weight}%{existsButBlocked ? ' ⚫' : !rawSym ? ' —' : ''}
                             </button>
                           );
                         })}
                       </div>
+                      {/* Warn when any basket asset is cancel-only */}
+                      {(ssiBasketData.basket?.basket ?? []).some((item: any) => {
+                        const s = (symbols.data ?? []).find(x => x.baseCoin === `v${item.asset}` || x.baseCoin === item.asset);
+                        return s && isNonTrading(s.status ?? '');
+                      }) && (
+                        <p className="mt-2 text-[11px]" style={{ color: 'rgba(255,180,60,0.85)' }}>
+                          ⚫ Some assets are in cancel-only mode — their buttons are disabled. Trade an active asset or use the sector proxy below.
+                        </p>
+                      )}
                       {(ssiBasketData.basket?.basket ?? []).every((item: any) =>
                         !(symbols.data ?? []).find((s) => s.baseCoin === `v${item.asset}` || s.baseCoin === item.asset)
                       ) && (
