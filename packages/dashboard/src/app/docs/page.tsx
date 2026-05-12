@@ -145,17 +145,39 @@ export default function DocsPage() {
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const container = contentRef.current;
+    if (!container) return;
     const observer = new IntersectionObserver(
-      (entries) => { for (const e of entries) { if (e.isIntersecting) setActiveSection(e.target.id.split("-")[0] || e.target.id); } },
-      { rootMargin: "-20% 0px -70% 0px", threshold: 0 }
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            // Map sub-section IDs back to their parent section ID
+            const rawId = e.target.id;
+            const sectionId = NAV_SECTIONS.find(s =>
+              s.id === rawId || s.subsections?.some(sub => sub.id === rawId)
+            )?.id ?? rawId.split("-")[0];
+            setActiveSection(sectionId);
+          }
+        }
+      },
+      { root: container, rootMargin: "-10% 0px -80% 0px", threshold: 0 }
     );
-    document.querySelectorAll("[data-section]").forEach(el => observer.observe(el));
+    container.querySelectorAll("[data-section]").forEach(el => observer.observe(el));
     return () => observer.disconnect();
   }, []);
 
   const scrollTo = useCallback((id: string) => {
+    const container = contentRef.current;
     const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (!el) { setSidebarOpen(false); return; }
+    if (container) {
+      const elTop = el.getBoundingClientRect().top;
+      const containerTop = container.getBoundingClientRect().top;
+      const offset = elTop - containerTop + container.scrollTop - 24;
+      container.scrollTo({ top: offset, behavior: "smooth" });
+    } else {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
     setSidebarOpen(false);
   }, []);
 

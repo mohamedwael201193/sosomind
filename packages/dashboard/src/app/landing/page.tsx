@@ -381,7 +381,7 @@ export default function LandingPage() {
             {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
           {address ? (
-            <Link href="/">
+            <Link href="/dashboard">
               <button className="px-4 py-2 rounded-[20px] text-sm font-bold text-white" style={{ background: "linear-gradient(135deg,#f97316 0%,#ea580c 50%,#c2410c 100%)" }}>
                 Dashboard
               </button>
@@ -518,7 +518,7 @@ export default function LandingPage() {
               className="flex flex-col sm:flex-row gap-3 mb-10"
             >
               {address ? (
-                <Link href="/">
+                <Link href="/dashboard">
                   <MagneticButton
                     className="flex items-center gap-2 px-7 py-3.5 rounded-[14px] font-bold text-white text-sm"
                     style={{ background: "linear-gradient(135deg,#f97316 0%,#ea580c 100%)" }}
@@ -2082,7 +2082,7 @@ export default function LandingPage() {
               Connect your wallet and deploy the full AI agent stack in under 60 seconds.
             </p>
             {address ? (
-              <Link href="/">
+              <Link href="/dashboard">
                 <MagneticButton
                   className="inline-flex items-center gap-3 px-10 py-5 rounded-[20px] font-bold text-white text-lg"
                   style={{ background: "linear-gradient(135deg,#f97316 0%,#ea580c 50%,#c2410c 100%)" }}
