@@ -1913,37 +1913,61 @@ export function createBot(): Bot | null {
             if ((action === 'buy' || action === 'sell') && asset) {
               const side = action as 'buy' | 'sell';
               const usd = amountUsd ?? 100;
-              // Convert USD → base asset quantity using current price
+              // 1. Validate asset on SoDEX Testnet (catches SOL "cancel only", unlisted assets, etc.)
+              let symMeta: any;
+              try {
+                const { sodex: houseSodex } = await import('../clients/sodex');
+                symMeta = await houseSodex.findMarketForAsset(asset);
+                // Status guard — cancel-only symbols reject all new orders immediately
+                const st = (symMeta?.status ?? '').toLowerCase().replace(/[_\s-]/g, '');
+                if (st && st !== 'trading' && st !== 'active' && st !== '' && st !== 'open') {
+                  await ctx.reply(
+                    `⚠️ <b>${asset} Not Tradeable on SoDEX Testnet</b>\n\n` +
+                    `<b>${symMeta.name}</b> is currently in <b>${symMeta.status}</b> mode.\n` +
+                    `New orders are not accepted for this symbol.\n\n` +
+                    `<b>Available now:</b> BTC · ETH\n` +
+                    `<i>Try: "buy $10 BTC" or "buy $10 ETH"</i>`,
+                    {
+                      parse_mode: 'HTML',
+                      reply_markup: new InlineKeyboard()
+                        .text('₿ Trade BTC', 'trade_amount:BTC:buy').text('Ξ Trade ETH', 'trade_amount:ETH:buy').row()
+                        .text('🏠 Main Menu', 'menu:main'),
+                    }
+                  );
+                  return true;
+                }
+              } catch {
+                // Asset not found on SoDEX Testnet
+                await ctx.reply(
+                  `⚠️ <b>${asset} Not on SoDEX Testnet</b>\n\n` +
+                  `This asset isn't listed on SoDEX Testnet.\n\n` +
+                  `<b>Available now:</b> BTC · ETH\n` +
+                  `<i>Try: "buy $10 BTC" or "buy $10 ETH"</i>`,
+                  {
+                    parse_mode: 'HTML',
+                    reply_markup: new InlineKeyboard()
+                      .text('₿ Trade BTC', 'trade_amount:BTC:buy').text('Ξ Trade ETH', 'trade_amount:ETH:buy').row()
+                      .text('🏠 Main Menu', 'menu:main'),
+                  }
+                );
+                return true;
+              }
+              // 2. Get price to estimate quantity from USD amount
               let price = 0;
               try {
                 const snap: any = await sosovalue.getMarketSnapshot(asset);
                 price = Number(snap?.price ?? snap?.last_price ?? snap?.data?.price ?? 0);
               } catch { /* ignore */ }
               if (!price || price <= 0) {
-                // Fallback: use SoDEX orderbook price via execution agent price resolution
-                price = 1; // execution agent will resolve the real price internally
+                try {
+                  const { getSpotPrice } = await import('../clients/market');
+                  price = (await getSpotPrice(asset)) ?? 0;
+                } catch { /* ignore */ }
               }
-              const qty = price > 1 ? usd / price : usd;
-              const result = await runExecutionAgent({
-                userId: String(ctx.from?.id ?? ''),
-                market: `${asset}-USDC`,
-                side,
-                amount: qty,
-                orderType: 'market',
-              });
-              const statusIcon = result.status === 'submitted' ? '✅' : result.status === 'rejected' ? '🚫' : '⚠️';
-              const execPrice = (result as any).trade?.price ?? price;
-              await ctx.reply(
-                `${statusIcon} <b>Voice Trade Executed</b>\n\n` +
-                `🎙️ "${transcript}"\n` +
-                `${side === 'buy' ? '📈' : '📉'} ${side.toUpperCase()} $${usd} ${asset} @ $${Number(execPrice).toLocaleString()}\n` +
-                `📊 Status: <b>${result.status}</b>\n` +
-                `🛡️ Risk: <b>${result.risk?.verdict ?? 'n/a'}</b>\n` +
-                (result.status === 'rejected' ? `\n⚠️ ${(result.risk?.reasons || []).join(', ')}\n` : '') +
-                ((result as any).error ? `\n❌ <code>${String((result as any).error).slice(0, 200)}</code>\n` : '') +
-                `\n<i>⛓️ Live order sent to SoDEX</i>`,
-                { parse_mode: 'HTML' }
-              );
+              const qty = price > 1 ? usd / price : 0.001;
+              // 3. Route through showTradeConfirm → uses embedded wallet (same path as button trades)
+              //    This ensures orders appear in the user's own portfolio on testnet.sodex.com
+              await showTradeConfirm(ctx, asset, side, qty);
               return true;
             } else if (action === 'research' && asset) {
               await runResearch(ctx, asset);
@@ -2492,8 +2516,14 @@ export function createBot(): Bot | null {
         `📋 Copy it now, then:\n` +
         `1. Open MetaMask → Import Account → Paste key\n` +
         `2. <b>Delete this message immediately!</b>\n\n` +
+        `✅ <i>Once imported, tap <b>Continue Setup</b> to add the ValueChain network and get testnet funds.</i>\n\n` +
         `⚠️ <i>SosoMind will never ask for your key again.</i>`,
-        { parse_mode: 'HTML', reply_markup: new InlineKeyboard().text('✅ Done — Go to Wallet', 'menu:wallet') }
+        {
+          parse_mode: 'HTML',
+          reply_markup: new InlineKeyboard()
+            .text('➡️ Continue Setup (Step 2)', 'setup:step2').row()
+            .text('✅ Done — My Wallet', 'menu:wallet'),
+        }
       );
     } catch (e) {
       await (ctx as any).editMessageText(`❌ Decrypt error: ${(e as Error).message}`, { parse_mode: 'HTML' });
