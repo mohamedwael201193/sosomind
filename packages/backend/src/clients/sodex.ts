@@ -329,6 +329,16 @@ export class SoDEXClient {
   async getSpotBalancesForAddress(address: string) {
     return this.read(this.spot, `/accounts/${address}/balances`);
   }
+  /** Resolve the numeric SoDEX account ID (aid) for any wallet address. Returns 0 if not found. */
+  async getAccountIDForAddress(address: string): Promise<number> {
+    try {
+      const data: any = await this.read(this.spot, `/accounts/${address}/state`);
+      const id = Number(data?.aid ?? data?.accountID ?? data?.id ?? 0);
+      return Number.isFinite(id) && id > 0 ? id : 0;
+    } catch {
+      return 0;
+    }
+  }
   async getSpotOrdersForAddress(address: string, symbol?: string) {
     return this.read(this.spot, `/accounts/${address}/orders`, { params: symbol ? { symbol } : undefined });
   }

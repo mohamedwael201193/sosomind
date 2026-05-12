@@ -86,6 +86,17 @@ router.get('/user/:address/orders/history', asyncHandler(async (req, res) => {
   res.json({ data });
 }));
 
+// Resolve the numeric SoDEX accountID (aid) for a wallet address
+router.get('/user/:address/accountid', asyncHandler(async (req, res) => {
+  const { address } = req.params;
+  if (!/^0x[0-9a-fA-F]{40}$/.test(address))
+    return res.status(400).json({ error: 'invalid_address' });
+  const accountID = await cached(`sodex:aid:${address.toLowerCase()}`, 120, () =>
+    sodex.getAccountIDForAddress(address.toLowerCase())
+  );
+  res.json({ accountID });
+}));
+
 // House account balance (house wallet)
 router.get('/account/balances', asyncHandler(async (req, res) => {
   const accId = req.query.accountID ? Number(req.query.accountID) : undefined;

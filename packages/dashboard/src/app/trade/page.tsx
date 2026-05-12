@@ -294,6 +294,18 @@ function TradeInner() {
     queryFn: () => fetcher(`/api/sodex/user/${address}/balances`),
   });
 
+  // Resolve the user's real numeric SoDEX accountID (required in order bodies)
+  const accountIDQuery = useQuery<number>({
+    queryKey: ['sodex', 'accountid', address],
+    enabled: Boolean(address),
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const j = await fetcher(`/api/sodex/user/${address}/accountid`);
+      return (j as any)?.accountID ?? 0;
+    },
+  });
+  const accountID = accountIDQuery.data ?? 0;
+
   const orderHistory = useQuery<OrderRow[]>({
     queryKey: ['sodex', 'user-orders-history', address],
     enabled: Boolean(address),
@@ -505,7 +517,7 @@ function TradeInner() {
     setSubmitting(true);
     try {
       const r = await placeSpotOrder({
-        accountID: 0,
+        accountID,
         symbolID: activeSymbol.id,
         market: activeSymbol.name,
         side,
@@ -530,7 +542,9 @@ function TradeInner() {
         balanceQuery.refetch();
         setWizardStep(4);
       } else {
-        setResult({ ok: false, message: r.error || 'Order rejected by SoDEX' });
+        // Show the real SoDEX rejection reason (e.g. "insufficient balance", "invalid quantity")
+        const sodexErr = (r.sodex as any)?.error || (r.sodex as any)?.message;
+        setResult({ ok: false, message: r.error || sodexErr || 'Order rejected by SoDEX' });
       }
     } catch (err: any) {
       setResult({ ok: false, message: err?.message || 'Signing cancelled or rejected' });
@@ -1227,6 +1241,12 @@ function TradeInner() {
                         <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                           className="text-sm rounded-lg px-3 py-2 bg-red-500/10 text-red-400">
                           {result.message}
+                        </motion.div>
+                      )}
+                      {address && accountID === 0 && !accountIDQuery.isLoading && (
+                        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+                          className="text-xs rounded-lg px-3 py-2 bg-amber-500/10 text-amber-400">
+                          SoDEX account not found for this wallet. Deposit on testnet.sodex.com first to register.
                         </motion.div>
                       )}
                     </AnimatePresence>
