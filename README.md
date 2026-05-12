@@ -10,7 +10,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?style=flat-square&logo=typescript)](https://www.typescriptlang.org)
 [![Next.js](https://img.shields.io/badge/Next.js-14-000000?style=flat-square&logo=nextdotjs)](https://nextjs.org)
 
-Multi-agent AI research · Real-time sector intelligence · EIP-712 DEX execution · Telegram trading bot
+Multi-agent AI research · Real-time sector intelligence · EIP-712 DEX execution · Telegram trading bot · **32 live spot pairs**
 
 </div>
 
@@ -20,7 +20,7 @@ Multi-agent AI research · Real-time sector intelligence · EIP-712 DEX executio
 
 SoSoMind is an agentic finance intelligence platform that synthesises live market data from 13 sources, runs it through a coordinated system of specialist AI agents, surfaces high-confidence trading signals, and executes orders directly on SoDEX via EIP-712 non-custodial signing — all accessible from a Next.js dashboard, a Telegram bot, or an AI assistant via MCP tools.
 
-**Current deployment status:** Active testnet (SoDEX Testnet, chainId=138565). Backend live on Render, dashboard live on Vercel. Bot is reachable at [@SosoMindbot](https://t.me/SosoMindbot).
+**Current deployment status:** Active testnet (SoDEX Testnet, chainId=138565). Backend live on Render, dashboard live on Vercel. Bot is reachable at [@SosoMindbot](https://t.me/SosoMindbot). **32 spot markets live** — crypto (BTC ETH SOL XRP ADA DOGE LINK AVAX BNB UNI LTC ZEC HYPE SHIB AAVE XAUT USDT SOSO), synthetic stocks (TSLA NVDA META AAPL AMZN GOOGL MSFT), SSI indexes (MAG7ssi MEMEssi DEFIssi USSI).
 
 ---
 
