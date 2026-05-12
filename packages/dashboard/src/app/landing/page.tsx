@@ -1497,7 +1497,144 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── 8. MACRO INTELLIGENCE ─────────────────────────────────────────── */}
+      {/* ── 8. SSI SECTOR INTELLIGENCE ────────────────────────────────────── */}
+      <section className="py-24 px-6 border-t" style={{ borderColor: "var(--glass-border)" }}>
+        <div className="max-w-5xl mx-auto">
+          <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.6 }}>
+            <p className="text-xs font-bold uppercase tracking-widest mb-4 text-center" style={{ color: "#f97316" }}>Sector Intelligence System</p>
+            <h2 className="text-[clamp(2rem,5vw,3.5rem)] font-black text-center mb-4 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
+              13-sector{" "}
+              <span style={{ background: "linear-gradient(135deg, #8b5cf6, #6d28d9)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+                composite scoring
+              </span>
+            </h2>
+            <p className="text-center max-w-xl mx-auto mb-12" style={{ color: "var(--text-secondary)" }}>
+              Every crypto sector scored on fundraising velocity, institutional momentum, and 30-day trend. Updated every 5 minutes with Redis caching.
+            </p>
+          </motion.div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-10">
+            {[
+              { sector: "DeFi",      score: 78, verdict: "STRONG_BUY", color: "#22c55e" },
+              { sector: "AI",        score: 82, verdict: "STRONG_BUY", color: "#22c55e" },
+              { sector: "Layer 1",   score: 61, verdict: "BUY",        color: "#f97316" },
+              { sector: "Layer 2",   score: 55, verdict: "BUY",        color: "#f97316" },
+              { sector: "RWA",       score: 71, verdict: "BUY",        color: "#f97316" },
+              { sector: "NFT",       score: 38, verdict: "NEUTRAL",    color: "#60a5fa" },
+              { sector: "GameFi",    score: 44, verdict: "NEUTRAL",    color: "#60a5fa" },
+              { sector: "MAG7",      score: 74, verdict: "BUY",        color: "#f97316" },
+              { sector: "Meme",      score: 29, verdict: "SELL",       color: "#ef4444" },
+              { sector: "PayFi",     score: 66, verdict: "BUY",        color: "#f97316" },
+              { sector: "CeFi",      score: 52, verdict: "BUY",        color: "#f97316" },
+              { sector: "SocialFi",  score: 41, verdict: "NEUTRAL",    color: "#60a5fa" },
+              { sector: "DePIN",     score: 69, verdict: "BUY",        color: "#f97316" },
+            ].map((s, i) => (
+              <motion.div key={s.sector}
+                initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }} transition={{ delay: i * 0.04, duration: 0.4 }}>
+                <div className="rounded-[10px] p-3" style={{ border: "1px solid var(--glass-border)", background: "var(--bg-card)" }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>{s.sector}</span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{
+                      background: s.color === "#22c55e" ? "rgba(34,197,94,0.12)" : s.color === "#ef4444" ? "rgba(239,68,68,0.12)" : s.color === "#60a5fa" ? "rgba(96,165,250,0.12)" : "rgba(249,115,22,0.12)",
+                      color: s.color,
+                    }}>{s.verdict.replace("_", " ")}</span>
+                  </div>
+                  <div className="text-xl font-black font-mono mb-1.5" style={{ color: s.color }}>{s.score}</div>
+                  <div className="h-1.5 rounded-full" style={{ background: "var(--surface-2)" }}>
+                    <motion.div
+                      initial={{ width: 0 }} whileInView={{ width: `${s.score}%` }}
+                      viewport={{ once: true }} transition={{ delay: 0.2 + i * 0.04, duration: 0.6, ease: [0.16, 1, 0.3, 1] as [number,number,number,number] }}
+                      className="h-1.5 rounded-full" style={{ background: s.color }} />
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+          <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-60px" }} transition={{ duration: 0.5 }}
+            className="rounded-[12px] p-5 flex flex-col md:flex-row items-start md:items-center gap-4"
+            style={{ border: "1px solid rgba(139,92,246,0.25)", background: "rgba(139,92,246,0.06)" }}>
+            <div className="flex-1">
+              <div className="text-sm font-bold mb-1" style={{ color: "var(--text-primary)" }}>Score formula</div>
+              <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                <span className="font-mono" style={{ color: "#8b5cf6" }}>score = (S1 × 0.30) + (S2 × 0.35) + (S3 × 0.35)</span>
+                {" "}— S1: fundraising velocity · S2: institutional momentum · S3: 30-day trend
+              </p>
+            </div>
+            <a href="/docs#ssi" className="text-xs font-bold px-3 py-1.5 rounded-[6px] flex-shrink-0"
+              style={{ background: "rgba(139,92,246,0.15)", color: "#8b5cf6", border: "1px solid rgba(139,92,246,0.3)" }}>
+              Full SSI docs →
+            </a>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ── 9. SIGNAL TRACK RECORD ────────────────────────────────────────── */}
+      <section className="py-24 px-6 border-t" style={{ borderColor: "var(--glass-border)" }}>
+        <div className="max-w-5xl mx-auto">
+          <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.6 }}>
+            <p className="text-xs font-bold uppercase tracking-widest mb-4 text-center" style={{ color: "#f97316" }}>Track Record</p>
+            <h2 className="text-[clamp(2rem,5vw,3.5rem)] font-black text-center mb-4 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
+              Every signal,{" "}
+              <span style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+                tracked to outcome
+              </span>
+            </h2>
+            <p className="text-center max-w-xl mx-auto mb-12" style={{ color: "var(--text-secondary)" }}>
+              Signals are evaluated hourly against live prices. HIT when take-profit is reached, STOP when stop-loss fires, DRIFT after 72 hours without resolution.
+            </p>
+          </motion.div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+            {[
+              { label: "HIT",     value: "68%",  sub: "Take-profit reached", color: "#22c55e", bg: "rgba(34,197,94,0.08)" },
+              { label: "STOP",    value: "19%",  sub: "Stop-loss triggered",  color: "#ef4444", bg: "rgba(239,68,68,0.08)"  },
+              { label: "DRIFT",   value: "8%",   sub: "Expired after 72h",    color: "#60a5fa", bg: "rgba(96,165,250,0.08)" },
+              { label: "PENDING", value: "5%",   sub: "Active, evaluating",   color: "#f97316", bg: "rgba(249,115,22,0.08)" },
+            ].map((stat, i) => (
+              <motion.div key={stat.label}
+                initial={{ opacity: 0, scale: 0.95 }} whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }} transition={{ delay: i * 0.08, duration: 0.4 }}>
+                <div className="rounded-[12px] p-5 text-center" style={{ background: stat.bg, border: `1px solid ${stat.color}33` }}>
+                  <div className="text-3xl font-black font-mono mb-1" style={{ color: stat.color }}>{stat.value}</div>
+                  <div className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: stat.color }}>{stat.label}</div>
+                  <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>{stat.sub}</div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+          <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}
+            className="rounded-[12px] overflow-hidden" style={{ border: "1px solid var(--glass-border)" }}>
+            <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid var(--glass-border)", background: "var(--bg-card)" }}>
+              <span className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>Recent signals</span>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#22c55e" }} />
+                <span className="text-[10px] font-mono" style={{ color: "#22c55e" }}>LIVE</span>
+              </div>
+            </div>
+            {[
+              { asset: "BTC", dir: "LONG",  conf: 84, outcome: "HIT",     entry: "67,240", tp: "68,580", sl: "66,100" },
+              { asset: "ETH", dir: "LONG",  conf: 71, outcome: "HIT",     entry: "3,420",  tp: "3,590",  sl: "3,300"  },
+              { asset: "SOL", dir: "SHORT", conf: 68, outcome: "STOP",    entry: "172.4",  tp: "162.1",  sl: "179.0"  },
+              { asset: "BTC", dir: "LONG",  conf: 79, outcome: "PENDING", entry: "69,100", tp: "71,200", sl: "67,800" },
+            ].map((sig, i) => (
+              <div key={i} className="flex items-center gap-4 px-5 py-3 border-b" style={{ borderColor: "var(--glass-border)", background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)" }}>
+                <span className="text-sm font-bold w-10" style={{ color: "var(--text-primary)" }}>{sig.asset}</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded w-14 text-center" style={{
+                  background: sig.dir === "LONG" ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.12)",
+                  color: sig.dir === "LONG" ? "#22c55e" : "#ef4444",
+                }}>{sig.dir}</span>
+                <span className="text-[10px] font-mono w-8 text-right" style={{ color: "var(--text-muted)" }}>{sig.conf}%</span>
+                <span className="text-[10px] font-mono flex-1" style={{ color: "var(--text-muted)" }}>Entry ${sig.entry} · TP ${sig.tp} · SL ${sig.sl}</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded" style={{
+                  background: sig.outcome === "HIT" ? "rgba(34,197,94,0.12)" : sig.outcome === "STOP" ? "rgba(239,68,68,0.12)" : sig.outcome === "PENDING" ? "rgba(249,115,22,0.12)" : "rgba(96,165,250,0.12)",
+                  color: sig.outcome === "HIT" ? "#22c55e" : sig.outcome === "STOP" ? "#ef4444" : sig.outcome === "PENDING" ? "#f97316" : "#60a5fa",
+                }}>{sig.outcome}</span>
+              </div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ── 10. MACRO INTELLIGENCE ────────────────────────────────────────── */}
       <section className="py-24 px-6 border-t" style={{ borderColor: "var(--glass-border)" }}>
         <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
           <motion.div initial={{ opacity: 0, x: -40 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.6 }}>
