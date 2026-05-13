@@ -277,6 +277,26 @@ function GradientBorderCard({ children, className = "", style }: {
 
 // ── Main ───────────────────────────────────────────────────────────────────────
 
+interface PublicSignal {
+  id: string;
+  asset: string;
+  direction: string;
+  confidence: number;
+  outcome: string | null;
+  outcome_price: number | null;
+  created_at: string;
+}
+interface PublicSignalsMeta {
+  total: number;
+  hits: number;
+  hit_rate: number | null;
+  source: string;
+}
+interface PublicSignalsResponse {
+  data: PublicSignal[];
+  meta: PublicSignalsMeta;
+}
+
 export default function LandingPage() {
   const { address, isConnecting, connect } = useWallet();
   const { theme, toggle: toggleTheme } = useTheme();
@@ -286,7 +306,16 @@ export default function LandingPage() {
   const [execStep, setExecStep] = useState(-1);
   const [heroTab, setHeroTab] = useState(0);
   const [mounted, setMounted] = useState(false);
+  const [liveTrackRecord, setLiveTrackRecord] = useState<PublicSignalsResponse | null>(null);
   const execRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://sosomind-backend.onrender.com';
+    fetch(`${apiUrl}/api/public/signals`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((json) => { if (json?.data && json?.meta) setLiveTrackRecord(json); })
+      .catch(() => {/* silently fall back to static data */});
+  }, []);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -315,6 +344,10 @@ export default function LandingPage() {
     obs.observe(el);
     return () => obs.disconnect();
   }, []);
+
+  const winRateDisplay = liveTrackRecord?.meta?.hit_rate != null
+    ? String(liveTrackRecord.meta.hit_rate) + '%'
+    : '\u2014';
 
   return (
     <div data-theme={theme} className="min-h-screen overflow-x-hidden" style={{ background: "var(--bg-base)", color: "var(--text-primary)" }}>
@@ -563,7 +596,12 @@ export default function LandingPage() {
               transition={{ delay: 0.9, duration: 0.5 }}
               className="flex flex-wrap gap-x-6 gap-y-2"
             >
-              {[["2,400+","Assets"],["18K+","Signals"],["67%","Win Rate"],["15","AI Agents"]].map(([v, l]) => (
+              {[
+                ["2,400+","Assets"],
+                ["18K+","Signals"],
+                [winRateDisplay,"Win Rate"],
+                ["15","AI Agents"],
+              ].map(([v, l]) => (
                 <div key={l} className="flex items-baseline gap-1.5">
                   <span className="font-black text-base" style={{ color: "#f97316" }}>{v}</span>
                   <span className="text-xs" style={{ color: "var(--text-muted)" }}>{l}</span>
@@ -1583,54 +1621,77 @@ export default function LandingPage() {
               Signals are evaluated hourly against live prices. HIT when take-profit is reached, STOP when stop-loss fires, DRIFT after 72 hours without resolution.
             </p>
           </motion.div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-            {[
-              { label: "HIT",     value: "68%",  sub: "Take-profit reached", color: "#22c55e", bg: "rgba(34,197,94,0.08)" },
-              { label: "STOP",    value: "19%",  sub: "Stop-loss triggered",  color: "#ef4444", bg: "rgba(239,68,68,0.08)"  },
-              { label: "DRIFT",   value: "8%",   sub: "Expired after 72h",    color: "#60a5fa", bg: "rgba(96,165,250,0.08)" },
-              { label: "PENDING", value: "5%",   sub: "Active, evaluating",   color: "#f97316", bg: "rgba(249,115,22,0.08)" },
-            ].map((stat, i) => (
-              <motion.div key={stat.label}
-                initial={{ opacity: 0, scale: 0.95 }} whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }} transition={{ delay: i * 0.08, duration: 0.4 }}>
-                <div className="rounded-[12px] p-5 text-center" style={{ background: stat.bg, border: `1px solid ${stat.color}33` }}>
-                  <div className="text-3xl font-black font-mono mb-1" style={{ color: stat.color }}>{stat.value}</div>
-                  <div className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: stat.color }}>{stat.label}</div>
-                  <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>{stat.sub}</div>
+          {/* Live stats — computed from /api/public/signals or fall back to static */}
+          {(() => {
+            const resolved = liveTrackRecord?.data ?? [];
+            const meta = liveTrackRecord?.meta;
+            const isLive = !!meta;
+            const total = isLive ? meta!.total : 100;
+            const hits = isLive ? meta!.hits : 68;
+            const stops = isLive ? resolved.filter((s) => s.outcome === 'STOP').length : 19;
+            const drifts = isLive ? resolved.filter((s) => s.outcome === 'DRIFT').length : 8;
+            const hitRate = isLive && total > 0 ? meta!.hit_rate! : 68;
+            const stopRate = isLive && total > 0 ? Math.round((stops / total) * 100) : 19;
+            const driftRate = isLive && total > 0 ? Math.round((drifts / total) * 100) : 8;
+            const pendingRate = isLive ? Math.max(0, 100 - hitRate - stopRate - driftRate) : 5;
+            return (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+                  {[
+                    { label: "HIT",     value: `${hitRate}%`,     sub: "Take-profit reached", color: "#22c55e", bg: "rgba(34,197,94,0.08)" },
+                    { label: "STOP",    value: `${stopRate}%`,    sub: "Stop-loss triggered",  color: "#ef4444", bg: "rgba(239,68,68,0.08)"  },
+                    { label: "DRIFT",   value: `${driftRate}%`,   sub: "Expired after 72h",    color: "#60a5fa", bg: "rgba(96,165,250,0.08)" },
+                    { label: "PENDING", value: `${pendingRate}%`, sub: "Active, evaluating",   color: "#f97316", bg: "rgba(249,115,22,0.08)" },
+                  ].map((stat, i) => (
+                    <motion.div key={stat.label}
+                      initial={{ opacity: 0, scale: 0.95 }} whileInView={{ opacity: 1, scale: 1 }}
+                      viewport={{ once: true }} transition={{ delay: i * 0.08, duration: 0.4 }}>
+                      <div className="rounded-[12px] p-5 text-center" style={{ background: stat.bg, border: `1px solid ${stat.color}33` }}>
+                        <div className="text-3xl font-black font-mono mb-1" style={{ color: stat.color }}>{stat.value}</div>
+                        <div className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: stat.color }}>{stat.label}</div>
+                        <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>{stat.sub}</div>
+                      </div>
+                    </motion.div>
+                  ))}
                 </div>
-              </motion.div>
-            ))}
-          </div>
-          <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}
-            className="rounded-[12px] overflow-hidden" style={{ border: "1px solid var(--glass-border)" }}>
-            <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid var(--glass-border)", background: "var(--bg-card)" }}>
-              <span className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>Recent signals</span>
-              <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#22c55e" }} />
-                <span className="text-[10px] font-mono" style={{ color: "#22c55e" }}>LIVE</span>
-              </div>
-            </div>
-            {[
-              { asset: "BTC", dir: "LONG",  conf: 84, outcome: "HIT",     entry: "67,240", tp: "68,580", sl: "66,100" },
-              { asset: "ETH", dir: "LONG",  conf: 71, outcome: "HIT",     entry: "3,420",  tp: "3,590",  sl: "3,300"  },
-              { asset: "SOL", dir: "SHORT", conf: 68, outcome: "STOP",    entry: "172.4",  tp: "162.1",  sl: "179.0"  },
-              { asset: "BTC", dir: "LONG",  conf: 79, outcome: "PENDING", entry: "69,100", tp: "71,200", sl: "67,800" },
-            ].map((sig, i) => (
-              <div key={i} className="flex items-center gap-4 px-5 py-3 border-b" style={{ borderColor: "var(--glass-border)", background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)" }}>
-                <span className="text-sm font-bold w-10" style={{ color: "var(--text-primary)" }}>{sig.asset}</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded w-14 text-center" style={{
-                  background: sig.dir === "LONG" ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.12)",
-                  color: sig.dir === "LONG" ? "#22c55e" : "#ef4444",
-                }}>{sig.dir}</span>
-                <span className="text-[10px] font-mono w-8 text-right" style={{ color: "var(--text-muted)" }}>{sig.conf}%</span>
-                <span className="text-[10px] font-mono flex-1" style={{ color: "var(--text-muted)" }}>Entry ${sig.entry} · TP ${sig.tp} · SL ${sig.sl}</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded" style={{
-                  background: sig.outcome === "HIT" ? "rgba(34,197,94,0.12)" : sig.outcome === "STOP" ? "rgba(239,68,68,0.12)" : sig.outcome === "PENDING" ? "rgba(249,115,22,0.12)" : "rgba(96,165,250,0.12)",
-                  color: sig.outcome === "HIT" ? "#22c55e" : sig.outcome === "STOP" ? "#ef4444" : sig.outcome === "PENDING" ? "#f97316" : "#60a5fa",
-                }}>{sig.outcome}</span>
-              </div>
-            ))}
-          </motion.div>
+                <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}
+                  className="rounded-[12px] overflow-hidden" style={{ border: "1px solid var(--glass-border)" }}>
+                  <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid var(--glass-border)", background: "var(--bg-card)" }}>
+                    <span className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>
+                      Recent signals {isLive ? <span className="ml-1 text-[10px] font-mono" style={{ color: "var(--text-muted)" }}>({total} resolved)</span> : null}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: isLive ? "#22c55e" : "#f97316" }} />
+                      <span className="text-[10px] font-mono" style={{ color: isLive ? "#22c55e" : "#f97316" }}>{isLive ? "LIVE" : "DEMO"}</span>
+                    </div>
+                  </div>
+                  {(isLive ? resolved.slice(0, 6) : [
+                    { asset: "BTC", direction: "LONG",  confidence: 84, outcome: "HIT",     id: "1", outcome_price: null, created_at: "" },
+                    { asset: "ETH", direction: "LONG",  confidence: 71, outcome: "HIT",     id: "2", outcome_price: null, created_at: "" },
+                    { asset: "SOL", direction: "SHORT", confidence: 68, outcome: "STOP",    id: "3", outcome_price: null, created_at: "" },
+                    { asset: "BTC", direction: "LONG",  confidence: 79, outcome: "PENDING", id: "4", outcome_price: null, created_at: "" },
+                  ] as PublicSignal[]).map((sig, i) => (
+                    <div key={sig.id ?? i} className="flex items-center gap-4 px-5 py-3 border-b" style={{ borderColor: "var(--glass-border)", background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)" }}>
+                      <span className="text-sm font-bold w-10" style={{ color: "var(--text-primary)" }}>{sig.asset}</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded w-14 text-center" style={{
+                        background: sig.direction === "LONG" ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.12)",
+                        color: sig.direction === "LONG" ? "#22c55e" : "#ef4444",
+                      }}>{sig.direction?.toUpperCase()}</span>
+                      <span className="text-[10px] font-mono w-8 text-right" style={{ color: "var(--text-muted)" }}>{sig.confidence}%</span>
+                      <span className="text-[10px] font-mono flex-1" style={{ color: "var(--text-muted)" }}>
+                        {sig.created_at ? new Date(sig.created_at).toLocaleDateString() : "—"}
+                        {sig.outcome_price ? ` · Exit $${Number(sig.outcome_price).toLocaleString()}` : ""}
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded" style={{
+                        background: sig.outcome === "HIT" ? "rgba(34,197,94,0.12)" : sig.outcome === "STOP" ? "rgba(239,68,68,0.12)" : sig.outcome === "PENDING" ? "rgba(249,115,22,0.12)" : "rgba(96,165,250,0.12)",
+                        color: sig.outcome === "HIT" ? "#22c55e" : sig.outcome === "STOP" ? "#ef4444" : sig.outcome === "PENDING" ? "#f97316" : "#60a5fa",
+                      }}>{sig.outcome ?? "ACTIVE"}</span>
+                    </div>
+                  ))}
+                </motion.div>
+              </>
+            );
+          })()}
         </div>
       </section>
 
