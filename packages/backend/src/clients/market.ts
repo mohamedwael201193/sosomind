@@ -655,7 +655,13 @@ export async function getSpotPrice(asset: string): Promise<number | null> {
  */
 export async function getMarketContext(asset: string) {
   const [ticker, klines, global, defiChains, trending, news] = await Promise.all([
-    safe(getBinanceTicker(asset)),
+    // Binance first; fall back to multi-exchange waterfall so price is never null
+    safe(getBinanceTicker(asset).then(t => t ?? getPriceFromAnyExchange(asset).then(p => p ? {
+      symbol: `${asset}USDT`, price: p.price, priceChange: 0,
+      priceChangePercent: p.change24h, highPrice: p.price * 1.01, lowPrice: p.price * 0.99,
+      volume: (p.vol24h ?? 0), quoteVolume: (p.vol24h ?? 0),
+      bidPrice: p.price, askPrice: p.price, count: 0,
+    } : null))),
     safe(getBinanceKlines(asset, '1h', 24)),
     safe(getCoinGeckoGlobal()),
     safe(getDefiChains()),

@@ -84,29 +84,94 @@ export async function runResearchAgent(asset: string, opts: { saveToDb?: boolean
   const cachedSignal = await cachedFetch<ResearchSignal>(
     cacheKey,
     async () => {
-      // ── Price-based baseline signal (works even with no AI) ──────────────
-      // Direction from Binance 24h change: >2% → LONG, <-2% → SHORT, else NEUTRAL
-      const change24h = Number((market as any)?.ticker?.priceChangePercent ?? 0);
+      // ── Multi-factor baseline signal — sosovalue snapshot + Binance ─────────
+      // Uses all data fetched in parallel above for a rich, non-AI signal.
+      const baseSnap = intel.snapshot && !(intel.snapshot as any).__error ? intel.snapshot as any : null;
+      const binTicker = (market as any)?.ticker;
+
+      // 24h % change: Binance = percentage (e.g. 2.5); sosovalue = fraction (e.g. -0.025 = -2.5%)
+      const soso24h = baseSnap?.change_pct_24h != null ? Number(baseSnap.change_pct_24h) * 100 : null;
+      const bx24h   = binTicker?.priceChangePercent != null ? Number(binTicker.priceChangePercent) : null;
+      const change24h = bx24h ?? soso24h ?? 0;
+
+      // Intraday range position: 0 = at session low, 1 = at session high
+      const livePrice2  = Number(binTicker?.price ?? baseSnap?.price ?? livePrice ?? 0);
+      const sessionHigh = Number(binTicker?.highPrice ?? baseSnap?.high_24h ?? livePrice2);
+      const sessionLow  = Number(binTicker?.lowPrice  ?? baseSnap?.low_24h  ?? livePrice2);
+      const rangePos    = sessionHigh > sessionLow && livePrice2 > 0
+        ? (livePrice2 - sessionLow) / (sessionHigh - sessionLow) : 0.5;
+
+      // Cycle context from sosovalue
+      const downFromAth    = baseSnap?.down_from_ath    ? Number(String(baseSnap.down_from_ath).replace(/%/g, ''))    : null;
+      const upFromCycleLow = baseSnap?.up_from_cycle_low ? Number(String(baseSnap.up_from_cycle_low).replace(/%/g, '')) : null;
+      const turnoverRate   = baseSnap?.turnover_rate ? Number(baseSnap.turnover_rate) : null;
+
+      // ETF net inflow (3-day sum — bullish if > 0, bearish if < 0)
+      const etfNetInflow = (() => {
+        if (!Array.isArray(intel.etfFlow) || (intel.etfFlow as any).__error) return 0;
+        return (intel.etfFlow as any[]).slice(0, 3)
+          .reduce((sum: number, e: any) => sum + Number(e.net_inflow ?? e.flowDaily ?? 0), 0);
+      })();
+
+      // ── Weighted score: sum of factors → direction + confidence ──────────────
+      let score = 0;
+      const baseFactors: Array<{ module: string; insight: string }> = [];
+
+      // 1. 24h momentum (dominant: ±45pts)
+      score += Math.max(-45, Math.min(45, change24h * 6));
+      baseFactors.push({ module: bx24h != null ? 'binance' : 'sosovalue', insight: `24h Δ ${change24h >= 0 ? '+' : ''}${change24h.toFixed(2)}%` });
+
+      // 2. Intraday range position (±15pts) — trading near highs is bullish
+      const rangePts = (rangePos - 0.5) * 30;
+      score += rangePts;
+      if (Math.abs(rangePts) > 4)
+        baseFactors.push({ module: 'market', insight: `Price at ${(rangePos * 100).toFixed(0)}% of session range ($${sessionLow}–$${sessionHigh})` });
+
+      // 3. Cycle context (±20pts)
+      if (upFromCycleLow != null && upFromCycleLow > 20) {
+        score += Math.min(20, upFromCycleLow / 5);
+        baseFactors.push({ module: 'sosovalue', insight: `+${upFromCycleLow.toFixed(0)}% recovery from cycle low` });
+      } else if (downFromAth != null && downFromAth < -50) {
+        score -= 10;
+        baseFactors.push({ module: 'sosovalue', insight: `${downFromAth.toFixed(0)}% below ATH — deep drawdown` });
+      }
+
+      // 4. ETF capital flow (±15pts)
+      if (Math.abs(etfNetInflow) > 10_000_000) {
+        score += Math.max(-15, Math.min(15, etfNetInflow / 50_000_000));
+        baseFactors.push({ module: 'sosovalue', insight: `ETF ${etfNetInflow >= 0 ? '+' : ''}$${(etfNetInflow / 1e6).toFixed(0)}M flow` });
+      }
+
+      // 5. Volume spike (±5pts)
+      if (turnoverRate != null && turnoverRate > 0.04) {
+        score += 5;
+        baseFactors.push({ module: 'sosovalue', insight: `Elevated volume turnover ${(turnoverRate * 100).toFixed(1)}%` });
+      }
+
       const baseDirection: 'LONG' | 'SHORT' | 'NEUTRAL' =
-        change24h > 2 ? 'LONG' : change24h < -2 ? 'SHORT' : 'NEUTRAL';
-      const baseConfidence = Math.min(65, 45 + Math.abs(change24h) * 2);
+        score > 8 ? 'LONG' : score < -8 ? 'SHORT' : 'NEUTRAL';
+      const baseConfidence = Math.round(Math.min(78, Math.max(40, 50 + Math.abs(score) * 0.75)));
 
       const buildConfidenceExplanation = (conf: number, dir: string, srcs: Array<{ module: string; insight: string }>) => {
-        const tier = conf >= 80 ? 'High' : conf >= 60 ? 'Moderate' : conf >= 40 ? 'Low' : 'Very low';
-        const srcList = srcs.map(s => s.module).join(', ') || 'price data';
-        return `${tier} (${conf}/100) — ${dir} signal supported by: ${srcList}.`;
+        const tier = conf >= 75 ? 'High' : conf >= 60 ? 'Moderate' : conf >= 45 ? 'Low' : 'Very low';
+        const srcList = [...new Set(srcs.map(s => s.module))].join(', ') || 'price data';
+        return `${tier} (${conf}/100) — ${dir} signal from: ${srcList}.`;
       };
+
+      // Build reasoning string from actual factors
+      const factorSummary = baseFactors.slice(0, 3).map(f => f.insight).join('; ');
+      const entryPx = livePrice2 || livePrice;
 
       let signal: ResearchSignal = {
         asset: symbol,
         direction: baseDirection,
-        confidence: Math.round(baseConfidence),
-        confidence_explanation: buildConfidenceExplanation(Math.round(baseConfidence), baseDirection, [{ module: 'binance', insight: `24h change: ${change24h.toFixed(2)}%` }]),
-        reasoning: `Price-based signal: ${change24h >= 0 ? '+' : ''}${change24h.toFixed(2)}% 24h move. AI synthesis pending.`,
-        entry: livePrice,
-        takeProfit: livePrice ? +(livePrice * (baseDirection === 'SHORT' ? 0.95 : 1.05)).toFixed(0) : null,
-        stopLoss: livePrice ? +(livePrice * (baseDirection === 'SHORT' ? 1.03 : 0.97)).toFixed(0) : null,
-        sources: [{ module: 'binance', insight: `24h change: ${change24h.toFixed(2)}%` }],
+        confidence: baseConfidence,
+        confidence_explanation: buildConfidenceExplanation(baseConfidence, baseDirection, baseFactors),
+        reasoning: `Multi-factor baseline: ${factorSummary}. Score ${score >= 0 ? '+' : ''}${score.toFixed(1)} → ${baseDirection}. AI synthesis pending.`,
+        entry: entryPx,
+        takeProfit: entryPx ? +(entryPx * (baseDirection === 'SHORT' ? 0.94 : 1.06)).toFixed(4) : null,
+        stopLoss:   entryPx ? +(entryPx * (baseDirection === 'SHORT' ? 1.03 : 0.97)).toFixed(4) : null,
+        sources: baseFactors.length > 0 ? baseFactors : [{ module: 'market', insight: `24h Δ ${change24h.toFixed(2)}%` }],
         raw: intel,
       };
 
@@ -171,6 +236,8 @@ export async function runResearchAgent(asset: string, opts: { saveToDb?: boolean
           `## ${symbol} Market Research — ${new Date().toUTCString()}`,
           `**Price**: $${price} | 24h: ${change24h >= 0 ? '+' : ''}${change24h.toFixed(2)}%`,
           `**24h Range**: $${low24} – $${high24} | Volume: ${vol24}`,
+          upFromCycleLow != null ? `**Cycle recovery**: +${upFromCycleLow.toFixed(0)}% from cycle low` : null,
+          downFromAth != null    ? `**ATH distance**: ${downFromAth.toFixed(0)}% below ATH` : null,
           klinesSummary ? `**Hourly close (last 6h)**: ${klinesSummary}` : null,
           globalSummary ? `**Market**: ${globalSummary}` : null,
           defiChains    ? `**DeFi TVL top chains**: ${defiChains}` : null,

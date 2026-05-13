@@ -16,6 +16,25 @@ router.post('/research/:asset', asyncHandler(async (req, res) => {
   res.json({ signal });
 }));
 
+// Seed signals for top assets — call once after deploy to populate the feed
+// GET /api/agents/seed-signals?key=<SEED_SECRET>
+router.get('/seed-signals', asyncHandler(async (req, res) => {
+  const secret = process.env.SEED_SECRET ?? 'sosomind-seed-2026';
+  if (req.query.key !== secret) return res.status(403).json({ error: 'forbidden' });
+
+  const ASSETS = ['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'AVAX', 'LINK', 'DOGE'];
+  const results: any[] = [];
+  for (const asset of ASSETS) {
+    try {
+      const signal = await runResearchAgent(asset, { saveToDb: true });
+      results.push({ asset, direction: signal.direction, confidence: signal.confidence, ok: true });
+    } catch (e) {
+      results.push({ asset, ok: false, error: (e as Error).message });
+    }
+  }
+  return res.json({ seeded: results.length, results });
+}));
+
 // ─── Signal Track Record (public) ────────────────────────────────────────────
 router.get('/signals/track-record', asyncHandler(async (_req, res) => {
   // Try to fetch persisted stats from agent_meta first

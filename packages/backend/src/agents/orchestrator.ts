@@ -91,7 +91,7 @@ export async function orchestrate(task: AgentTask): Promise<OrchestrationResult>
 }
 
 // Background research loop — run every 4h
-export function startResearchLoop(assets = ['BTC', 'ETH', 'SOL']): void {
+export function startResearchLoop(assets = ['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'AVAX', 'LINK', 'DOGE']): void {
   const run = async () => {
     for (const asset of assets) {
       await orchestrate({ type: 'research', asset }).catch((e) =>
