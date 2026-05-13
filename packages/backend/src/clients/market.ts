@@ -184,6 +184,213 @@ export async function getKrakenKlines(asset: string, interval = '1h', limit = 10
   }, 60));
 }
 
+// ============================================================================
+// OKX — free public ticker, no API key required
+// ============================================================================
+const okxHttp = axios.create({ baseURL: 'https://www.okx.com', timeout: 8000 });
+
+const OKX_INST_MAP: Record<string, string> = {
+  BTC: 'BTC-USDT', ETH: 'ETH-USDT', SOL: 'SOL-USDT', BNB: 'BNB-USDT',
+  AVAX: 'AVAX-USDT', LINK: 'LINK-USDT', DOGE: 'DOGE-USDT', ARB: 'ARB-USDT',
+  OP: 'OP-USDT', SUI: 'SUI-USDT', DOT: 'DOT-USDT', ADA: 'ADA-USDT',
+  XRP: 'XRP-USDT', LTC: 'LTC-USDT', ATOM: 'ATOM-USDT', UNI: 'UNI-USDT',
+  AAVE: 'AAVE-USDT', INJ: 'INJ-USDT', TIA: 'TIA-USDT', JUP: 'JUP-USDT',
+  WIF: 'WIF-USDT', PEPE: 'PEPE-USDT', SHIB: 'SHIB-USDT', ZEC: 'ZEC-USDT',
+};
+
+/** OKX spot ticker — returns { price, change24h } or null */
+export async function getOKXTicker(asset: string): Promise<{ price: number; change24h: number; vol24h: number } | null> {
+  const a = asset.toUpperCase().replace(/^V/, '').replace(/(USDT|BUSD|USDC|USD)$/, '');
+  const instId = OKX_INST_MAP[a] ?? `${a}-USDT`;
+  return cachedFetch(`okx:ticker:${instId}`, async () => {
+    const r = await okxHttp.get('/api/v5/market/ticker', { params: { instId } });
+    if (r.data?.code !== '0' || !r.data?.data?.[0]) throw new Error('OKX no data');
+    const d = r.data.data[0];
+    const price = Number(d.last);
+    const open24h = Number(d.open24h);
+    const change24h = open24h > 0 ? ((price - open24h) / open24h) * 100 : 0;
+    return { price, change24h, vol24h: Number(d.volCcy24h ?? d.vol24h ?? 0) };
+  }, 15);
+}
+
+// ============================================================================
+// COINBASE (Advanced Trade public) — no API key for spot prices
+// ============================================================================
+const coinbaseHttp = axios.create({ baseURL: 'https://api.coinbase.com', timeout: 8000 });
+
+const COINBASE_PAIR_MAP: Record<string, string> = {
+  BTC: 'BTC-USD', ETH: 'ETH-USD', SOL: 'SOL-USD', AVAX: 'AVAX-USD',
+  LINK: 'LINK-USD', DOGE: 'DOGE-USD', ADA: 'ADA-USD', DOT: 'DOT-USD',
+  XRP: 'XRP-USD', LTC: 'LTC-USD', ATOM: 'ATOM-USD', UNI: 'UNI-USD',
+  AAVE: 'AAVE-USD', ARB: 'ARB-USD', OP: 'OP-USD', SUI: 'SUI-USD',
+  MATIC: 'MATIC-USD', INJ: 'INJ-USD', SHIB: 'SHIB-USD', PEPE: 'PEPE-USD',
+};
+
+/** Coinbase spot ticker — returns { price, change24h } or null */
+export async function getCoinbaseTicker(asset: string): Promise<{ price: number; change24h: number } | null> {
+  const a = asset.toUpperCase().replace(/^V/, '').replace(/(USDT|BUSD|USDC|USD)$/, '');
+  const pair = COINBASE_PAIR_MAP[a] ?? `${a}-USD`;
+  return cachedFetch(`coinbase:ticker:${pair}`, async () => {
+    // Advanced Trade public products endpoint
+    const r = await coinbaseHttp.get(`/api/v3/brokerage/market/products/${pair}`);
+    const d = r.data;
+    const price = Number(d.price ?? d.best_bid ?? 0);
+    const open24h = Number(d.price_percentage_change_24h ?? 0);
+    return { price, change24h: open24h };
+  }, 15);
+}
+
+// ============================================================================
+// BYBIT — free public ticker, no API key
+// ============================================================================
+const bybitHttp = axios.create({ baseURL: 'https://api.bybit.com', timeout: 8000 });
+
+const BYBIT_SYMBOL_MAP: Record<string, string> = {
+  BTC: 'BTCUSDT', ETH: 'ETHUSDT', SOL: 'SOLUSDT', BNB: 'BNBUSDT',
+  AVAX: 'AVAXUSDT', LINK: 'LINKUSDT', DOGE: 'DOGEUSDT', ARB: 'ARBUSDT',
+  OP: 'OPUSDT', SUI: 'SUIUSDT', DOT: 'DOTUSDT', ADA: 'ADAUSDT',
+  XRP: 'XRPUSDT', LTC: 'LTCUSDT', ATOM: 'ATOMUSDT', UNI: 'UNIUSDT',
+  AAVE: 'AAVEUSDT', INJ: 'INJUSDT', TIA: 'TIAUSDT', PEPE: '1000PEPEUSDT',
+  SHIB: '1000SHIBUSDT', WIF: 'WIFUSDT', JUP: 'JUPUSDT', ZEC: 'ZECUSDT',
+};
+
+/** Bybit spot ticker — returns { price, change24h } or null */
+export async function getBybitTicker(asset: string): Promise<{ price: number; change24h: number; vol24h: number } | null> {
+  const a = asset.toUpperCase().replace(/^V/, '').replace(/(USDT|BUSD|USDC|USD)$/, '');
+  const symbol = BYBIT_SYMBOL_MAP[a] ?? `${a}USDT`;
+  return cachedFetch(`bybit:ticker:${symbol}`, async () => {
+    const r = await bybitHttp.get('/v5/market/tickers', { params: { category: 'spot', symbol } });
+    if (r.data?.retCode !== 0 || !r.data?.result?.list?.[0]) throw new Error('Bybit no data');
+    const d = r.data.result.list[0];
+    return {
+      price: Number(d.lastPrice),
+      change24h: Number(d.price24hPcnt ?? 0) * 100,
+      vol24h: Number(d.turnover24h ?? 0),
+    };
+  }, 15);
+}
+
+// ============================================================================
+// KUCOIN — free public ticker, no API key
+// ============================================================================
+const kucoinHttp = axios.create({ baseURL: 'https://api.kucoin.com', timeout: 8000 });
+
+const KUCOIN_SYMBOL_MAP: Record<string, string> = {
+  BTC: 'BTC-USDT', ETH: 'ETH-USDT', SOL: 'SOL-USDT', AVAX: 'AVAX-USDT',
+  LINK: 'LINK-USDT', DOGE: 'DOGE-USDT', ADA: 'ADA-USDT', DOT: 'DOT-USDT',
+  XRP: 'XRP-USDT', LTC: 'LTC-USDT', ATOM: 'ATOM-USDT', UNI: 'UNI-USDT',
+  AAVE: 'AAVE-USDT', ARB: 'ARB-USDT', OP: 'OP-USDT', SUI: 'SUI-USDT',
+  INJ: 'INJ-USDT', TIA: 'TIA-USDT', JUP: 'JUP-USDT', WIF: 'WIF-USDT',
+  PEPE: 'PEPE-USDT', SHIB: 'SHIB-USDT',
+};
+
+/** KuCoin spot ticker — returns { price, change24h } or null */
+export async function getKuCoinTicker(asset: string): Promise<{ price: number; change24h: number } | null> {
+  const a = asset.toUpperCase().replace(/^V/, '').replace(/(USDT|BUSD|USDC|USD)$/, '');
+  const symbol = KUCOIN_SYMBOL_MAP[a] ?? `${a}-USDT`;
+  return cachedFetch(`kucoin:ticker:${symbol}`, async () => {
+    const r = await kucoinHttp.get('/api/v1/market/stats', { params: { symbol } });
+    if (r.data?.code !== '200000' || !r.data?.data) throw new Error('KuCoin no data');
+    const d = r.data.data;
+    return {
+      price: Number(d.last),
+      change24h: Number(d.changeRate ?? 0) * 100,
+    };
+  }, 15);
+}
+
+// ============================================================================
+// MEXC — free public ticker, no API key
+// ============================================================================
+const mexcHttp = axios.create({ baseURL: 'https://api.mexc.com', timeout: 8000 });
+
+/** MEXC spot 24hr ticker — returns { price, change24h } or null */
+export async function getMEXCTicker(asset: string): Promise<{ price: number; change24h: number } | null> {
+  const a = asset.toUpperCase().replace(/^V/, '').replace(/(USDT|BUSD|USDC|USD)$/, '');
+  const symbol = `${a}USDT`;
+  return cachedFetch(`mexc:ticker:${symbol}`, async () => {
+    const r = await mexcHttp.get('/api/v3/ticker/24hr', { params: { symbol } });
+    return {
+      price: Number(r.data.lastPrice),
+      change24h: Number(r.data.priceChangePercent ?? 0),
+    };
+  }, 15);
+}
+
+// ============================================================================
+// GATE.IO — free public ticker, no API key
+// ============================================================================
+const gateHttp = axios.create({ baseURL: 'https://api.gateio.ws', timeout: 8000 });
+
+/** Gate.io spot ticker — returns { price, change24h } or null */
+export async function getGateIOTicker(asset: string): Promise<{ price: number; change24h: number } | null> {
+  const a = asset.toUpperCase().replace(/^V/, '').replace(/(USDT|BUSD|USDC|USD)$/, '');
+  const currencyPair = `${a}_USDT`;
+  return cachedFetch(`gateio:ticker:${currencyPair}`, async () => {
+    const r = await gateHttp.get('/api/v4/spot/tickers', { params: { currency_pair: currencyPair } });
+    const d = r.data?.[0];
+    if (!d) throw new Error('Gate.io no data');
+    return {
+      price: Number(d.last),
+      change24h: Number(d.change_percentage ?? 0),
+    };
+  }, 15);
+}
+
+/**
+ * Multi-exchange price waterfall: Binance → OKX → Bybit → KuCoin → Coinbase → MEXC → Gate.io → Kraken → CoinGecko
+ * Returns the first successful { price, change24h, source } or null.
+ */
+export async function getPriceFromAnyExchange(asset: string): Promise<{ price: number; change24h: number; vol24h?: number; source: string } | null> {
+  const a = asset.toUpperCase().replace(/^V/, '').replace(/(USDT|BUSD|USDC|USD)$/, '');
+  type RawResult = { price: number; change24h: number; vol24h?: number; source: string } | null;
+
+  // Run first batch in parallel (fastest tier — CEX REST)
+  const [bin, okx, bybit] = await Promise.all([
+    getBinanceTicker(a).then(t => t && t.price > 0 ? { price: t.price, change24h: t.priceChangePercent, vol24h: t.quoteVolume, source: 'binance' } : null).catch(() => null),
+    getOKXTicker(a).then(t => t && t.price > 0 ? { ...t, source: 'okx' } : null).catch(() => null),
+    getBybitTicker(a).then(t => t && t.price > 0 ? { ...t, source: 'bybit' } : null).catch(() => null),
+  ] as Promise<RawResult>[]);
+  if (bin) return bin;
+  if (okx) return okx;
+  if (bybit) return bybit;
+
+  // Second tier
+  const [kucoin, coinbase, mexc] = await Promise.all([
+    getKuCoinTicker(a).then(t => t && t.price > 0 ? { ...t, source: 'kucoin' } : null).catch(() => null),
+    getCoinbaseTicker(a).then(t => t && t.price > 0 ? { ...t, source: 'coinbase' } : null).catch(() => null),
+    getMEXCTicker(a).then(t => t && t.price > 0 ? { ...t, source: 'mexc' } : null).catch(() => null),
+  ] as Promise<RawResult>[]);
+  if (kucoin) return kucoin;
+  if (coinbase) return coinbase;
+  if (mexc) return mexc;
+
+  // Third tier
+  const [gate, kraken, coingecko] = await Promise.all([
+    getGateIOTicker(a).then(t => t && t.price > 0 ? { ...t, source: 'gate.io' } : null).catch(() => null),
+    (() => {
+      const pair = KRAKEN_PAIR_MAP[a];
+      if (!pair) return Promise.resolve(null);
+      return safe(
+        krakenHttp.get('/0/public/Ticker', { params: { pair } }).then(r => {
+          if (r.data.error?.length) throw new Error('Kraken error');
+          const pairKey = Object.keys(r.data.result)[0];
+          const d = r.data.result[pairKey];
+          const price = Number(d.c[0]);
+          const open24h = Number(d.o);
+          const change24h = open24h > 0 ? ((price - open24h) / open24h) * 100 : 0;
+          return { price, change24h, source: 'kraken' };
+        })
+      );
+    })(),
+    getCoinGeckoPrices([a]).then(r => {
+      const d = r?.[a];
+      return d?.usd ? { price: d.usd, change24h: d.usd_24h_change ?? 0, source: 'coingecko' } : null;
+    }).catch(() => null),
+  ] as Promise<RawResult>[]);
+  return gate ?? kraken ?? coingecko ?? null;
+}
+
 /**
  * GET /api/v3/ticker/price — simple latest price only.
  * Fastest Binance price endpoint, lowest weight.

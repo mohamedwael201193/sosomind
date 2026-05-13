@@ -4,6 +4,7 @@ import { runResearchAgent } from '../agents/research';
 import { supabase } from '../db/supabase';
 import { asyncHandler, validate } from '../utils/http';
 import { wrapMeta } from '../utils/responseMeta';
+import { getBinanceTicker, getCoinGeckoPrices, getPriceFromAnyExchange } from '../clients/market';
 
 const router = Router();
 
@@ -99,15 +100,12 @@ router.get('/signals/live/:asset', asyncHandler(async (req, res) => {
     .limit(1);
   if (anySignals?.[0]) return res.json({ signal: anySignals[0], source: 'db' });
 
-  // 3. Build Binance momentum signal (no AI, < 1s)
-  const { getBinanceTicker } = await import('../clients/market');
-  const ticker = await getBinanceTicker(asset).catch(() => null);
-  if (!ticker || ticker.price <= 0) {
-    return res.status(503).json({ error: `Cannot fetch price for ${asset}` });
+  // 3. Multi-exchange price waterfall: Binance → OKX → Bybit → KuCoin → Coinbase → MEXC → Gate.io → Kraken → CoinGecko
+  const priceData = await getPriceFromAnyExchange(asset).catch(() => null);
+  if (!priceData || priceData.price <= 0) {
+    return res.status(503).json({ error: `Cannot fetch price for ${asset} from any exchange` });
   }
-
-  const change24h = ticker.priceChangePercent;
-  const price = ticker.price;
+  const { price, change24h, vol24h, source: priceSource } = priceData;
   const direction: 'LONG' | 'SHORT' | 'NEUTRAL' =
     change24h > 2 ? 'LONG' : change24h < -2 ? 'SHORT' : 'NEUTRAL';
   const confidence = Math.round(Math.min(75, 40 + Math.abs(change24h) * 3));
@@ -122,12 +120,12 @@ router.get('/signals/live/:asset', asyncHandler(async (req, res) => {
     symbol: asset,
     direction: direction.toLowerCase(),
     confidence,
-    confidence_explanation: `${confidence >= 60 ? 'Moderate' : 'Low'} (${confidence}/100) — Binance 24h momentum.`,
-    reasoning: `Binance 24h momentum: ${change24h >= 0 ? '+' : ''}${change24h.toFixed(2)}% ($${price.toLocaleString()}). ${trend}`,
+    confidence_explanation: `${confidence >= 60 ? 'Moderate' : 'Low'} (${confidence}/100) — ${priceSource} 24h momentum.`,
+    reasoning: `[${priceSource}] 24h momentum: ${change24h >= 0 ? '+' : ''}${change24h.toFixed(2)}% ($${price.toLocaleString()}). ${trend}`,
     entry: +price.toFixed(4),
     take_profit: +(price * (direction === 'SHORT' ? 0.95 : 1.05)).toFixed(4),
     stop_loss: +(price * (direction === 'SHORT' ? 1.03 : 0.97)).toFixed(4),
-    sources: [{ module: 'binance', insight: `24h Δ ${change24h.toFixed(2)}%, vol $${(ticker.quoteVolume / 1e6).toFixed(0)}M` }],
+    sources: [{ module: priceSource, insight: `24h Δ ${change24h.toFixed(2)}%${vol24h ? `, vol $${(vol24h / 1e6).toFixed(0)}M` : ''}` }],
     status: 'active',
   };
 
@@ -139,7 +137,7 @@ router.get('/signals/live/:asset', asyncHandler(async (req, res) => {
     .then(({ data }) => { if (data?.id) signal.id = data.id; })
     .catch(() => { /* non-fatal */ });
 
-  return res.json({ signal, source: 'binance' });
+  return res.json({ signal, source: priceSource });
 }));
 
 router.get('/signals/:id', asyncHandler(async (req, res) => {
