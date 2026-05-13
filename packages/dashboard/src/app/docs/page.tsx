@@ -234,9 +234,9 @@ export default function DocsPage() {
     setOpenSections(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]), []);
 
   return (
-    <div className="min-h-screen flex" style={{ background: "var(--bg-primary)" }}>
-      <aside className="hidden lg:flex flex-col w-64 xl:w-72 flex-shrink-0 sticky top-0 h-screen overflow-y-auto py-8 px-4"
-        style={{ borderRight: "1px solid var(--glass-border)", background: "var(--bg-primary)" }}>
+    <div className="h-screen overflow-hidden flex" style={{ background: "var(--bg-base)" }}>
+      <aside className="hidden lg:flex flex-col w-64 xl:w-72 flex-shrink-0 h-full overflow-y-auto py-8 px-4"
+        style={{ borderRight: "1px solid var(--glass-border)", background: "var(--bg-base)" }}>
         <Link href="/landing" className="flex items-center gap-2 px-3 mb-8">
           <div className="w-7 h-7 rounded-[6px] flex items-center justify-center" style={{ background: "rgba(249,115,22,0.15)" }}>
             <BookOpen className="w-3.5 h-3.5" style={{ color: "#f97316" }} />
@@ -271,9 +271,9 @@ export default function DocsPage() {
           </>
         )}
       </AnimatePresence>
-      <main ref={contentRef} className="flex-1 overflow-auto">
+      <main ref={contentRef} className="flex-1 overflow-y-auto h-full">
         <div className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 lg:hidden"
-          style={{ background: "var(--bg-primary)", borderBottom: "1px solid var(--glass-border)", backdropFilter: "blur(16px)" }}>
+          style={{ background: "var(--bg-base)", borderBottom: "1px solid var(--glass-border)", backdropFilter: "blur(16px)" }}>
           <button onClick={() => setSidebarOpen(true)} className="p-1.5 rounded-[6px]" style={{ border: "1px solid var(--glass-border)" }}>
             <Menu className="w-4 h-4" style={{ color: "var(--text-secondary)" }} />
           </button>
