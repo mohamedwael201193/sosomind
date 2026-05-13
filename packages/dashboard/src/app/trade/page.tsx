@@ -437,16 +437,17 @@ function TradeInner() {
         const sigsArr: any[] = Array.isArray(sigsResp) ? sigsResp : (sigsResp?.data ?? []);
         let sig: any = sigsArr[0] ?? null;
 
-        // 2. If table empty, generate a live signal from the research agent
+        // 2. No stored signal — use fast live endpoint (Binance-backed, < 3s, no AI timeout)
         if (!sig) {
           const researchAsset = activeSymbol?.baseCoin?.replace(/^v/, '') ?? 'ETH';
           try {
-            const res = await api.post(`/api/agents/research/${researchAsset}`);
-            // api is axios — res.data = response body = { signal: {...} }
-            sig = res?.data?.signal ?? res?.data ?? null;
+            const quickRes = await api.get(`/api/agents/signals/live/${researchAsset}`, { timeout: 8000 });
+            sig = quickRes?.data?.signal ?? null;
           } catch (e) {
-            console.warn('[Copy Signal] research agent failed:', e);
+            console.warn('[Copy Signal] quick signal failed:', e);
           }
+          // Kick off full AI research in background to enrich DB for next visit
+          api.post(`/api/agents/research/${researchAsset}`, {}, { timeout: 90000 }).catch(() => {});
         }
 
         if (sig) {
@@ -1099,8 +1100,8 @@ function TradeInner() {
                   {strategy === 'copy' && !copySignalData && (
                     <div className="mb-3 p-3 rounded-xl border text-[11px]"
                       style={{ borderColor: 'rgba(249,115,22,0.2)', background: 'rgba(249,115,22,0.04)' }}>
-                      <p className="font-semibold mb-0.5" style={{ color: '#f97316' }}>No stored signal — research agent was called live.</p>
-                      <p style={{ color: 'var(--text-muted)' }}>If the signal still didn&apos;t load, fill in the order fields below manually or go back and retry.</p>
+                      <p className="font-semibold mb-0.5" style={{ color: '#f97316' }}>Signal unavailable — price data unreachable.</p>
+                      <p style={{ color: 'var(--text-muted)' }}>Go back and retry, or fill in the order fields below manually.</p>
                     </div>
                   )}
 

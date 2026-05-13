@@ -73,6 +73,75 @@ router.get('/signals', validate(z.object({ status: z.string().optional(), asset:
   res.json({ data });
 }));
 
+// Fast live signal — DB first, then Binance momentum fallback (< 3s, no AI required)
+router.get('/signals/live/:asset', asyncHandler(async (req, res) => {
+  const asset = req.params.asset.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  const freshCutoff = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+
+  // 1. Fresh active signal for this exact asset (< 6h old)
+  const { data: assetSignals } = await supabase
+    .from('signals')
+    .select('*')
+    .eq('asset', asset)
+    .eq('status', 'active')
+    .gte('created_at', freshCutoff)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (assetSignals?.[0]) return res.json({ signal: assetSignals[0], source: 'db' });
+
+  // 2. Any fresh active signal (cross-asset copy)
+  const { data: anySignals } = await supabase
+    .from('signals')
+    .select('*')
+    .eq('status', 'active')
+    .gte('created_at', freshCutoff)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (anySignals?.[0]) return res.json({ signal: anySignals[0], source: 'db' });
+
+  // 3. Build Binance momentum signal (no AI, < 1s)
+  const { getBinanceTicker } = await import('../clients/market');
+  const ticker = await getBinanceTicker(asset).catch(() => null);
+  if (!ticker || ticker.price <= 0) {
+    return res.status(503).json({ error: `Cannot fetch price for ${asset}` });
+  }
+
+  const change24h = ticker.priceChangePercent;
+  const price = ticker.price;
+  const direction: 'LONG' | 'SHORT' | 'NEUTRAL' =
+    change24h > 2 ? 'LONG' : change24h < -2 ? 'SHORT' : 'NEUTRAL';
+  const confidence = Math.round(Math.min(75, 40 + Math.abs(change24h) * 3));
+  const trend = direction === 'LONG'
+    ? 'Bullish momentum — buyers in control.'
+    : direction === 'SHORT'
+    ? 'Bearish momentum — sellers dominating.'
+    : 'Sideways action — no clear directional edge.';
+
+  const signal: Record<string, any> = {
+    asset,
+    symbol: asset,
+    direction: direction.toLowerCase(),
+    confidence,
+    confidence_explanation: `${confidence >= 60 ? 'Moderate' : 'Low'} (${confidence}/100) — Binance 24h momentum.`,
+    reasoning: `Binance 24h momentum: ${change24h >= 0 ? '+' : ''}${change24h.toFixed(2)}% ($${price.toLocaleString()}). ${trend}`,
+    entry: +price.toFixed(4),
+    take_profit: +(price * (direction === 'SHORT' ? 0.95 : 1.05)).toFixed(4),
+    stop_loss: +(price * (direction === 'SHORT' ? 1.03 : 0.97)).toFixed(4),
+    sources: [{ module: 'binance', insight: `24h Δ ${change24h.toFixed(2)}%, vol $${(ticker.quoteVolume / 1e6).toFixed(0)}M` }],
+    status: 'active',
+  };
+
+  // Persist to DB (non-blocking, best-effort)
+  supabase.from('signals').insert({
+    ...signal,
+    expires_at: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(),
+  }).select('id').single()
+    .then(({ data }) => { if (data?.id) signal.id = data.id; })
+    .catch(() => { /* non-fatal */ });
+
+  return res.json({ signal, source: 'binance' });
+}));
+
 router.get('/signals/:id', asyncHandler(async (req, res) => {
   const { id } = req.params;
   // Validate UUID format to prevent routing collision with named sub-routes
