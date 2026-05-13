@@ -2095,8 +2095,10 @@ export function createBot(): Bot | null {
               const usd = amountUsd ?? 100;
               // 1. Validate asset on SoDEX Testnet (catches SOL "cancel only", unlisted assets, etc.)
               let symMeta: any;
+              let houseSodex: any;
               try {
-                const { sodex: houseSodex } = await import('../clients/sodex');
+                const { sodex: _hs } = await import('../clients/sodex');
+                houseSodex = _hs;
                 symMeta = await houseSodex.findMarketForAsset(asset);
                 // Status guard — cancel-only symbols reject all new orders immediately
                 const st = (symMeta?.status ?? '').toLowerCase().replace(/[_\s-]/g, '');

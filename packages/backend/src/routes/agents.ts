@@ -130,7 +130,7 @@ router.get('/signals/live/:asset', asyncHandler(async (req, res) => {
   };
 
   // Persist to DB (non-blocking, best-effort)
-  supabase.from('signals').insert({
+  void supabase.from('signals').insert({
     ...signal,
     expires_at: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(),
   }).select('id').single()
