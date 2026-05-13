@@ -107,7 +107,8 @@ export async function startServer() {
   app.use('/api/analyses', charts);
   app.use('/api/sodex/relay', sodexRelay);
   app.use('/api/sodex', sodex);
-  app.use('/api', agents);
+  app.use('/api/agents', agents); // dashboard expects /api/agents/* prefix
+  app.use('/api', agents);        // legacy / direct path compat
   app.use('/api/portfolio', portfolio);
   app.use('/api/alerts', alerts);
   app.use('/api/sectors', sectors);
