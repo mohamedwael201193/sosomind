@@ -138,6 +138,56 @@ function ArchDiagram() {
   );
 }
 
+interface SidebarContentProps {
+  activeSection: string;
+  openSections: string[];
+  onToggle: (id: string) => void;
+  onScrollTo: (id: string) => void;
+}
+
+function SidebarContent({ activeSection, openSections, onToggle, onScrollTo }: SidebarContentProps) {
+  return (
+    <nav className="flex flex-col gap-0.5">
+      <div className="text-[10px] font-bold uppercase tracking-widest px-3 py-2 mb-1" style={{ color: "var(--text-muted)" }}>Documentation</div>
+      {NAV_SECTIONS.map(section => {
+        const Icon = section.icon;
+        const isActive = activeSection === section.id;
+        const isOpen = openSections.includes(section.id);
+        return (
+          <div key={section.id}>
+            <button onClick={() => { if (section.subsections) { onToggle(section.id); onScrollTo(section.id); } else onScrollTo(section.id); }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-[6px] text-left transition-all text-[13px] font-medium"
+              style={{ color: isActive ? "#f97316" : "var(--text-secondary)", background: isActive ? "rgba(249,115,22,0.08)" : "transparent" }}>
+              <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+              <span className="flex-1">{section.label}</span>
+              {section.subsections && (
+                <motion.div animate={{ rotate: isOpen ? 90 : 0 }} transition={{ duration: 0.2 }}>
+                  <ChevronRight className="w-3 h-3" />
+                </motion.div>
+              )}
+            </button>
+            {section.subsections && (
+              <AnimatePresence>
+                {isOpen && (
+                  <motion.div key="sub" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
+                    <div className="ml-6 flex flex-col gap-0.5 py-0.5">
+                      {section.subsections.map(sub => (
+                        <button key={sub.id} onClick={() => onScrollTo(sub.id)}
+                          className="text-left text-[12px] px-3 py-1.5 rounded-[4px] transition-all hover:opacity-80"
+                          style={{ color: "var(--text-muted)" }}>{sub.label}</button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            )}
+          </div>
+        );
+      })}
+    </nav>
+  );
+}
+
 export default function DocsPage() {
   const [activeSection, setActiveSection] = useState("overview");
   const [openSections, setOpenSections] = useState<string[]>(["agents","signals","ssi","execution","telegram","mcp"]);
@@ -151,7 +201,6 @@ export default function DocsPage() {
       (entries) => {
         for (const e of entries) {
           if (e.isIntersecting) {
-            // Map sub-section IDs back to their parent section ID
             const rawId = e.target.id;
             const sectionId = NAV_SECTIONS.find(s =>
               s.id === rawId || s.subsections?.some(sub => sub.id === rawId)
@@ -181,51 +230,8 @@ export default function DocsPage() {
     setSidebarOpen(false);
   }, []);
 
-  const toggleSection = (id: string) =>
-    setOpenSections(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
-
-  function SidebarContent() {
-    return (
-      <nav className="flex flex-col gap-0.5">
-        <div className="text-[10px] font-bold uppercase tracking-widest px-3 py-2 mb-1" style={{ color: "var(--text-muted)" }}>Documentation</div>
-        {NAV_SECTIONS.map(section => {
-          const Icon = section.icon;
-          const isActive = activeSection === section.id;
-          const isOpen = openSections.includes(section.id);
-          return (
-            <div key={section.id}>
-              <button onClick={() => { if (section.subsections) { toggleSection(section.id); scrollTo(section.id); } else scrollTo(section.id); }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-[6px] text-left transition-all text-[13px] font-medium"
-                style={{ color: isActive ? "#f97316" : "var(--text-secondary)", background: isActive ? "rgba(249,115,22,0.08)" : "transparent" }}>
-                <Icon className="w-3.5 h-3.5 flex-shrink-0" />
-                <span className="flex-1">{section.label}</span>
-                {section.subsections && (
-                  <motion.div animate={{ rotate: isOpen ? 90 : 0 }} transition={{ duration: 0.2 }}>
-                    <ChevronRight className="w-3 h-3" />
-                  </motion.div>
-                )}
-              </button>
-              {section.subsections && (
-                <AnimatePresence>
-                  {isOpen && (
-                    <motion.div key="sub" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
-                      <div className="ml-6 flex flex-col gap-0.5 py-0.5">
-                        {section.subsections.map(sub => (
-                          <button key={sub.id} onClick={() => scrollTo(sub.id)}
-                            className="text-left text-[12px] px-3 py-1.5 rounded-[4px] transition-all hover:opacity-80"
-                            style={{ color: "var(--text-muted)" }}>{sub.label}</button>
-                        ))}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              )}
-            </div>
-          );
-        })}
-      </nav>
-    );
-  }
+  const toggleSection = useCallback((id: string) =>
+    setOpenSections(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]), []);
 
   return (
     <div className="min-h-screen flex" style={{ background: "var(--bg-primary)" }}>
@@ -238,7 +244,7 @@ export default function DocsPage() {
           <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>SoSoMind Docs</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded font-mono ml-auto" style={{ background: "rgba(249,115,22,0.1)", color: "#f97316" }}>v2</span>
         </Link>
-        <SidebarContent />
+        <SidebarContent activeSection={activeSection} openSections={openSections} onToggle={toggleSection} onScrollTo={scrollTo} />
         <div className="mt-auto px-3 pt-6">
           <a href="https://t.me/SosoMindbot" target="_blank" rel="noopener noreferrer"
             className="flex items-center gap-2 text-xs py-2 px-3 rounded-[6px]"
@@ -260,7 +266,7 @@ export default function DocsPage() {
                 <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>SoSoMind Docs</span>
                 <button onClick={() => setSidebarOpen(false)}><X className="w-4 h-4" style={{ color: "var(--text-muted)" }} /></button>
               </div>
-              <SidebarContent />
+              <SidebarContent activeSection={activeSection} openSections={openSections} onToggle={toggleSection} onScrollTo={scrollTo} />
             </motion.aside>
           </>
         )}
