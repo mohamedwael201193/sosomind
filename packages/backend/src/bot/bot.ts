@@ -475,9 +475,10 @@ export function createBot(): Bot | null {
     } catch { /* non-fatal — proceed normally if check fails */ }
 
     // Fetch live price to show approximate qty per $ amount
+    // Use Binance first (accurate, real-time) — sosovalue returns stale/wrong denomination values
     let price = 0;
-    try { const s: any = await sosovalue.getMarketSnapshot(asset); price = Number(s?.price ?? 0); } catch {}
-    if (!price) { try { const { getBinancePrice } = await import('../clients/market'); price = (await getBinancePrice(asset)) ?? 0; } catch {} }
+    try { const b = await getBinanceTicker(asset).catch(() => null); if (b && b.price > 0) price = b.price; } catch {}
+    if (!price) { try { const s: any = await sosovalue.getMarketSnapshot(asset).catch(() => null); const raw = Number(s?.price ?? 0); if (raw > 1) price = raw; } catch {} }
     const qtyFor = (usd: number) => price > 0 ? `~${(usd / price).toFixed(4)}` : '';
     const dir = side === 'buy' ? 'LONG 📈' : 'SHORT 📉';
     const text =
@@ -506,9 +507,11 @@ export function createBot(): Bot | null {
     const side = ctx.match[2] as 'buy' | 'sell';
     const usd = Number(ctx.match[3]);
     await ctx.answerCallbackQuery({ text: `Computing quantity for $${usd}…` });
+    // Use Binance first (accurate, real-time) — sosovalue returns stale/wrong denomination values
+    // causing qty to be massively wrong (e.g. $10 ETH → 219 ETH instead of ~0.003 ETH)
     let price = 0;
-    try { const s: any = await sosovalue.getMarketSnapshot(asset); price = Number(s?.price ?? 0); } catch {}
-    if (!price) { try { const { getBinancePrice } = await import('../clients/market'); price = (await getBinancePrice(asset)) ?? 0; } catch {} }
+    try { const b = await getBinanceTicker(asset).catch(() => null); if (b && b.price > 0) price = b.price; } catch {}
+    if (!price) { try { const s: any = await sosovalue.getMarketSnapshot(asset).catch(() => null); const raw = Number(s?.price ?? 0); if (raw > 1) price = raw; } catch {} }
     // Compute base qty from USD amount; will be enforced against SoDEX minimums in tx: handler
     const rawQty = price > 0 ? usd / price : 0.001;
     const qty = Math.max(parseFloat(rawQty.toFixed(8)), 0.00000001);
@@ -928,11 +931,16 @@ export function createBot(): Bot | null {
       // Batch response shape: { orders: [{ orderID, clOrdID, status, ... }] }
       // or direct array of order objects
       let orderId = 'pending';
-      try {
-        const orders = sodexResult?.orders ?? (Array.isArray(sodexResult) ? sodexResult : []);
-        const first = orders[0] ?? sodexResult ?? {};
-        orderId = String(first.orderID ?? first.clOrdID ?? first.id ?? 'pending');
-      } catch { /* keep 'pending' */ }
+      const _orders = sodexResult?.orders ?? (Array.isArray(sodexResult) ? sodexResult : []);
+      const _first = _orders[0] ?? sodexResult ?? {};
+      // Check if the individual order was rejected by SoDEX.
+      // Batch API returns code:0 (HTTP success) even when the order item itself was rejected.
+      const _orderStatus = String(_first?.status ?? '').toUpperCase();
+      if (_orderStatus === 'REJECTED' || _orderStatus === 'FAILED' || _orderStatus === 'ERROR') {
+        const _orderErr = String(_first?.error ?? _first?.reason ?? _first?.message ?? 'Order rejected by exchange');
+        throw new Error(_orderErr);
+      }
+      try { orderId = String(_first.orderID ?? _first.clOrdID ?? _first.id ?? 'pending'); } catch { /* keep 'pending' */ }
       const text =
         `✅ <b>Order Submitted</b>\n\n` +
         `🪙 Market: <b>${market}</b>\n` +
@@ -2127,18 +2135,37 @@ export function createBot(): Bot | null {
                 return true;
               }
               // 2. Get price to estimate quantity from USD amount
+              // Priority: Binance (accurate) → SoDEX orderbook → sosovalue (sanity-checked > $1)
+              // sosovalue returns stale/wrong denomination values causing massively wrong qty
               let price = 0;
-              try {
-                const snap: any = await sosovalue.getMarketSnapshot(asset);
-                price = Number(snap?.price ?? snap?.last_price ?? snap?.data?.price ?? 0);
-              } catch { /* ignore */ }
+              try { const b = await getBinanceTicker(asset).catch(() => null); if (b && b.price > 0) price = b.price; } catch {}
               if (!price || price <= 0) {
                 try {
-                  const { getSpotPrice } = await import('../clients/market');
-                  price = (await getSpotPrice(asset)) ?? 0;
+                  const ob: any = await houseSodex.getSpotOrderbook(symMeta.name, 1);
+                  const asks = ob?.asks ?? ob?.data?.asks ?? [];
+                  const bids = ob?.bids ?? ob?.data?.bids ?? [];
+                  const bestAsk = asks[0] ? Number(Array.isArray(asks[0]) ? asks[0][0] : asks[0].price) : 0;
+                  const bestBid = bids[0] ? Number(Array.isArray(bids[0]) ? bids[0][0] : bids[0].price) : 0;
+                  const obPrice = side === 'buy' ? (bestAsk || bestBid) : (bestBid || bestAsk);
+                  if (obPrice > 0) price = obPrice;
+                } catch { /* non-fatal */ }
+              }
+              if (!price || price <= 0) {
+                try {
+                  const snap: any = await sosovalue.getMarketSnapshot(asset).catch(() => null);
+                  const raw = Number(snap?.price ?? snap?.last_price ?? snap?.data?.price ?? 0);
+                  if (raw > 1) price = raw; // reject micro-values that are clearly wrong
                 } catch { /* ignore */ }
               }
-              const qty = price > 1 ? usd / price : 0.001;
+              if (!price || price <= 0) {
+                await ctx.reply(`⚠️ <b>Cannot determine ${asset} price</b>\n\nOrderbook unavailable. Try again or use /trade.`, { parse_mode: 'HTML' });
+                return true;
+              }
+              const qty = usd / price;
+              if (!qty || qty <= 0 || !isFinite(qty)) {
+                await ctx.reply(`⚠️ Cannot compute quantity for $${usd} ${asset}. Try again.`, { parse_mode: 'HTML' });
+                return true;
+              }
               // 3. Route through showTradeConfirm → uses embedded wallet (same path as button trades)
               //    This ensures orders appear in the user's own portfolio on testnet.sodex.com
               await showTradeConfirm(ctx, asset, side, qty);
