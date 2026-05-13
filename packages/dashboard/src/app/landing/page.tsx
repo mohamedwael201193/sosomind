@@ -349,6 +349,12 @@ export default function LandingPage() {
     ? String(liveTrackRecord.meta.hit_rate) + '%'
     : '\u2014';
 
+  const liveStats = STATS.map(s =>
+    s.label === 'Signal Win Rate' && liveTrackRecord?.meta?.hit_rate != null
+      ? { ...s, to: liveTrackRecord.meta.hit_rate, fmt: `${liveTrackRecord.meta.hit_rate}%` }
+      : s
+  );
+
   return (
     <div data-theme={theme} className="min-h-screen overflow-x-hidden" style={{ background: "var(--bg-base)", color: "var(--text-primary)" }}>
 
@@ -873,7 +879,7 @@ export default function LandingPage() {
             className="text-center text-xs font-bold uppercase tracking-widest mb-10" style={{ color: "var(--text-muted)" }}
           >Platform at a glance</motion.p>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-8 text-center">
-            {STATS.map((s, i) => (
+            {liveStats.map((s, i) => (
               <motion.div key={s.label}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -1630,7 +1636,7 @@ export default function LandingPage() {
             const hits = isLive ? meta!.hits : 68;
             const stops = isLive ? resolved.filter((s) => s.outcome === 'STOP').length : 19;
             const drifts = isLive ? resolved.filter((s) => s.outcome === 'DRIFT').length : 8;
-            const hitRate = isLive && total > 0 ? meta!.hit_rate! : 68;
+            const hitRate = (isLive && total > 0 && meta!.hit_rate != null) ? meta!.hit_rate : 68;
             const stopRate = isLive && total > 0 ? Math.round((stops / total) * 100) : 19;
             const driftRate = isLive && total > 0 ? Math.round((drifts / total) * 100) : 8;
             const pendingRate = isLive ? Math.max(0, 100 - hitRate - stopRate - driftRate) : 5;
