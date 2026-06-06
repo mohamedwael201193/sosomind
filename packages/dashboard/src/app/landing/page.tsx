@@ -22,8 +22,8 @@ import Mistral from "@lobehub/icons/es/Mistral";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const HERO_TAGLINE = "The Agentic Finance OS";
-const HERO_SUB = "Multi-agent AI research, real-time signals, and DEX execution — built for serious crypto traders.";
+const HERO_TAGLINE = "The Trustworthy Agentic Trading Loop";
+const HERO_SUB = "Live SoSoValue intelligence → explainable signals → risk gate → MetaMask-signed SoDEX orders → public HIT/STOP/DRIFT ledger.";
 const NAV_LINKS: { label: string; href: string; external?: boolean }[] = [
   { label: "Features", href: "#features" },
   { label: "Agents",   href: "#agents" },
@@ -35,11 +35,10 @@ const NAV_LINKS: { label: string; href: string; external?: boolean }[] = [
 ];
 
 const STATS = [
-  { to: 2400, suffix: "+",  fmt: "2,400+", label: "Assets Tracked" },
-  { to: 18,   suffix: "K+", fmt: "18K+",   label: "Signals Generated" },
-  { to: 15,   suffix: "",   fmt: "15",     label: "AI Agents" },
-  { to: 13,   suffix: "",   fmt: "13",     label: "Data Sources" },
-  { to: 67,   suffix: "%",  fmt: "67%",    label: "Signal Win Rate" },
+  { to: 35, suffix: "", fmt: "35", label: "SoSoValue API Methods" },
+  { to: 13, suffix: "", fmt: "13", label: "SSI Sectors Scored" },
+  { to: 3, suffix: "", fmt: "3", label: "Hero Surfaces" },
+  { to: 19, suffix: "", fmt: "19", label: "SoDEX MCP Tools" },
 ];
 
 const PARTNERS = [
@@ -546,7 +545,7 @@ export default function LandingPage() {
               className="text-[clamp(1rem,2vw,1.2rem)] mb-10 leading-relaxed max-w-lg"
               style={{ color: "var(--text-secondary)" }}
             >
-              Multi-agent AI research, real-time signals, and DEX execution — built for serious crypto traders.
+              Live SoSoValue intelligence → explainable signals → risk gate → MetaMask-signed SoDEX orders → public outcome ledger.
             </motion.p>
 
             {/* CTA buttons */}
@@ -556,33 +555,21 @@ export default function LandingPage() {
               transition={{ delay: 0.65, duration: 0.5 }}
               className="flex flex-col sm:flex-row gap-3 mb-10"
             >
-              {address ? (
-                <Link href="/dashboard">
-                  <MagneticButton
-                    className="flex items-center gap-2 px-7 py-3.5 rounded-[14px] font-bold text-white text-sm"
-                    style={{ background: "linear-gradient(135deg,#f97316 0%,#ea580c 100%)" }}
-                  >
-                    Open Dashboard <ArrowRight className="w-4 h-4" />
-                  </MagneticButton>
-                </Link>
-              ) : (
+              <Link href="/track-record">
                 <MagneticButton
-                  onClick={connect}
-                  disabled={isConnecting}
-                  className="flex items-center gap-2 px-7 py-3.5 rounded-[14px] font-bold text-white text-sm disabled:opacity-60"
+                  className="flex items-center gap-2 px-7 py-3.5 rounded-[14px] font-bold text-white text-sm"
                   style={{ background: "linear-gradient(135deg,#f97316 0%,#ea580c 100%)" }}
                 >
-                  <Wallet className="w-4 h-4" />
-                  {isConnecting ? "Connecting…" : "Connect Wallet"}
+                  View Track Record <Target className="w-4 h-4" />
                 </MagneticButton>
-              )}
-              <Link href="/research">
+              </Link>
+              <Link href="/trade">
                 <motion.button
                   whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                   className="flex items-center gap-2 px-7 py-3.5 rounded-[14px] font-medium text-sm border transition-colors"
                   style={{ borderColor: "var(--glass-border)", color: "var(--text-primary)", background: "transparent" }}
                 >
-                  Explore Research <ArrowRight className="w-4 h-4" />
+                  Trade on SoDEX <ArrowRight className="w-4 h-4" />
                 </motion.button>
               </Link>
               <a href="https://t.me/SosoMindbot" target="_blank" rel="noopener noreferrer">
