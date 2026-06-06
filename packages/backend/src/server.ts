@@ -39,8 +39,13 @@ import { startResearchLoop } from './agents/orchestrator.js';
 import { startWebSocketServer } from './ws/server.js';
 import { runDailyBriefing, runContentPipeline } from './content/pipeline.js';
 import { runOutcomeEvaluation } from './cron/outcomeEvaluator.js';
+import { assertProductionSecrets } from './utils/startupGuards.js';
+import { loadCircuitBreakerState } from './agents/circuitBreaker.js';
 
 export async function startServer() {
+  assertProductionSecrets();
+  await loadCircuitBreakerState();
+
   const app = express();
   const PORT = Number(process.env.PORT || 10000);
 
