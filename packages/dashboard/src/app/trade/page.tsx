@@ -215,7 +215,7 @@ function TradeInner() {
   type WizardStep = 1 | 2 | 3 | 4;
   type Strategy = 'copy' | 'ssi' | 'manual';
   const [wizardStep, setWizardStep] = useState<WizardStep>(1);
-  const [strategy, setStrategy] = useState<Strategy>('manual');
+  const [strategy, setStrategy] = useState<Strategy>('copy');
   const [executionProof, setExecutionProof] = useState<{
     orderId: string | number;
     status: string;
