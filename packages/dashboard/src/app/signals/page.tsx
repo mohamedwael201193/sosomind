@@ -108,42 +108,34 @@ export default function SignalsPage() {
         </div>
       </motion.div>
 
-      {/* Track Record Banner */}
-      {!trackRecord.isLoading && evaluated > 0 && (
+      {/* Track Record Banner — always visible; links to full ledger */}
+      {!trackRecord.isLoading && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.1 }}
         >
-          <GlassCard animate padding="md" glow={hitRate >= 0.6 ? "green" : hitRate >= 0.4 ? "none" : "red"}>
-            <div className="flex items-center gap-3 flex-wrap">
-              <Target className="w-4 h-4 text-[var(--text-muted)] flex-shrink-0" />
-              <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Signal Track Record</span>
-              <div className="flex items-center gap-6 flex-wrap ml-auto">
-                <div className="text-center">
-                  <motion.div
-                    className={cn("text-xl font-black tabular-nums", hitRate >= 0.6 ? "text-[var(--green)]" : hitRate >= 0.4 ? "text-[var(--yellow)]" : "text-[var(--red)]")}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.3 }}
-                  >
-                    {(hitRate * 100).toFixed(1)}%
-                  </motion.div>
-                  <div className="text-[10px] text-[var(--text-muted)]">Hit Rate</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-xl font-black tabular-nums text-[var(--text-primary)]">{evaluated}</div>
-                  <div className="text-[10px] text-[var(--text-muted)]">Evaluated</div>
-                </div>
-                <div className="text-center">
-                  <div className={cn("text-xl font-black tabular-nums", avgReturn >= 0 ? "text-[var(--green)]" : "text-[var(--red)]")}>
-                    {avgReturn >= 0 ? "+" : ""}{avgReturn.toFixed(2)}%
+          <Link href="/track-record">
+            <GlassCard animate padding="md" glow={evaluated > 0 && hitRate >= 0.6 ? "green" : evaluated > 0 && hitRate >= 0.4 ? "none" : "none"} className="cursor-pointer hover:border-[var(--accent)] transition-colors">
+              <div className="flex items-center gap-3 flex-wrap">
+                <Target className="w-4 h-4 text-[var(--text-muted)] flex-shrink-0" />
+                <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Live Outcome Ledger</span>
+                <div className="flex items-center gap-6 flex-wrap ml-auto">
+                  <div className="text-center">
+                    <div className={cn("text-xl font-black tabular-nums", evaluated > 0 ? (hitRate >= 0.6 ? "text-[var(--green)]" : hitRate >= 0.4 ? "text-[var(--yellow)]" : "text-[var(--red)]") : "text-[var(--text-muted)]")}>
+                      {evaluated > 0 ? `${(hitRate * 100).toFixed(1)}%` : "—"}
+                    </div>
+                    <div className="text-[10px] text-[var(--text-muted)]">Hit Rate</div>
                   </div>
-                  <div className="text-[10px] text-[var(--text-muted)]">Avg Return</div>
+                  <div className="text-center">
+                    <div className="text-xl font-black tabular-nums text-[var(--text-primary)]">{evaluated || "0"}</div>
+                    <div className="text-[10px] text-[var(--text-muted)]">Resolved</div>
+                  </div>
+                  <ExternalLink className="w-4 h-4 text-[var(--accent)]" />
                 </div>
               </div>
-            </div>
-          </GlassCard>
+            </GlassCard>
+          </Link>
         </motion.div>
       )}
 
