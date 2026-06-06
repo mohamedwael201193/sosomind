@@ -2,16 +2,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { LayoutDashboard, Zap, PieChart, Search, Trophy, Waves } from "lucide-react";
+import { LayoutDashboard, Zap, PieChart, Target, CandlestickChart } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
-  { href: "/dashboard", label: "Home", icon: LayoutDashboard },
+  { href: "/track-record", label: "Record", icon: Target },
   { href: "/signals", label: "Signals", icon: Zap },
+  { href: "/trade", label: "Trade", icon: CandlestickChart },
   { href: "/portfolio", label: "Portfolio", icon: PieChart },
-  { href: "/research", label: "Research", icon: Search },
-  { href: "/whales", label: "Whales", icon: Waves },
-  { href: "/leaderboard", label: "Ranks", icon: Trophy },
+  { href: "/dashboard", label: "Home", icon: LayoutDashboard },
 ];
 
 export function MobileNav() {
