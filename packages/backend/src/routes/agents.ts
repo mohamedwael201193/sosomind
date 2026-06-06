@@ -37,49 +37,50 @@ router.get('/seed-signals', asyncHandler(async (req, res) => {
 
 // ─── Signal Track Record (public) ────────────────────────────────────────────
 router.get('/signals/track-record', asyncHandler(async (_req, res) => {
-  // Try to fetch persisted stats from agent_meta first
   const { data: metaRow } = await supabase
     .from('agent_meta')
     .select('value, updated_at')
     .eq('key', 'track_record')
     .maybeSingle();
 
-  // Also pull live aggregate counts for enrichment
   const { data: liveStats } = await supabase
     .from('signals')
     .select('direction, status, outcome')
     .limit(1000);
 
+  const { data: recentResolved } = await supabase
+    .from('signals')
+    .select('id, asset, direction, confidence, entry, take_profit, stop_loss, outcome, outcome_price, outcome_at, created_at, citations')
+    .not('outcome', 'is', null)
+    .order('outcome_at', { ascending: false, nullsFirst: false })
+    .limit(50);
+
   const totalSignals = liveStats?.length ?? 0;
   const activeSignals = liveStats?.filter((s: any) => s.status === 'active').length ?? 0;
+  const hits = liveStats?.filter((s: any) => s.outcome === 'HIT').length ?? 0;
+  const stops = liveStats?.filter((s: any) => s.outcome === 'STOP').length ?? 0;
+  const drifts = liveStats?.filter((s: any) => s.outcome === 'DRIFT').length ?? 0;
+  const decisive = hits + stops;
 
-  if (metaRow?.value) {
-    const stored = metaRow.value as Record<string, any>;
-    return res.json(wrapMeta(
-      { ...stored, total_signals: totalSignals, active_signals: activeSignals },
-      { cachedAt: metaRow.updated_at, ttlMs: 3_600_000, source: 'cache' },
-    ));
-  }
-
-  // No persisted stats yet — return live aggregate placeholder
-  const longSignals = liveStats?.filter((s: any) => s.direction === 'long').length ?? 0;
-  const shortSignals = liveStats?.filter((s: any) => s.direction === 'short').length ?? 0;
+  const base = metaRow?.value ? (metaRow.value as Record<string, any>) : {};
 
   return res.json(wrapMeta(
     {
-      hit_rate: null,
-      evaluated_count: 0,
-      avg_return_pct: null,
-      by_direction: {
-        long: { hits: 0, stops: 0, total: longSignals },
-        short: { hits: 0, stops: 0, total: shortSignals },
-      },
-      by_asset: {},
-      last_updated: null,
+      hit_rate: base.hit_rate ?? (decisive > 0 ? Math.round((hits / decisive) * 1000) / 1000 : null),
+      evaluated_count: base.evaluated_count ?? decisive,
+      avg_return_pct: base.avg_return_pct ?? null,
+      by_direction: base.by_direction ?? {},
+      by_asset: base.by_asset ?? {},
+      last_updated: base.last_updated ?? metaRow?.updated_at ?? null,
       total_signals: totalSignals,
       active_signals: activeSignals,
+      hits,
+      stops,
+      drifts,
+      recent: recentResolved ?? [],
+      measurement_note: 'Outcomes vs live spot (Binance/CoinGecko). Testnet fill PnL may differ.',
     },
-    { ttlMs: 3_600_000, source: 'live' },
+    { cachedAt: metaRow?.updated_at, ttlMs: 3_600_000, source: metaRow?.value ? 'cache' : 'live' },
   ));
 }));
 
