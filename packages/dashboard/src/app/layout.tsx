@@ -4,8 +4,8 @@ import { Providers } from "./providers";
 import { ConditionalLayout } from "@/components/ConditionalLayout";
 
 export const metadata: Metadata = {
-  title: "SoSoMind — The Agentic Finance OS",
-  description: "Multi-agent AI-powered crypto trading intelligence. Real-time signals, DEX execution, and macro research — powered by SoSoValue + SoDEX.",
+  title: "SoSoMind — The Trustworthy Agentic Trading Loop",
+  description: "Live SoSoValue intelligence → explainable signals → risk-gated SoDEX execution → public outcome ledger.",
   icons: {
     icon: "/logo.png",
     apple: "/logo.png",
