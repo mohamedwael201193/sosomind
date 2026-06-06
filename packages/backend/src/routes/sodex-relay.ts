@@ -21,6 +21,8 @@ import rateLimit from 'express-rate-limit';
 import { supabase } from '../db/supabase.js';
 import { requireWallet, AuthedRequest } from '../middleware/requireWallet.js';
 import { asyncHandler } from '../utils/http.js';
+import { assertTradingAllowed, recordTradeResult, estimatePnlPct } from '../agents/circuitBreaker.js';
+import { runRiskAgent } from '../agents/risk.js';
 
 const router = Router();
 
@@ -109,12 +111,30 @@ router.post('/', requireWallet, tradeLimiter, asyncHandler(async (req: AuthedReq
     return res.status(401).json({ error: 'signer_mismatch', expected: req.wallet, recovered: recovered.toLowerCase() });
   }
 
-  // ── 2. Look up user_id from wallet (best-effort; null is fine) ──────────
+  const assetFromMarket = (market ?? '').split('_')[0]?.replace(/^v/i, '').replace(/TEST/i, '') || '';
+  const circuit = assertTradingAllowed(assetFromMarket || undefined);
+  if (!circuit.ok) {
+    return res.status(423).json({ error: 'circuit_breaker', message: circuit.reason });
+  }
+
   let userId: string | null = null;
   try {
     const { data } = await supabase.from('user_profiles').select('id').eq('wallet_address', req.wallet).maybeSingle();
     if (data?.id) userId = data.id as string;
   } catch { /* ignore */ }
+
+  if (side && quantity && price) {
+    const risk = await runRiskAgent({
+      userId: userId ?? undefined,
+      asset: assetFromMarket || 'BTC',
+      side,
+      amount: quantity,
+      price,
+    });
+    if (risk.verdict === 'REJECTED' || risk.verdict === 'HALT') {
+      return res.status(403).json({ error: 'risk_rejected', verdict: risk.verdict, reasons: risk.reasons });
+    }
+  }
 
   // ── 3. Persist the audit row BEFORE submitting (so we have a trail even on failure) ──
   const { data: inserted, error: insErr } = await supabase
@@ -176,6 +196,11 @@ router.post('/', requireWallet, tradeLimiter, asyncHandler(async (req: AuthedReq
         submitted_at: new Date().toISOString(),
       })
       .eq('id', orderRowId);
+  }
+
+  if (ok && side && price && assetFromMarket) {
+    const fillPx = Number(upstream?.data?.avgPrice ?? upstream?.data?.price ?? price);
+    recordTradeResult(assetFromMarket, estimatePnlPct(side, Number(price), fillPx));
   }
 
   return res.status(httpStatus).json({
