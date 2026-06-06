@@ -7,71 +7,88 @@ import { LogoMark } from "@/components/Logo";
 import { useTheme } from "@/context/ThemeContext";
 import { useWallet } from "@/context/WalletContext";
 import {
-  LayoutDashboard, PieChart, Search,
-  Grid3X3, BarChart3, Bell, Settings, ChevronLeft,
-  ChevronRight, Sun, Moon, Zap, Wallet, LogOut, User,
+  LayoutDashboard, PieChart, Search, Grid3X3, BarChart3, Bell, Settings,
+  ChevronLeft, ChevronRight, Sun, Moon, Zap, Wallet, LogOut, User,
   Waves, ArrowLeftRight, BookOpen, Trophy, Scale, UserCircle2,
   CandlestickChart, Activity, Layers, Newspaper, Code2, Map, FlaskConical,
+  Target, ChevronDown, Beaker,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+type NavItem = {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: boolean;
+  labs?: boolean;
+};
+
 type NavSection = {
   label: string;
-  items: { href: string; label: string; icon: React.ComponentType<{ className?: string }>; badge?: boolean; count?: number }[];
+  items: NavItem[];
+  collapsible?: boolean;
 };
 
 const navSections: NavSection[] = [
   {
-    label: "TRADE",
+    label: "PROVE",
     items: [
-      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, count: 1 },
-      { href: "/trade", label: "Trade", icon: CandlestickChart, count: 1 },
-      { href: "/strategies", label: "Strategies", icon: Layers, badge: true, count: 1 },
-      { href: "/signals", label: "Signals", icon: Zap, badge: true, count: 3 },
-      { href: "/portfolio", label: "Portfolio", icon: PieChart, count: 1 },
-      { href: "/rebalance", label: "Rebalance", icon: Scale, count: 1 },
+      { href: "/signals", label: "Signals", icon: Zap, badge: true },
+      { href: "/track-record", label: "Track Record", icon: Target },
+      { href: "/methodology", label: "Methodology", icon: FlaskConical },
+      { href: "/research", label: "Research", icon: Search },
     ],
   },
   {
-    label: "INTELLIGENCE",
+    label: "ACT",
     items: [
-      { href: "/newsletter", label: "Newsletter", icon: Newspaper, badge: true, count: 1 },
-      { href: "/research", label: "Research", icon: Search, count: 1 },
-      { href: "/agents", label: "Macro & AI", icon: BarChart3, count: 1 },
-      { href: "/sectors", label: "Sectors", icon: Grid3X3, count: 1 },
-      { href: "/whales", label: "Whales", icon: Waves, count: 1 },
-      { href: "/arbitrage", label: "Arbitrage", icon: ArrowLeftRight, count: 1 },
+      { href: "/trade", label: "Trade", icon: CandlestickChart },
+      { href: "/sectors", label: "SSI Sectors", icon: Grid3X3 },
     ],
   },
   {
-    label: "TOOLS",
+    label: "MONITOR",
     items: [
-      { href: "/playbook", label: "Playbook", icon: BookOpen, count: 1 },
-      { href: "/leaderboard", label: "Leaderboard", icon: Trophy, count: 1 },
-      { href: "/persona", label: "Persona", icon: UserCircle2, count: 1 },
-      { href: "/alerts", label: "Alerts", icon: Bell, badge: true, count: 2 },
+      { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+      { href: "/portfolio", label: "Portfolio", icon: PieChart },
+      { href: "/agents", label: "Market Regime", icon: BarChart3 },
+    ],
+  },
+  {
+    label: "LABS",
+    collapsible: true,
+    items: [
+      { href: "/strategies", label: "Strategies", icon: Layers, labs: true },
+      { href: "/rebalance", label: "Rebalance", icon: Scale, labs: true },
+      { href: "/newsletter", label: "Newsletter", icon: Newspaper, labs: true },
+      { href: "/whales", label: "Whales", icon: Waves, labs: true },
+      { href: "/arbitrage", label: "Arbitrage", icon: ArrowLeftRight, labs: true },
+      { href: "/playbook", label: "Playbook", icon: BookOpen, labs: true },
+      { href: "/leaderboard", label: "Leaderboard", icon: Trophy, labs: true },
+      { href: "/persona", label: "Persona", icon: UserCircle2, labs: true },
+      { href: "/alerts", label: "Alerts", icon: Bell, labs: true },
     ],
   },
   {
     label: "ACCOUNT",
     items: [
-      { href: "/profile", label: "Profile", icon: User, count: 1 },
-      { href: "/status", label: "System Status", icon: Activity, count: 1 },
-      { href: "/settings", label: "Settings", icon: Settings, count: 1 },
+      { href: "/profile", label: "Profile", icon: User },
+      { href: "/status", label: "System Status", icon: Activity },
+      { href: "/settings", label: "Settings", icon: Settings },
     ],
   },
   {
     label: "RESOURCES",
     items: [
-      { href: "/docs", label: "API Docs", icon: Code2, count: 1 },
-      { href: "/roadmap", label: "Roadmap", icon: Map, count: 1 },
-      { href: "/methodology", label: "Methodology", icon: FlaskConical, count: 1 },
+      { href: "/docs", label: "API Docs", icon: Code2 },
+      { href: "/roadmap", label: "Roadmap", icon: Map },
     ],
   },
 ];
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const [labsOpen, setLabsOpen] = useState(false);
   const pathname = usePathname();
   const { theme, toggle } = useTheme();
   const { address, disconnect } = useWallet();
@@ -87,13 +104,11 @@ export function Sidebar() {
         borderRight: '1px solid var(--glass-border)',
       }}
     >
-      {/* Logo */}
       <div
         className="h-16 flex items-center px-4 border-b"
         style={{ borderColor: 'var(--glass-border)', flexShrink: 0 }}
       >
         <Link href="/landing" className="flex items-center min-w-0 flex-1 gap-0">
-          {/* SVG mark — always visible, scales with collapsed state */}
           <LogoMark size={collapsed ? 30 : 34} />
           <AnimatePresence>
             {!collapsed && (
@@ -119,181 +134,130 @@ export function Sidebar() {
                   className="text-[10px] mt-0.5 whitespace-nowrap"
                   style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', letterSpacing: '0.02em' }}
                 >
-                  Agentic Finance OS
+                  Trustworthy Trading Loop
                 </span>
               </motion.div>
             )}
           </AnimatePresence>
         </Link>
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="ml-auto w-6 h-6 rounded-lg flex items-center justify-center transition-colors flex-shrink-0"
-          style={{ background: 'var(--bg-glass)' }}
-          onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-glass-hover)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-glass)')}
-        >
-          {collapsed ? (
-            <ChevronRight className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
-          ) : (
-            <ChevronLeft className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
-          )}
-        </button>
       </div>
 
-      {/* Sectioned Nav */}
-      <nav className="flex-1 py-3 px-2 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
-        {navSections.map((section) => (
-          <div key={section.label} className="mb-4">
-            <AnimatePresence>
-              {!collapsed && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="px-3 py-1.5 mb-1"
+      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4 scrollbar-thin">
+        {navSections.map((section) => {
+          const isLabs = section.label === "LABS";
+          if (isLabs && !labsOpen && !collapsed) {
+            const labsActive = section.items.some((i) => pathname === i.href || pathname.startsWith(i.href + "/"));
+            return (
+              <div key={section.label}>
+                <button
+                  type="button"
+                  onClick={() => setLabsOpen(true)}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider"
+                  style={{ color: labsActive ? 'var(--accent)' : 'var(--text-muted)' }}
                 >
-                  <span
-                    className="text-[10px] font-bold tracking-[0.14em] uppercase"
-                    style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}
-                  >
+                  <Beaker className="w-3.5 h-3.5" />
+                  Labs (Preview)
+                  <ChevronDown className="w-3 h-3 ml-auto" />
+                </button>
+              </div>
+            );
+          }
+          if (isLabs && collapsed) return null;
+
+          return (
+            <div key={section.label}>
+              {!collapsed && (
+                <div className="flex items-center justify-between px-3 mb-1.5">
+                  <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
                     {section.label}
-                  </span>
-                </motion.div>
+                  </p>
+                  {isLabs && (
+                    <button type="button" onClick={() => setLabsOpen(false)} className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                      hide
+                    </button>
+                  )}
+                </div>
               )}
-            </AnimatePresence>
-            <div className="space-y-0.5">
-              {section.items.map((item) => {
-                const isActive =
-                  pathname === item.href ||
-                  (item.href !== "/" && pathname?.startsWith(item.href + "/"));
-                const Icon = item.icon;
-                return (
-                  <Link key={item.href} href={item.href}>
-                    <motion.div
-                      whileHover={{ x: collapsed ? 0 : 2 }}
-                      className="relative flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-150"
-                      style={{
-                        background: isActive ? 'rgba(249,115,22,0.15)' : 'transparent',
-                        color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
-                      }}
-                      onMouseEnter={e => {
-                        if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
-                      }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.background = isActive ? 'rgba(249,115,22,0.15)' : 'transparent';
-                      }}
-                    >
-                      {/* Active left bar */}
-                      {isActive && (
-                        <motion.div
-                          layoutId="sidebar-active-bar"
-                          className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-full"
-                          style={{ background: 'var(--accent)', boxShadow: '0 0 8px rgba(249,115,22,0.6)' }}
-                          transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-                        />
-                      )}
-                      <span style={{ color: isActive ? 'var(--accent)' : 'var(--text-secondary)', display: 'flex', flexShrink: 0 }}>
-                        <Icon className="w-[18px] h-[18px]" />
-                      </span>
-                      <AnimatePresence>
-                        {!collapsed && (
-                          <motion.span
-                            initial={{ opacity: 0, width: 0 }}
-                            animate={{ opacity: 1, width: "auto" }}
-                            exit={{ opacity: 0, width: 0 }}
-                            transition={{ duration: 0.2 }}
-                            className="text-sm font-medium whitespace-nowrap overflow-hidden flex-1"
-                            style={{ color: isActive ? 'var(--accent)' : 'var(--text-secondary)' }}
-                          >
-                            {item.label}
-                          </motion.span>
+              <ul className="space-y-0.5">
+                {section.items.map((item) => {
+                  const active = pathname === item.href || pathname.startsWith(item.href + "/");
+                  const Icon = item.icon;
+                  return (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        className={cn(
+                          "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
+                          active ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--text-secondary)] hover:bg-[var(--glass-bg)]"
                         )}
-                      </AnimatePresence>
-                      {/* Count badge */}
-                      {!collapsed && item.count !== undefined && (
-                        <span
-                          className="ml-auto text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1"
-                          style={{
-                            background: isActive ? 'rgba(249,115,22,0.25)' : 'rgba(255,255,255,0.06)',
-                            color: isActive ? 'var(--accent)' : 'var(--text-muted)',
-                            fontFamily: 'var(--font-mono)',
-                          }}
-                        >
-                          {item.badge && !isActive ? (
-                            <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--accent)' }} />
-                          ) : (
-                            item.count
-                          )}
-                        </span>
-                      )}
-                    </motion.div>
-                  </Link>
-                );
-              })}
+                        title={collapsed ? item.label : undefined}
+                      >
+                        <Icon className={cn("w-4 h-4 flex-shrink-0", active && "text-[var(--accent)]")} />
+                        {!collapsed && (
+                          <>
+                            <span className="truncate flex-1">{item.label}</span>
+                            {item.labs && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase" style={{ background: 'var(--glass-bg)', color: 'var(--text-muted)' }}>
+                                lab
+                              </span>
+                            )}
+                            {item.badge && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] flex-shrink-0" />
+                            )}
+                          </>
+                        )}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </nav>
 
-      {/* Bottom: Theme + Wallet */}
-      <div
-        className="p-3 space-y-1"
-        style={{ flexShrink: 0, borderTop: '1px solid var(--glass-border)' }}
-      >
-        <button
-          onClick={toggle}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150"
-          style={{ color: 'var(--text-secondary)' }}
-          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-        >
-          {theme === "dark" ? (
-            <Moon className="w-[18px] h-[18px] flex-shrink-0" />
-          ) : (
-            <Sun className="w-[18px] h-[18px] flex-shrink-0" />
-          )}
-          <AnimatePresence>
-            {!collapsed && (
-              <motion.span
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="text-sm whitespace-nowrap"
-              >
-                {theme === "dark" ? "Dark Mode" : "Light Mode"}
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </button>
-
-        {address && (
-          <div className="flex items-center gap-3 px-3 py-2">
-            <Wallet className="w-[18px] h-[18px] flex-shrink-0" style={{ color: 'var(--accent)' }} />
-            <AnimatePresence>
-              {!collapsed && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="flex items-center gap-2 min-w-0"
-                >
-                  <span className="text-xs truncate" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                    {address.slice(0, 6)}...{address.slice(-4)}
-                  </span>
-                  <button
-                    onClick={disconnect}
-                    className="flex-shrink-0 transition-opacity hover:opacity-80"
-                    style={{ color: 'var(--red)' }}
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
+      <div className="border-t p-2 space-y-1" style={{ borderColor: 'var(--glass-border)' }}>
+        {!collapsed && address && (
+          <div className="px-3 py-2 text-[10px] font-mono truncate" style={{ color: 'var(--text-muted)' }}>
+            {address.slice(0, 6)}…{address.slice(-4)}
           </div>
         )}
+        <button
+          type="button"
+          onClick={toggle}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm"
+          style={{ color: 'var(--text-secondary)' }}
+        >
+          {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          {!collapsed && <span>Theme</span>}
+        </button>
+        {address && (
+          <button
+            type="button"
+            onClick={disconnect}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm"
+            style={{ color: 'var(--red)' }}
+          >
+            <LogOut className="w-4 h-4" />
+            {!collapsed && <span>Disconnect</span>}
+          </button>
+        )}
+        {!address && !collapsed && (
+          <Link href="/trade" className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold" style={{ color: 'var(--accent)' }}>
+            <Wallet className="w-4 h-4" />
+            Connect Wallet
+          </Link>
+        )}
+        <button
+          type="button"
+          onClick={() => setCollapsed(!collapsed)}
+          className="w-full flex items-center justify-center py-2 rounded-xl"
+          style={{ color: 'var(--text-muted)' }}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </button>
       </div>
     </motion.aside>
   );
 }
-
