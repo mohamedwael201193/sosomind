@@ -19,7 +19,7 @@ const NAV_SECTIONS: NavSection[] = [
   { id: "ssi",         label: "Sector Intelligence", icon: BarChart2,  subsections: [{ id: "ssi-scoring", label: "Composite Scoring" }, { id: "ssi-sectors", label: "13 Sectors" }, { id: "ssi-basket", label: "Basket Trading" }] },
   { id: "execution",   label: "DEX Execution",       icon: Globe,      subsections: [{ id: "exec-eip712", label: "EIP-712 Signing" }, { id: "exec-orders", label: "Order Types" }, { id: "exec-symbols", label: "Testnet Symbols" }] },
   { id: "telegram",    label: "Telegram Bot",        icon: Bot,        subsections: [{ id: "tg-commands", label: "Commands Reference" }, { id: "tg-wallet", label: "Embedded Wallets" }, { id: "tg-alerts", label: "Anomaly Alerts" }] },
-  { id: "mcp",         label: "MCP Tools",           icon: Package,    subsections: [{ id: "mcp-sosovalue", label: "mcp-sosovalue (35t)" }, { id: "mcp-sodex", label: "mcp-sodex (25t)" }] },
+  { id: "mcp",         label: "MCP Tools",           icon: Package,    subsections: [{ id: "mcp-sosovalue", label: "mcp-sosovalue (35t)" }, { id: "mcp-sodex", label: "mcp-sodex (19t)" }] },
   { id: "openclaw",    label: "OpenClaw Skills",     icon: FileCode   },
   { id: "risk",        label: "Risk Management",     icon: Shield     },
   { id: "websocket",   label: "WebSocket API",       icon: Radio      },
@@ -287,8 +287,22 @@ export default function DocsPage() {
               </div>
               <h1 className="text-4xl font-black mb-4 tracking-tight" style={{ fontFamily: "var(--font-display)", color: "var(--text-primary)" }}>SoSoMind Documentation</h1>
               <p className="text-base leading-relaxed mb-8" style={{ color: "var(--text-secondary)", maxWidth: "60ch" }}>
-                SoSoMind is a production-grade agentic finance OS. Five specialist AI agents coordinate market research, risk assessment, macro analysis, and DEX execution through a unified dashboard and Telegram bot.
+                The Trustworthy Agentic Trading Loop — live SoSoValue data, risk-gated SoDEX testnet execution, public HIT/STOP/DRIFT ledger.
               </p>
+              <SubTitle id="feature-matrix">Live Feature Matrix (Wave 2)</SubTitle>
+              <Table headers={["Feature", "Status", "Surface"]} rows={[
+                ["SoSoValue 35 API methods", "✅ Live", "Backend + MCP"],
+                ["SoDEX testnet relay (MetaMask)", "✅ Live", "Dashboard /trade"],
+                ["Signal outcome ledger", "✅ Live", "/track-record"],
+                ["Research agent + citations", "✅ Live", "/signals/[id]"],
+                ["Risk preflight gate", "✅ Live", "Relay + Telegram tx:"],
+                ["Circuit breaker", "✅ Wired", "agent_meta persistence"],
+                ["Telegram hosted wallet", "✅ Live", "@SosoMindbot (disclosed)"],
+                ["House POST /api/trades", "🔒 Disabled", "Admin key only"],
+                ["Whales / Arb / Persona", "⚠️ Labs", "Preview nav"],
+                ["Mainnet trading", "❌ Roadmap", "Testnet only"],
+                ["Dashboard perps UI", "❌ Not built", "MCP partial"],
+              ]} />
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
                 {[
                   { label: "Dashboard", value: "sosomind.vercel.app", href: "https://sosomind.vercel.app", color: "#f97316", status: "LIVE" as StatusType },
