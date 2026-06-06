@@ -16,6 +16,7 @@ import {
   buildPerpsNewOrderBody,
   type Scope,
 } from './sodex-signing';
+import { getActiveWalletProvider } from './wallet-provider';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:10000';
 
@@ -59,10 +60,9 @@ export interface RelayResult {
 }
 
 async function signTypedDataV4(address: string, typedData: unknown): Promise<string> {
-  const eth = (typeof window !== 'undefined' ? (window as any).ethereum : null);
-  if (!eth) throw new Error('No injected wallet (MetaMask) detected');
+  const eth = getActiveWalletProvider();
+  if (!eth) throw new Error('No wallet connected — open Connect Wallet and choose a provider');
   const json = JSON.stringify(typedData);
-  // Some wallets accept the object directly, others need a string. v4 spec is string.
   return eth.request({ method: 'eth_signTypedData_v4', params: [address, json] });
 }
 
@@ -114,8 +114,8 @@ export async function ensureSoDEXChain(eth: any, targetChainId: number): Promise
 
 export async function signAndSubmit(args: SignAndSubmitArgs): Promise<RelayResult> {
   if (typeof window === 'undefined') throw new Error('signAndSubmit must run in the browser');
-  const eth = (window as any).ethereum;
-  if (!eth) throw new Error('MetaMask not detected');
+  const eth = getActiveWalletProvider();
+  if (!eth) throw new Error('Connect your wallet to trade');
 
   // Confirm wallet & chain
   const accounts: string[] = await eth.request({ method: 'eth_accounts' });

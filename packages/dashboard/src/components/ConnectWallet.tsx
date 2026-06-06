@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { Wallet, LogOut, Link2, Copy, CheckCheck, RefreshCw } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useWallet } from '../context/WalletContext';
 
 function shortAddr(addr: string): string {
@@ -19,12 +19,6 @@ export function ConnectWallet({ variant = 'compact' }: ConnectWalletProps) {
   const [linkCode, setLinkCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [loadingCode, setLoadingCode] = useState(false);
-
-  // Detect MetaMask client-side only to avoid SSR/hydration mismatch
-  const [hasMetaMask, setHasMetaMask] = useState(false);
-  useEffect(() => {
-    setHasMetaMask(!!(window as any).ethereum);
-  }, []);
 
   const handleLinkTelegram = async () => {
     setLoadingCode(true);
@@ -64,7 +58,7 @@ export function ConnectWallet({ variant = 'compact' }: ConnectWalletProps) {
             color: 'var(--green)',
             fontSize: 12,
             fontWeight: 600,
-            cursor: isConnecting ? 'wait' : hasMetaMask ? 'pointer' : 'not-allowed',
+            cursor: isConnecting ? 'wait' : 'pointer',
             letterSpacing: '0.02em',
             transition: 'all 0.15s ease',
             opacity: isConnecting ? 0.7 : 1,
@@ -73,9 +67,9 @@ export function ConnectWallet({ variant = 'compact' }: ConnectWalletProps) {
           <Wallet size={13} />
           {isConnecting ? 'Connecting…' : 'Connect Wallet'}
         </motion.button>
-        {!hasMetaMask && (
+        {!error && (
           <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4, textAlign: 'center' }}>
-            MetaMask required
+            MetaMask · WalletConnect · Coinbase & more
           </div>
         )}
         {error && (

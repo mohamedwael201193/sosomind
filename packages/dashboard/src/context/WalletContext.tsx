@@ -1,14 +1,13 @@
 'use client';
 
 /**
- * WalletContext — MetaMask-based wallet authentication
+ * WalletContext — Reown AppKit multi-wallet auth
  *
  * Flow:
- *  1. connect() → eth_requestAccounts (MetaMask popup)
+ *  1. connect() → AppKit modal (MetaMask, WalletConnect, Coinbase, etc.)
  *  2. GET /api/auth/nonce → server returns message to sign
- *  3. eth_sign (personal_sign) → signature
+ *  3. personal_sign via connected provider
  *  4. POST /api/auth/verify → JWT token + profile
- *  5. Token stored in localStorage('sosomind_token')
  */
 
 import React, {
@@ -16,9 +15,16 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from 'react';
+import { useAppKit, useAppKitAccount, useAppKitProvider, useDisconnect } from '@reown/appkit/react';
+import { BrowserProvider } from 'ethers';
 import { ensureSoDEXChain } from '@/lib/sodex-client';
+import { setActiveWalletProvider } from '@/lib/wallet-provider';
+import { ensureReownAppKit } from '@/lib/reown-config';
+
+ensureReownAppKit();
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:10000';
 const TOKEN_KEY = 'sosomind_token';
@@ -58,12 +64,54 @@ const WalletContext = createContext<WalletContextValue>({
   refreshProfile: async () => {},
 });
 
+async function authenticateWithBackend(
+  addr: string,
+  walletProvider: unknown,
+): Promise<{ token: string; profile: UserProfile }> {
+  setActiveWalletProvider(walletProvider);
+
+  try {
+    await ensureSoDEXChain(walletProvider as any, 138565);
+  } catch (chainErr: any) {
+    console.warn('[WalletContext] chain switch skipped:', chainErr?.message);
+  }
+
+  const nonceRes = await fetch(`${API_URL}/api/auth/nonce`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ address: addr }),
+  });
+  if (!nonceRes.ok) throw new Error('Failed to get nonce from server');
+  const { message } = await nonceRes.json();
+
+  const provider = new BrowserProvider(walletProvider as any);
+  const signer = await provider.getSigner();
+  const signature = await signer.signMessage(message);
+
+  const verifyRes = await fetch(`${API_URL}/api/auth/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ address: addr, signature }),
+  });
+  if (!verifyRes.ok) {
+    const err = await verifyRes.json();
+    throw new Error(err.error || 'Signature verification failed');
+  }
+  return verifyRes.json();
+}
+
 export function WalletProvider({ children }: { children: React.ReactNode }) {
+  const { open } = useAppKit();
+  const { disconnect: appKitDisconnect } = useDisconnect();
+  const { address: appKitAddress, isConnected } = useAppKitAccount();
+  const { walletProvider } = useAppKitProvider('eip155');
+
   const [address, setAddress] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const authInFlight = useRef(false);
 
   // Restore session on mount
   useEffect(() => {
@@ -73,13 +121,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     if (savedToken && savedAddress) {
       setToken(savedToken);
       setAddress(savedAddress);
-      // Validate and refresh profile in background
       fetch(`${API_URL}/api/auth/me`, {
         headers: { Authorization: `Bearer ${savedToken}` },
       })
         .then((r) => {
           if (r.status === 401 || r.status === 403) {
-            // Token expired/invalid — clear session
             localStorage.removeItem(TOKEN_KEY);
             localStorage.removeItem(ADDRESS_KEY);
             setToken(null);
@@ -91,82 +137,64 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         .then((data) => {
           if (data?.profile) setProfile(data.profile);
         })
-        .catch(() => {
-          // Network error — keep session alive, profile stays empty until next poll
-        });
+        .catch(() => {});
     }
   }, []);
+
+  // Sync AppKit connection → JWT auth (when user picks a wallet in the modal)
+  useEffect(() => {
+    if (!isConnected || !appKitAddress || !walletProvider) return;
+
+    const addr = appKitAddress.toLowerCase();
+    const savedToken = localStorage.getItem(TOKEN_KEY);
+    const savedAddress = localStorage.getItem(ADDRESS_KEY)?.toLowerCase();
+
+    if (savedToken && savedAddress === addr) {
+      setAddress(addr);
+      setToken(savedToken);
+      setActiveWalletProvider(walletProvider);
+      setIsConnecting(false);
+      return;
+    }
+
+    if (authInFlight.current) return;
+
+    authInFlight.current = true;
+    setIsConnecting(true);
+    setError(null);
+
+    authenticateWithBackend(addr, walletProvider)
+      .then(({ token: jwt, profile: prof }) => {
+        localStorage.setItem(TOKEN_KEY, jwt);
+        localStorage.setItem(ADDRESS_KEY, addr);
+        setToken(jwt);
+        setAddress(addr);
+        setProfile(prof ?? { wallet_address: addr });
+      })
+      .catch((e: any) => {
+        const msg = e?.message || 'Authentication failed';
+        if (e?.code === 4001 || msg.toLowerCase().includes('user rejected')) {
+          setError('Connection cancelled by user');
+        } else {
+          setError(msg);
+        }
+      })
+      .finally(() => {
+        authInFlight.current = false;
+        setIsConnecting(false);
+      });
+  }, [isConnected, appKitAddress, walletProvider]);
 
   const connect = useCallback(async () => {
     setError(null);
-    if (typeof window === 'undefined' || !(window as any).ethereum) {
-      setError('MetaMask not detected. Please install MetaMask.');
-      return;
-    }
     setIsConnecting(true);
     try {
-      const ethereum = (window as any).ethereum;
-
-      // 1. Request accounts
-      const accounts: string[] = await ethereum.request({ method: 'eth_requestAccounts' });
-      if (!accounts.length) throw new Error('No accounts returned from MetaMask');
-      const addr = accounts[0].toLowerCase();
-
-      // 1b. Auto-switch to ValueChain Testnet (chainId 138565 = 0x21d45)
-      //     RPC: https://testnet.valuechain.xyz — adds the chain if not yet in MetaMask
-      try {
-        await ensureSoDEXChain(ethereum, 138565);
-      } catch (chainErr: any) {
-        // Non-fatal: if user rejects chain switch, continue — they will be
-        // prompted again when they actually try to sign a trade
-        console.warn('[WalletContext] chain switch skipped:', chainErr?.message);
-      }
-
-      // 2. Get nonce message from server
-      const nonceRes = await fetch(`${API_URL}/api/auth/nonce`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address: addr }),
-      });
-      if (!nonceRes.ok) throw new Error('Failed to get nonce from server');
-      const { message } = await nonceRes.json();
-
-      // 3. Sign message (personal_sign)
-      const signature: string = await ethereum.request({
-        method: 'personal_sign',
-        params: [message, addr],
-      });
-
-      // 4. Verify signature, get JWT
-      const verifyRes = await fetch(`${API_URL}/api/auth/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address: addr, signature }),
-      });
-      if (!verifyRes.ok) {
-        const err = await verifyRes.json();
-        throw new Error(err.error || 'Signature verification failed');
-      }
-      const { token: jwt, profile: prof } = await verifyRes.json();
-
-      // 5. Persist
-      localStorage.setItem(TOKEN_KEY, jwt);
-      localStorage.setItem(ADDRESS_KEY, addr);
-      setToken(jwt);
-      setAddress(addr);
-      setProfile(prof ?? { wallet_address: addr });
+      open();
     } catch (e: any) {
-      const msg = e?.message || 'Connection failed';
-      // User rejected (code 4001) — show friendly message
-      if (e?.code === 4001) {
-        setError('Connection cancelled by user');
-      } else {
-        setError(msg);
-      }
-    } finally {
+      setError(e?.message || 'Could not open wallet modal');
       setIsConnecting(false);
     }
-  }, []);
+  }, [open]);
 
   const disconnect = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
@@ -175,7 +203,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setAddress(null);
     setProfile(null);
     setError(null);
-  }, []);
+    setActiveWalletProvider(null);
+    appKitDisconnect();
+  }, [appKitDisconnect]);
 
   const refreshProfile = useCallback(async () => {
     const savedToken = token ?? localStorage.getItem(TOKEN_KEY);
@@ -190,7 +220,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }, [token]);
 
-  // Auto-poll profile every 30s when connected (picks up telegram link from bot)
   useEffect(() => {
     if (!token) return;
     const id = setInterval(refreshProfile, 30_000);
