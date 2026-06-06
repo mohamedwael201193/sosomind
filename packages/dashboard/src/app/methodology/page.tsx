@@ -497,6 +497,40 @@ export default function MethodologyPage() {
       </section>
 
       {/* ── CTA ── */}
+      {/* ── Trust Model (Wave 2) ── */}
+      <section className="mb-14">
+        <SectionHeader
+          label="06 — Trust Model"
+          title="Custody & Audit Paths"
+          sub="Two signing models — both disclosed. Dashboard is non-custodial; Telegram uses hosted encrypted signing."
+        />
+        <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--glass-border)" }}>
+          <table className="w-full text-sm">
+            <thead>
+              <tr style={{ background: "var(--glass-bg)" }}>
+                {["Path", "Custody", "Signing", "Audit"].map((h) => (
+                  <th key={h} className="text-left px-4 py-3 font-bold text-[var(--text-muted)]">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                ["Dashboard relay", "Non-custodial", "MetaMask in browser", "signed_orders table"],
+                ["Telegram bot", "Hosted wallet", "Server decrypt on confirm", "SoDEX order ID + chat log"],
+                ["House API", "Disabled public", "Env operator key only", "Gated by ADMIN_API_KEY"],
+              ].map(([a, b, c, d]) => (
+                <tr key={a} className="border-t" style={{ borderColor: "var(--glass-border)" }}>
+                  <td className="px-4 py-3 font-semibold">{a}</td>
+                  <td className="px-4 py-3 text-[var(--text-secondary)]">{b}</td>
+                  <td className="px-4 py-3 text-[var(--text-secondary)]">{c}</td>
+                  <td className="px-4 py-3 text-[var(--text-secondary)] font-mono text-xs">{d}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -505,30 +539,19 @@ export default function MethodologyPage() {
         className="rounded-2xl px-8 py-8 text-center"
         style={{ background: "rgba(0,255,127,0.04)", border: "1px solid rgba(0,255,127,0.15)" }}
       >
-        <h3
-          className="text-xl font-black mb-2 tracking-tight"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          See it in action
+        <h3 className="text-xl font-black mb-2 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
+          5-minute judge path
         </h3>
         <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>
-          All data is live. No mocks. Every number you see is computed from real SoSoValue and SoDEX API calls.
+          Track Record → Signal audit → Risk preflight → MetaMask sign → Portfolio proof
         </p>
         <div className="flex flex-wrap gap-3 justify-center">
-          <Link
-            href="/sectors"
-            className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-bold transition-opacity hover:opacity-90"
-            style={{ background: "#00ff7f", color: "#030a05" }}
-          >
-            Sector Intelligence
+          <Link href="/track-record" className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-bold" style={{ background: "#00ff7f", color: "#030a05" }}>
+            View Track Record
             <ArrowRight className="w-4 h-4" />
           </Link>
-          <Link
-            href="/signals"
-            className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-bold transition-opacity hover:opacity-90"
-            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--text-primary)" }}
-          >
-            Live Signals
+          <Link href="/trade" className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-bold" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--text-primary)" }}>
+            Trade on SoDEX
           </Link>
         </div>
       </motion.div>
