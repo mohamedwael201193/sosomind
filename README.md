@@ -18,7 +18,7 @@ Multi-agent AI research · Real-time sector intelligence · EIP-712 DEX executio
 
 ## Overview
 
-SoSoMind is an agentic finance intelligence platform that synthesises live market data from 13 sources, runs it through a coordinated system of specialist AI agents, surfaces high-confidence trading signals, and executes orders directly on SoDEX via EIP-712 non-custodial signing — all accessible from a Next.js dashboard, a Telegram bot, or an AI assistant via MCP tools.
+SoSoMind turns live SoSoValue intelligence into risk-checked, user-approved SoDEX trades — with a public HIT/STOP/DRIFT outcome ledger. **Dashboard signing is non-custodial (MetaMask relay).** Telegram uses a **hosted encrypted wallet** with explicit disclosure.
 
 **Current deployment status:** Active testnet (SoDEX Testnet, chainId=138565). Backend live on Render, dashboard live on Vercel. Bot is reachable at [@SosoMindbot](https://t.me/SosoMindbot). **32 spot markets live** — crypto (BTC ETH SOL XRP ADA DOGE LINK AVAX BNB UNI LTC ZEC HYPE SHIB AAVE XAUT USDT SOSO), synthetic stocks (TSLA NVDA META AAPL AMZN GOOGL MSFT), SSI indexes (MAG7ssi MEMEssi DEFIssi USSI).
 
@@ -212,7 +212,7 @@ SoSoMind ships two MCP servers for AI assistant integration (Claude Desktop, Cur
 | Macro | `get_macro_events`, `get_macro_event_history` |
 | Analysis | `get_analysis_charts`, `get_analysis_chart_data` |
 
-### mcp-sodex (25 tools)
+### mcp-sodex (19 tools)
 
 ```json
 {
@@ -338,9 +338,10 @@ ws.onmessage = (e) => console.log(JSON.parse(e.data))
 
 ### Embedded Wallet System
 
-Every user gets a non-custodial EVM wallet created on first `/start`:
-- AES-256-GCM encrypted with `WALLET_ENCRYPT_KEY`
-- EIP-712 non-custodial signing (private key never leaves backend)
+Every Telegram user gets an embedded EVM wallet on first `/start`:
+- AES-256-GCM encrypted with `WALLET_ENCRYPT_KEY` (required in production)
+- **Hosted signing** — server decrypts and signs only after you confirm a trade
+- For **non-custodial** execution, use Dashboard + MetaMask via `/api/sodex/relay`
 - Stores wallet address in `telegram_wallets` Supabase table
 - Reset flow if decrypt fails (user can trigger with confirmation)
 
