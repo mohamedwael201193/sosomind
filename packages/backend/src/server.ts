@@ -85,7 +85,7 @@ export async function startServer() {
       );
       const { data, error } = await sb
         .from('signals')
-        .select('id, asset, direction, confidence, outcome, outcome_price, created_at, outcome_resolved_at')
+        .select('id, asset, direction, confidence, outcome, outcome_price, created_at, outcome_at')
         .not('outcome', 'is', null)
         .order('created_at', { ascending: false })
         .limit(10);

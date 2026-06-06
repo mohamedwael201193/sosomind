@@ -91,13 +91,13 @@ export function Sidebar() {
   const [labsOpen, setLabsOpen] = useState(false);
   const pathname = usePathname();
   const { theme, toggle } = useTheme();
-  const { address, disconnect } = useWallet();
+  const { address, disconnect, connect, isConnecting } = useWallet();
 
   return (
     <motion.aside
       animate={{ width: collapsed ? 68 : 240 }}
       transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-      className="flex flex-col overflow-hidden"
+      className="hidden md:flex flex-col overflow-hidden"
       style={{
         position: "fixed", left: 0, top: 0, height: "100vh", zIndex: 50,
         background: 'var(--bg-sidebar)',
@@ -243,10 +243,16 @@ export function Sidebar() {
           </button>
         )}
         {!address && !collapsed && (
-          <Link href="/trade" className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold" style={{ color: 'var(--accent)' }}>
+          <button
+            type="button"
+            onClick={() => connect()}
+            disabled={isConnecting}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold disabled:opacity-60"
+            style={{ color: 'var(--accent)' }}
+          >
             <Wallet className="w-4 h-4" />
-            Connect Wallet
-          </Link>
+            {isConnecting ? 'Connecting…' : 'Connect Wallet'}
+          </button>
         )}
         <button
           type="button"

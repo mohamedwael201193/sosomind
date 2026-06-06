@@ -23,7 +23,7 @@ export async function generateMetadata({
     const reasoning = ((signal?.reasoning ?? "") as string).slice(0, 155);
     const baseUrl = "https://sosomind.vercel.app";
     const ogUrl = `${baseUrl}/api/og?asset=${encodeURIComponent(asset)}&direction=${encodeURIComponent(dir)}&confidence=${conf}&outcome=${encodeURIComponent(outcome)}`;
-    const title = `${asset} ${dir} Signal â€” ${conf}% Confidence | SoSoMind`;
+    const title = `${asset} ${dir} Signal — ${conf}% Confidence | SoSoMind`;
     const description =
       reasoning ||
       `AI-generated ${dir.toLowerCase()} signal for ${asset} with ${conf}% confidence. Powered by SoSoValue + SoDEX.`;
@@ -46,7 +46,7 @@ export async function generateMetadata({
       },
     };
   } catch {
-    return { title: "Signal â€” SoSoMind" };
+    return { title: "Signal — SoSoMind" };
   }
 }
 

@@ -63,11 +63,13 @@ router.get('/signals/track-record', asyncHandler(async (_req, res) => {
   const decisive = hits + stops;
 
   const base = metaRow?.value ? (metaRow.value as Record<string, any>) : {};
+  const liveHitRate = decisive > 0 ? Math.round((hits / decisive) * 1000) / 1000 : null;
 
   return res.json(wrapMeta(
     {
-      hit_rate: base.hit_rate ?? (decisive > 0 ? Math.round((hits / decisive) * 1000) / 1000 : null),
-      evaluated_count: base.evaluated_count ?? decisive,
+      // Prefer live counts — stale cache may store hit_rate/evaluated_count as 0
+      hit_rate: liveHitRate ?? base.hit_rate ?? null,
+      evaluated_count: decisive > 0 ? decisive : (base.evaluated_count ?? 0),
       avg_return_pct: base.avg_return_pct ?? null,
       by_direction: base.by_direction ?? {},
       by_asset: base.by_asset ?? {},

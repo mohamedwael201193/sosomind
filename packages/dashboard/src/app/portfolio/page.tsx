@@ -27,7 +27,7 @@ function fmt(n: number, dec = 2) {
 }
 
 export default function PortfolioPage() {
-  const { address } = useWallet();
+  const { address, connect, isConnecting } = useWallet();
 
   const balanceQuery = useQuery<any>({
     queryKey: ['sodex', 'user-balance', address],
@@ -104,7 +104,16 @@ export default function PortfolioPage() {
         <div className="card" style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--muted)' }}>
           <Wallet size={32} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>Connect your wallet</div>
-          <div style={{ fontSize: 13 }}>Connect a wallet to see your real SoDEX balances and order history.</div>
+          <div style={{ fontSize: 13, marginBottom: 16 }}>Connect a wallet to see your real SoDEX balances and order history.</div>
+          <button
+            type="button"
+            onClick={() => connect()}
+            disabled={isConnecting}
+            className="px-5 py-2.5 rounded-xl text-sm font-bold disabled:opacity-60"
+            style={{ background: 'var(--accent)', color: '#fff' }}
+          >
+            {isConnecting ? 'Connecting…' : 'Connect MetaMask'}
+          </button>
         </div>
       ) : (
         <>

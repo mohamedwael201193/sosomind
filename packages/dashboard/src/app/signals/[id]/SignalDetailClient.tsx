@@ -126,7 +126,7 @@ export default function SignalDetailClient({ id }: { id: string }) {
       </div>
 
       <PageHeader
-        title={`Signal â€” ${asset || "Loading"}`}
+        title={`Signal — ${asset || "Loading"}`}
         subtitle="AI research signal with full provenance"
       />
 
@@ -199,7 +199,7 @@ export default function SignalDetailClient({ id }: { id: string }) {
                   <div key={label} className="text-center">
                     <div className="text-[11px] mb-1" style={{ color: "var(--text-muted)" }}>{label}</div>
                     <div className="text-base font-black tabular-nums" style={{ color }}>
-                      {val != null ? `$${Number(val).toLocaleString(undefined, { maximumFractionDigits: 2 })}` : "â€”"}
+                      {val != null ? `$${Number(val).toLocaleString(undefined, { maximumFractionDigits: 2 })}` : "—"}
                     </div>
                   </div>
                 ))}
@@ -244,7 +244,7 @@ export default function SignalDetailClient({ id }: { id: string }) {
                       </sup>
                       <span>
                         <span className="font-semibold uppercase tracking-wide text-[10px]">{src.module}</span>
-                        <span className="mx-1">â€”</span>
+                        <span className="mx-1">—</span>
                         <span className="italic">{src.insight}</span>
                       </span>
                     </li>

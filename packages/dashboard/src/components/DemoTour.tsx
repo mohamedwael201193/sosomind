@@ -41,6 +41,11 @@ export function DemoTour() {
     if (pathname === "/landing") return;
     const seen = localStorage.getItem("sosomind-demo-tour-v2");
     if (!seen) {
+      // Skip steps whose target page is already open (e.g. / → /track-record redirect)
+      if (pathname.startsWith("/portfolio")) setStep(3);
+      else if (pathname.startsWith("/trade")) setStep(2);
+      else if (pathname.startsWith("/signals")) setStep(1);
+      else if (pathname.startsWith("/track-record")) setStep(1);
       const t = setTimeout(() => setOpen(true), 1200);
       return () => clearTimeout(t);
     }
