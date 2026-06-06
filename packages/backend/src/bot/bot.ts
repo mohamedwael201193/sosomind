@@ -15,21 +15,24 @@ import { generateRebalanceRecommendation } from '../rebalance/engine';
 import { getStrategies, PRESET_STRATEGIES } from '../strategies/playbook';
 import { formatMevWarning } from '../utils/mev';
 import { getBinanceTicker } from '../clients/market';
+import { assertTradingAllowed, recordTradeResult, estimatePnlPct } from '../agents/circuitBreaker';
+import { runRiskAgent } from '../agents/risk';
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 // Admin chat IDs — used only for privileged commands, not to block regular users
 const ADMIN_IDS = (process.env.TELEGRAM_ALLOWED_CHAT_IDS || process.env.TELEGRAM_ALLOWED_CHAT_ID || '')
   .split(',').map((s) => s.trim()).filter(Boolean);
 
-// ─── Persistent bottom menu keyboard ────────────────────────────────────────
+const CUSTODY_NOTE =
+  `\n\n🔐 <b>Custody:</b> Telegram uses a <b>hosted wallet</b> (AES-256-GCM, server signs when you confirm). ` +
+  `For fully non-custodial signing use the Dashboard + MetaMask: ` +
+  `<a href="https://sosomind.vercel.app/trade">sosomind.vercel.app/trade</a>`;
+
+// ─── Persistent bottom menu keyboard (Wave 2 — 3 hero flows) ─────────────────
 const MAIN_KB = new Keyboard()
-  .text('🔬 Research').text('⚡ Signal').text('💼 Portfolio').row()
-  .text('📊 Briefing').text('🔔 Alerts').text('⚙️ Settings').row()
-  .text('📓 Journal').text('🤝 Subscribe').text('ℹ️ Help').row()
-  .text('🐋 Whales').text('🔄 Arb').text('📡 Funding').row()
-  .text('🏆 Leaderboard').text('🎯 Persona').text('📄 Tax').row()
-  .text('📈 SSI Indexes').text('📰 Newsletter').text('🧠 Intel').row()
-  .text('✖ Hide Menu')
+  .text('🔬 Research').text('💱 Trade').text('📊 Track Record').row()
+  .text('💼 Portfolio').text('📐 Methodology').text('ℹ️ Help').row()
+  .text('🧪 Labs').text('✖ Hide Menu')
   .resized();
 
 // ─── Inline asset picker ─────────────────────────────────────────────────────
@@ -55,33 +58,14 @@ function assetMenu(prefix: string) {
 
 function mainMenuMsg() {
   return (
-    `<b>🧠 SosoMind</b> — AI Crypto Intelligence (17 Unique Features)\n` +
-    `<i>⛓️ Powered by SoSoValue + SoDEX · DeFi-native · AI-driven</i>\n\n` +
-    `<b>📊 Market Intelligence:</b>\n` +
-    `🔬 <b>Research</b> — Deep AI analysis (13+ sources)\n` +
-    `⚡ <b>Signal</b> — Live price + AI signal\n` +
-    `📊 <b>Briefing</b> — ETF/Macro/Sectors daily brief\n` +
-    `🐋 <b>Whales</b> — Smart money: ETF flows, treasuries, VC\n` +
-    `🔄 <b>Arb</b> — Cross-exchange arbitrage scanner\n` +
-    `📡 <b>Funding</b> — Perps funding rate contrarian signals\n` +
-    `🧺 <b>Basket</b> — Top-3 assets for any SSI sector + execute\n` +
-    `📐 <b>Methodology</b> — Signal scoring formula (S1·S2·S3)\n\n` +
-    `<b>� SSI Indexes (SoSoValue Protocol):</b>\n` +
-    `📈 <b>SSI Indexes</b> — Live baskets: MAG7.ssi, DEFI.ssi, MEME.ssi, USSI\n` +
-    `📰 <b>Newsletter</b> — Smart-money daily brief with provenance\n\n` +
-    `<b>💼 Portfolio &amp; Trading:</b>\n` +
-    `💼 <b>Portfolio</b> — Positions, trades &amp; PnL\n` +
-    `🏆 <b>Leaderboard</b> — Top paper traders\n` +
-    `📚 <b>Playbook</b> — Macro event trading strategies\n` +
-    `⚖️ <b>Rebalance</b> — AI portfolio rebalancer\n\n` +
-    `<b>🧠 AI Features:</b>\n` +
-    `🎯 <b>Persona</b> — Set your trader style (quiz)\n` +
-    `📄 <b>Tax</b> — Auto tax report export\n` +
-    `🔔 <b>Alerts</b> — Price alerts &amp; notifications\n` +
-    `📓 <b>Journal</b> — Signal history &amp; accuracy\n\n` +
-    `<b>💬 NLP:</b> Type naturally — <i>"buy $500 BTC"</i>, <i>"show MAG7.ssi"</i>, or <i>"show whale alerts"</i>\n` +
-    `🎙️ <b>Voice:</b> Send a voice message to trade hands-free\n\n` +
-    `💎 <i>Zero mocks · Real APIs · EIP-712 signed trades · SSI on-chain indexes</i>`
+    `<b>🧠 SoSoMind</b> — The Trustworthy Agentic Trading Loop\n` +
+    `<i>SoSoValue intelligence → risk gate → SoDEX testnet → public outcomes</i>\n\n` +
+    `<b>Hero flows (Wave 2):</b>\n` +
+    `🔬 <code>/research BTC</code> — Evidence-backed signal + SoSoValue citations\n` +
+    `💱 <code>/trade BTC</code> — Risk preflight → hosted wallet execution\n` +
+    `📊 <code>/record</code> — HIT / STOP / DRIFT track record (live)\n\n` +
+    `💼 Portfolio · 📐 Methodology · 🧪 <code>/labs</code> for experimental tools` +
+    CUSTODY_NOTE
   );
 }
 
@@ -155,18 +139,10 @@ export function createBot(): Bot | null {
   // ── /start & /help ──────────────────────────────────────────────────────────
   const sendMainMenu = async (ctx: Context) => {
     const kb = new InlineKeyboard()
-      .text('🔬 Research', 'menu:research').text('⚡ Signal', 'menu:signal').row()
-      .text('💼 Portfolio', 'menu:portfolio').text('📊 Briefing', 'briefing:now').row()
-      .text('🐋 Whales', 'whales:refresh').text('🔄 Arb', 'arb:refresh').row()
-      .text('📡 Funding', 'funding:refresh').text('🏆 Leaderboard', 'leaderboard:refresh').row()
-      .text('📚 Playbook', 'playbook:cmd').text('⚖️ Rebalance', 'rebalance:cmd').row()
-      .text('🎯 Persona', 'persona:view').text('📄 Tax Report', 'tax:cmd').row()
-      .text('🔔 Alerts', 'menu:alerts').text('📓 Journal', 'journal:view').row()
-      .text('🤝 Subscribe', 'subscribe:btc,macro,etf').text('⚙️ Settings', 'settings:view').row()
-      .text('📈 SSI Indexes', 'ssi:view').text('📰 Newsletter', 'newsletter:latest').row()
-      .text('🧠 Intel', 'intel:view').text('📊 Track Record', 'track_record:view').row()
-      .text('🧺 Basket', 'basket:menu').text('📐 Methodology', 'methodology:full').row()
-      .text('💎👛 My Wallet', 'menu:wallet');
+      .text('🔬 Research', 'menu:research').text('💱 Trade', 'menu:signal').row()
+      .text('📊 Track Record', 'track_record:view').text('💼 Portfolio', 'menu:portfolio').row()
+      .text('📐 Methodology', 'methodology:full').text('🧪 Labs', 'labs:view').row()
+      .text('💎👛 Wallet', 'menu:wallet');
 
     const text = mainMenuMsg();
     if ((ctx as any).callbackQuery) {
@@ -211,7 +187,8 @@ export function createBot(): Bot | null {
           `━━━━━━━━━━━━━━━━━━━━━\n\n` +
           `📍 <b>Your wallet address:</b>\n` +
           `<code>${embWallet.wallet_address}</code>\n\n` +
-          `This wallet is used to sign all your trades automatically — <i>no MetaMask popup needed during trading.</i>\n\n` +
+          `This wallet is used to sign trades when you confirm — <i>hosted signing (server decrypts on confirm).</i>\n\n` +
+          `<b>For non-custodial signing:</b> use Dashboard + MetaMask at sosomind.vercel.app/trade\n\n` +
           `<b>What to do now:</b>\n` +
           `① Tap <b>📤 Export Private Key</b> below\n` +
           `② Copy the key\n` +
@@ -383,6 +360,11 @@ export function createBot(): Bot | null {
     const asset = (ctx.match || '').toString().trim().toUpperCase();
     if (!asset) return sendSignalMenu(ctx);
     await fetchSignal(ctx, asset);
+  });
+  bot.command('trade', async (ctx) => {
+    const asset = (ctx.match || '').toString().trim().toUpperCase();
+    if (!asset) return sendSignalMenu(ctx);
+    await showTradeConfirm(ctx, asset, 'buy', 0.001);
   });
   bot.hears('⚡ Signal', sendSignalMenu);
   bot.callbackQuery('menu:signal', sendSignalMenu);
@@ -647,10 +629,10 @@ export function createBot(): Bot | null {
       kb.url('🦊 Sign with MetaMask', `${dashboardUrl}/trade/sign?p=${b64}`).row();
     }
 
-    // Execute button — always available (uses embedded wallet or house account)
+    // Execute button — hosted Telegram wallet signing
     const execLabel = embeddedWallet
-      ? `⚡ Execute (Your Wallet)`
-      : `⚙️ Execute (House Account)`;
+      ? `⚡ Confirm (Hosted Wallet)`
+      : `⚙️ Setup Wallet First`;
     kb.text(execLabel, `tx:${market}:${side}:${qty}`).row();
     kb.text('❌ Cancel', 'tx:cancel').text('⬅️ Back', 'menu:signal');
 
@@ -671,6 +653,16 @@ export function createBot(): Bot | null {
       return ctx.answerCallbackQuery();
     }
     const [, market, side, qtyStr] = data.split(':');
+    const assetFromMarket = market.split('_')[0]?.replace(/^v/i, '').replace(/TEST/i, '') || 'BTC';
+    let tradePx = 0;
+    const circuit = assertTradingAllowed(assetFromMarket);
+    if (!circuit.ok) {
+      await ctx.editMessageText(
+        `⛔ <b>Circuit Breaker Active</b>\n\n${circuit.reason}\n\n<i>Trading paused to protect capital.</i>`,
+        { parse_mode: 'HTML', reply_markup: new InlineKeyboard().text('⬅️ Back', 'menu:main') }
+      );
+      return ctx.answerCallbackQuery();
+    }
     await ctx.answerCallbackQuery({ text: '⛓️ Signing & submitting…' });
     await ctx.editMessageText(
       `⏳ <b>Executing Trade…</b>\n\n🔐 Signing EIP-712…\n📡 Sending to SoDEX…`,
@@ -894,6 +886,22 @@ export function createBot(): Bot | null {
 
           console.log(`[Bot] Placing order: market=${market} symbolID=${symbolID} accountID=${accountID} side=${side} qty=${qtyFormatted} price=${limitPriceStr}`);
 
+          const px = parseFloat(limitPriceStr);
+          tradePx = px;
+          const risk = await runRiskAgent({
+            asset: assetFromMarket,
+            side: side as 'buy' | 'sell',
+            amount: parseFloat(qtyFormatted),
+            price: px,
+          });
+          if (risk.verdict === 'REJECTED' || risk.verdict === 'HALT') {
+            await ctx.editMessageText(
+              `🛑 <b>Risk Gate: ${risk.verdict}</b>\n\n${risk.reasons.join('\n')}`,
+              { parse_mode: 'HTML', reply_markup: new InlineKeyboard().text('⬅️ Back', 'menu:main') }
+            );
+            return;
+          }
+
           sodexResult = await userClient.placeSpotOrder({
             accountID,
             symbolID,
@@ -941,6 +949,9 @@ export function createBot(): Bot | null {
         throw new Error(_orderErr);
       }
       try { orderId = String(_first.orderID ?? _first.clOrdID ?? _first.id ?? 'pending'); } catch { /* keep 'pending' */ }
+      if (tradePx > 0) {
+        recordTradeResult(assetFromMarket, estimatePnlPct(side as 'buy' | 'sell', tradePx, tradePx));
+      }
       const text =
         `✅ <b>Order Submitted</b>\n\n` +
         `🪙 Market: <b>${market}</b>\n` +
@@ -3115,12 +3126,15 @@ export function createBot(): Bot | null {
       const avgReturn = Number(d.avg_return_pct ?? 0);
       const total = Number(d.total_signals ?? 0);
       const active = Number(d.active_signals ?? 0);
-      const hitPct = (hitRate * 100).toFixed(1);
-      const perfIcon = hitRate >= 0.6 ? '🟢' : hitRate >= 0.4 ? '🟡' : '🔴';
+      const hits = Number(d.hits ?? 0);
+      const stops = Number(d.stops ?? 0);
+      const drifts = Number(d.drifts ?? 0);
+      const hitPct = hitRate != null ? (Number(hitRate) * 100).toFixed(1) : '—';
+      const perfIcon = hitRate != null && hitRate >= 0.6 ? '🟢' : hitRate != null && hitRate >= 0.4 ? '🟡' : '🔴';
       const lines = [
         `📊 <b>Signal Track Record</b>\n`,
         `${perfIcon} Hit Rate: <b>${hitPct}%</b>`,
-        `✅ Evaluated: <b>${evaluated}</b> signals`,
+        `✅ HIT: <b>${hits}</b> · 🛑 STOP: <b>${stops}</b> · 〰️ DRIFT: <b>${drifts}</b>`,
         `📈 Avg Return: <b>${avgReturn >= 0 ? '+' : ''}${avgReturn.toFixed(2)}%</b>`,
         `📋 Total Signals: <b>${total}</b> (${active} active)\n`,
       ];
@@ -3133,9 +3147,10 @@ export function createBot(): Bot | null {
         }
         lines.push('');
       }
-      lines.push(`<i>⛓️ Powered by SosoMind outcome evaluator · Auto-updates hourly</i>`);
+      lines.push(`<i>⛓️ Live data · Outcomes vs spot prices · <a href="https://sosomind.vercel.app/track-record">Web track record</a></i>`);
       const kb = new InlineKeyboard()
-        .text('🔄 Refresh', 'track_record:refresh').text('📓 View Signals', 'journal:view').row()
+        .url('🌐 Full Ledger', 'https://sosomind.vercel.app/track-record').row()
+        .text('🔄 Refresh', 'track_record:refresh').text('📓 Signals', 'journal:view').row()
         .text('⬅️ Back', 'menu:main');
       const text = lines.join('\n');
       if ((ctx as any).callbackQuery) {
@@ -3151,9 +3166,35 @@ export function createBot(): Bot | null {
   };
 
   bot.command('track_record', sendTrackRecord);
+  bot.command('record', sendTrackRecord);
   bot.callbackQuery('track_record:refresh', sendTrackRecord);
   bot.callbackQuery('track_record:view', sendTrackRecord);
   bot.hears(/\b(track record|hit rate|signal accuracy|win rate)\b/i, sendTrackRecord);
+  bot.hears('📊 Track Record', sendTrackRecord);
+  bot.hears('💱 Trade', sendSignalMenu);
+  bot.hears('🧪 Labs', async (ctx) => {
+    await ctx.reply(
+      `🧪 <b>Labs</b> — experimental tools (not part of the core demo loop):\n` +
+      `Whales · Arb · Funding · Persona · Tax · Voice · Paper · Newsletter · SSI baskets\n\n` +
+      `<i>Type naturally or use legacy menu callbacks from /help.</i>`,
+      { parse_mode: 'HTML' }
+    );
+  });
+
+  bot.callbackQuery('labs:view', async (ctx) => {
+    await ctx.answerCallbackQuery();
+    await ctx.editMessageText(
+      `🧪 <b>Labs</b>\n\n` +
+      `🐋 Whales · 🔄 Arb · 📡 Funding · 🏆 Leaderboard\n` +
+      `🎯 Persona · 📄 Tax · 🎙️ Voice · 📰 Newsletter · 🧺 Basket`,
+      {
+        parse_mode: 'HTML',
+        reply_markup: new InlineKeyboard()
+          .text('🐋 Whales', 'whales:refresh').text('🔄 Arb', 'arb:refresh').row()
+          .text('⬅️ Back', 'menu:main'),
+      }
+    );
+  });
 
   // ── Error handler ─────────────────────────────────────────────────────────────
   bot.catch((err) => {
