@@ -2,7 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:10001";
+function resolveWsUrl(): string {
+  if (process.env.NEXT_PUBLIC_WS_URL) return process.env.NEXT_PUBLIC_WS_URL;
+  const api = process.env.NEXT_PUBLIC_API_URL || "";
+  if (api.includes("onrender.com")) {
+    return api.replace(/^http/, "ws").replace(/\/$/, "") + ":10001";
+  }
+  return "ws://localhost:10001";
+}
+
+const WS_URL = resolveWsUrl();
 
 interface WSMessage {
   channel: string;

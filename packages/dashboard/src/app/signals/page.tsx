@@ -9,6 +9,7 @@ import { TrendingUp, TrendingDown, Minus, Zap, Filter, Target, CheckCircle2, XCi
 import { CryptoIcon } from "@/components/CryptoIcon";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { formatUsdPrice } from "@/lib/format-price";
 
 type Filter = "all" | "long" | "short" | "high-conf";
 
@@ -293,19 +294,19 @@ export default function SignalsPage() {
                             {entryPx && (
                               <div>
                                 <span className="text-[var(--text-muted)] block mb-0.5">Entry</span>
-                                <span className="font-mono font-semibold text-[var(--text-secondary)]">${Number(entryPx).toLocaleString()}</span>
+                                <span className="font-mono font-semibold text-[var(--text-secondary)]">{formatUsdPrice(Number(entryPx))}</span>
                               </div>
                             )}
                             {tp && (
                               <div>
                                 <span className="text-[var(--text-muted)] block mb-0.5">Take Profit</span>
-                                <span className="font-mono font-semibold text-[var(--green)]">${Number(tp).toLocaleString()}</span>
+                                <span className="font-mono font-semibold text-[var(--green)]">{formatUsdPrice(Number(tp))}</span>
                               </div>
                             )}
                             {sl && (
                               <div>
                                 <span className="text-[var(--text-muted)] block mb-0.5">Stop Loss</span>
-                                <span className="font-mono font-semibold text-[var(--red)]">${Number(sl).toLocaleString()}</span>
+                                <span className="font-mono font-semibold text-[var(--red)]">{formatUsdPrice(Number(sl))}</span>
                               </div>
                             )}
                           </div>

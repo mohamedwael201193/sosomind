@@ -6,6 +6,7 @@ import { GlassCard } from "@/components/GlassCard";
 import { CryptoIcon } from "@/components/CryptoIcon";
 import { PageHeader } from "@/components/LoadingSkeleton";
 import { cn } from "@/lib/utils";
+import { formatUsdPrice } from "@/lib/format-price";
 import {
   TrendingUp, TrendingDown, Minus, ArrowLeft,
   ShieldCheck, BookOpen, ExternalLink, Clock,
@@ -199,7 +200,7 @@ export default function SignalDetailClient({ id }: { id: string }) {
                   <div key={label} className="text-center">
                     <div className="text-[11px] mb-1" style={{ color: "var(--text-muted)" }}>{label}</div>
                     <div className="text-base font-black tabular-nums" style={{ color }}>
-                      {val != null ? `$${Number(val).toLocaleString(undefined, { maximumFractionDigits: 2 })}` : "—"}
+                      {val != null ? formatUsdPrice(Number(val)) : "—"}
                     </div>
                   </div>
                 ))}

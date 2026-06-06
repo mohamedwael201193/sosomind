@@ -12,7 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export default function ProfilePage() {
-  const { address, profile, disconnect, generateLinkCode } = useWallet();
+  const { address, profile, disconnect, generateLinkCode, connect, isConnecting } = useWallet();
   const [copied, setCopied] = useState(false);
   const [linkCode, setLinkCode] = useState<string | null>(null);
   const [generatingCode, setGeneratingCode] = useState(false);
@@ -119,7 +119,16 @@ export default function ProfilePage() {
           <User className="w-8 h-8 text-[var(--blue)]" />
         </div>
         <h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Not connected</h2>
-        <p className="text-sm text-[var(--text-muted)]">Connect your wallet to view your profile</p>
+        <p className="text-sm text-[var(--text-muted)] mb-4">Connect your wallet to view your profile</p>
+        <button
+          type="button"
+          onClick={() => connect()}
+          disabled={isConnecting}
+          className="px-5 py-2.5 rounded-xl text-sm font-bold disabled:opacity-60"
+          style={{ background: 'var(--accent)', color: '#fff' }}
+        >
+          {isConnecting ? 'Connecting…' : 'Connect Wallet'}
+        </button>
       </div>
     );
   }

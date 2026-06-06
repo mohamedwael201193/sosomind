@@ -10,6 +10,7 @@ import {
   CheckCircle2, XCircle, Clock, ExternalLink, Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatUsdPrice } from "@/lib/format-price";
 
 interface ResolvedSignal {
   id: string;
@@ -88,6 +89,10 @@ export default function TrackRecordPage() {
           <Info className="w-4 h-4 flex-shrink-0 mt-0.5 text-[var(--accent)]" />
           <p className="text-xs leading-relaxed text-[var(--text-secondary)]">
             Outcomes are measured against live spot prices (Binance/CoinGecko). SoDEX testnet fill PnL may differ.
+            <strong className="text-[var(--text-primary)]"> HIT</strong> = TP reached ·
+            <strong className="text-[var(--text-primary)]"> STOP</strong> = SL hit ·
+            <strong className="text-[var(--text-primary)]"> DRIFT</strong> = neither within 72h (not a loss).
+            Hit rate = HIT ÷ (HIT + STOP) only — DRIFT excluded.
             This is a buildathon proof artifact — not financial advice.{" "}
             <Link href="/methodology" className="underline text-[var(--accent)]">Methodology →</Link>
           </p>
@@ -175,7 +180,7 @@ export default function TrackRecordPage() {
                             <OutcomeBadge outcome={sig.outcome} />
                           </div>
                           <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                            Entry ${Number(sig.entry ?? 0).toLocaleString()} · TP ${Number(sig.take_profit ?? 0).toLocaleString()} · SL ${Number(sig.stop_loss ?? 0).toLocaleString()}
+                            Entry {formatUsdPrice(sig.entry)} · TP {formatUsdPrice(sig.take_profit)} · SL {formatUsdPrice(sig.stop_loss)}
                           </p>
                         </div>
                         <div className="text-right text-xs text-[var(--text-muted)]">

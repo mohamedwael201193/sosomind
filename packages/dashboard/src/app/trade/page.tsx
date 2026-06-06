@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { CryptoIcon } from '@/components/CryptoIcon';
 
-// ─── helpers ─────────────────────────────────────────────────────────────────
+const MIN_NOTIONAL_USDC = 5;
 
 /** Strip testnet `v` prefix for display. */
 function dc(coin: string): string {
@@ -360,8 +360,9 @@ function TradeInner() {
   }, [balanceQuery.data, activeSymbol]);
 
   const qtyNum = Number(quantity);
+  const lastPx = Number(activeTicker?.lastPx ?? 0);
   const priceNum = orderType === 'market'
-    ? (side === 'buy' ? bestAsk : bestBid)
+    ? (side === 'buy' ? (bestAsk || bestBid || lastPx) : (bestBid || bestAsk || lastPx))
     : Number(price);
   const estCost = qtyNum && priceNum ? qtyNum * priceNum : 0;
   const changePct = activeTicker?.changePct ?? 0;
@@ -406,8 +407,10 @@ function TradeInner() {
     if (!activeSymbol || !strategy || autoFilledStrategyRef.current === strategy) return;
     if (strategy === 'copy' && copySignalData && usdcBalance > 0 && bestAsk > 0) {
       const confPct = Math.min(0.25, Math.max(0.05, ((copySignalData.confidence as number) || 50) / 400));
-      const entryPx = Number(copySignalData.entry) > 0 ? Number(copySignalData.entry) : bestAsk;
-      const autoQty = (usdcBalance * confPct) / entryPx;
+      const entryPx = Number(copySignalData.entry) > 0 ? Number(copySignalData.entry) : bestAsk || lastPx;
+      const confQty = (usdcBalance * confPct) / entryPx;
+      const minQty = entryPx > 0 ? (MIN_NOTIONAL_USDC / entryPx) * 1.02 : 0;
+      const autoQty = Math.max(confQty, minQty);
       if (autoQty > 0) {
         setQuantity(autoQty.toFixed(activeSymbol.quantityPrecision ?? 4));
         autoFilledStrategyRef.current = strategy;
@@ -419,7 +422,7 @@ function TradeInner() {
         autoFilledStrategyRef.current = strategy;
       }
     }
-  }, [strategy, copySignalData, ssiBasketData, activeSymbol, usdcBalance, bestAsk]);
+  }, [strategy, copySignalData, ssiBasketData, activeSymbol, usdcBalance, bestAsk, lastPx]);
 
   // Reset auto-fill flag and proxy when user switches strategy
   useEffect(() => {
@@ -532,6 +535,15 @@ function TradeInner() {
       : (bestBid > 0 ? bestBid : bestAsk);
     if (orderType === 'market' && !marketPrice) {
       setResult({ ok: false, message: 'No orderbook price available — try limit order' });
+      return;
+    }
+    const effectivePx = orderType === 'limit' ? Number(price) : marketPrice;
+    const notional = qtyNum * effectivePx;
+    if (notional < MIN_NOTIONAL_USDC) {
+      setResult({
+        ok: false,
+        message: `Minimum order is $${MIN_NOTIONAL_USDC} USDC (yours ≈ $${notional.toFixed(2)}). Increase quantity or use 25%+ sizing.`,
+      });
       return;
     }
     // Pre-flight: block cancel-only assets before MetaMask signature prompt

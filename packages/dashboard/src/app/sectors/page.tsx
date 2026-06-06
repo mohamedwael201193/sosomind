@@ -128,14 +128,18 @@ export default function SectorsPage() {
 
   const normalized = list.map((s: any) => ({
     ...s,
+    momentum: Number(s.momentum ?? 50),
     pct: (() => {
       const raw = Number(s.change_pct_24h ?? s.change_24h ?? 0);
-      return Math.abs(raw) < 1 ? raw * 100 : raw;
+      return Math.abs(raw) < 1 && raw !== 0 ? raw * 100 : raw;
     })(),
   })).sort((a, b) => b.pct - a.pct);
 
-  const gainers = normalized.filter(s => s.pct > 0);
-  const losers = normalized.filter(s => s.pct <= 0);
+  const allFlat24h = normalized.length > 0 && normalized.every((s) => s.pct === 0);
+  const byMomentum = [...normalized].sort((a, b) => b.momentum - a.momentum);
+
+  const gainers = allFlat24h ? byMomentum.filter(s => s.momentum >= 50) : normalized.filter(s => s.pct > 0);
+  const losers = allFlat24h ? byMomentum.filter(s => s.momentum < 50) : normalized.filter(s => s.pct <= 0);
 
   const intelList: any[] = (() => {
     const d = intel.data;
@@ -180,9 +184,23 @@ export default function SectorsPage() {
             {/* Summary stats */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 20 }}>
               {[
-                { label: 'Top Gainer', val: gainers[0]?.name ?? '—', sub: gainers[0] ? `+${gainers[0].pct.toFixed(1)}%` : '', color: 'var(--green)' },
+                {
+                  label: allFlat24h ? 'Top Momentum' : 'Top Gainer',
+                  val: (allFlat24h ? byMomentum[0] : gainers[0])?.name ?? '—',
+                  sub: allFlat24h
+                    ? (byMomentum[0] ? `Score ${byMomentum[0].momentum}/100` : '')
+                    : (gainers[0] ? `+${gainers[0].pct.toFixed(1)}%` : ''),
+                  color: 'var(--green)',
+                },
                 { label: 'Sectors Tracked', val: String(normalized.length), sub: `${gainers.length} up · ${losers.length} down`, color: 'var(--blue)' },
-                { label: 'Biggest Laggard', val: losers[losers.length - 1]?.name ?? '—', sub: losers.length ? `${losers[losers.length - 1].pct.toFixed(1)}%` : '', color: 'var(--red)' },
+                {
+                  label: allFlat24h ? 'Lowest Momentum' : 'Biggest Laggard',
+                  val: (allFlat24h ? byMomentum[byMomentum.length - 1] : losers[losers.length - 1])?.name ?? '—',
+                  sub: allFlat24h
+                    ? (byMomentum.length ? `Score ${byMomentum[byMomentum.length - 1].momentum}/100` : '')
+                    : (losers.length ? `${losers[losers.length - 1].pct.toFixed(1)}%` : ''),
+                  color: 'var(--red)',
+                },
               ].map((c, i) => (
                 <motion.div key={i} className="card" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }} style={{ padding: '16px 20px' }}>
                   <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>{c.label}</div>
@@ -194,7 +212,14 @@ export default function SectorsPage() {
 
             {/* Heatmap grid */}
             <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} style={{ marginBottom: 22 }}>
-              <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>24h Momentum Heatmap</h3>
+              <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>
+                {allFlat24h ? 'SSI Momentum Heatmap' : '24h Momentum Heatmap'}
+              </h3>
+              {allFlat24h && (
+                <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
+                  24h price feed flat from SoSoValue — showing composite SSI momentum scores (0–100).
+                </p>
+              )}
               {sectors.isLoading ? (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
                   {Array.from({ length: 8 }).map((_, i) => <div key={i} className="skeleton" style={{ height: 90, borderRadius: 12 }} />)}
@@ -206,8 +231,9 @@ export default function SectorsPage() {
                 </div>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-                  {normalized.map((s: any, i: number) => {
-                    const { bg, border, text } = colorForChange(s.pct);
+                  {(allFlat24h ? byMomentum : normalized).map((s: any, i: number) => {
+                    const heatVal = allFlat24h ? s.momentum - 50 : s.pct;
+                    const { bg, border, text } = colorForChange(heatVal);
                     const SectorIcon = SECTOR_ICON_MAP[s.name] ?? TrendingUp;
                     return (
                       <motion.div
@@ -220,7 +246,9 @@ export default function SectorsPage() {
                       >
                         <div style={{ marginBottom: 6 }}><SectorIcon size={22} style={{ color: text }} /></div>
                         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 4, lineHeight: 1.2 }}>{s.name ?? `Sector ${i + 1}`}</div>
-                        <div style={{ fontSize: 20, fontWeight: 800, color: text, fontFamily: "'JetBrains Mono'" }}>{s.pct >= 0 ? '+' : ''}{s.pct.toFixed(1)}%</div>
+                        <div style={{ fontSize: 20, fontWeight: 800, color: text, fontFamily: "'JetBrains Mono'" }}>
+                          {allFlat24h ? `${s.momentum}/100` : `${s.pct >= 0 ? '+' : ''}${s.pct.toFixed(1)}%`}
+                        </div>
                         {s.market_cap_usd != null && (
                           <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4 }}>MCap ${(Number(s.market_cap_usd) / 1e9).toFixed(1)}B</div>
                         )}
