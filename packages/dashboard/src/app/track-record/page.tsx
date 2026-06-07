@@ -130,6 +130,34 @@ export default function TrackRecordPage() {
             ))}
           </div>
 
+          {/* Outcome distribution */}
+          {evaluated > 0 && (
+            <GlassCard padding="md" className="mb-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-3">Outcome mix (resolved)</p>
+              <div className="flex h-3 rounded-full overflow-hidden">
+                {[
+                  { n: hits, color: 'var(--green)' },
+                  { n: stops, color: 'var(--red)' },
+                  { n: drifts, color: 'var(--orange)' },
+                ].map(({ n, color }, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      width: `${(n / Math.max(hits + stops + drifts, 1)) * 100}%`,
+                      background: color,
+                      minWidth: n > 0 ? 4 : 0,
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="flex gap-4 mt-2 text-[10px] text-[var(--text-muted)]">
+                <span><span className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: 'var(--green)' }} />HIT {hits}</span>
+                <span><span className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: 'var(--red)' }} />STOP {stops}</span>
+                <span><span className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: 'var(--orange)' }} />DRIFT {drifts}</span>
+              </div>
+            </GlassCard>
+          )}
+
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-[var(--text-primary)]">
               Resolved Signals ({recent.length})

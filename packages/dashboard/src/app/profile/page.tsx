@@ -10,6 +10,7 @@ import {
   Clock, FileText, Download, BarChart2, RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SetupProgress } from "@/components/SetupProgress";
 
 export default function ProfilePage() {
   const { address, profile, disconnect, generateLinkCode, connect, isConnecting } = useWallet();
@@ -147,6 +148,8 @@ export default function ProfilePage() {
         <h1 className="text-2xl font-black text-[var(--text-primary)] mb-1">Profile</h1>
         <p className="text-sm text-[var(--text-muted)]">Manage your account and integrations</p>
       </motion.div>
+
+      <SetupProgress variant="card" />
 
       {/* Avatar + Identity Card */}
       <GlassCard animate padding="lg">

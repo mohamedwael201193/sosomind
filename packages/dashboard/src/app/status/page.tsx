@@ -75,6 +75,17 @@ export default function StatusPage() {
   });
 
   const overallCfg = STATUS_CONFIG[(data?.status ?? "degraded") as keyof typeof STATUS_CONFIG];
+  const serviceEntries = data ? Object.entries(data.services) : [];
+  const criticalDown = serviceEntries.filter(([k, s]) =>
+    (k === 'sodex' || k === 'backend' || k === 'websocket') && s.status === 'down',
+  );
+  const aggregateLabel = !data
+    ? 'Checking…'
+    : criticalDown.length > 0
+      ? 'Unhealthy — trading may be blocked'
+      : data.status === 'degraded'
+        ? 'Degraded — some services limited'
+        : 'All core systems operational';
 
   return (
     <div className="space-y-6">
@@ -107,7 +118,7 @@ export default function StatusPage() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-lg font-bold text-[var(--text-primary)]">
-                {isLoading ? "Checking status…" : `All Systems ${overallCfg?.label}`}
+                {isLoading ? "Checking status…" : aggregateLabel}
               </div>
               <div className="text-sm text-[var(--text-muted)]">
                 {data ? (

@@ -98,7 +98,28 @@ export default function PortfolioPage() {
 
   return (
     <div>
-      <PageHeader title="Portfolio" subtitle="Real-time wallet balances and trade history from SoDEX" />
+      <PageHeader title="Portfolio" subtitle="Real-time wallet balances and trade history from SoDEX testnet" />
+
+      {address && (
+        <div className="flex flex-wrap gap-3 mb-4">
+          <a
+            href={`https://testnet.sodex.com/portfolio${address ? `?address=${address}` : ''}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-lg border"
+            style={{ borderColor: 'var(--glass-border)', color: 'var(--accent)' }}
+          >
+            Verify on SoDEX <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        </div>
+      )}
+
+      {address && usdcBal > 0 && nonStable.length === 0 && (
+        <div className="card mb-4 text-sm" style={{ borderColor: 'var(--accent-border)', color: 'var(--text-secondary)' }}>
+          You have USDC in Spot. Place a trade from{' '}
+          <a href="/trade" className="font-semibold" style={{ color: 'var(--accent)' }}>Trade</a> to complete the proof loop.
+        </div>
+      )}
 
       {!address ? (
         <div className="card" style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--muted)' }}>

@@ -223,6 +223,40 @@ export default function MethodologyPage() {
         </div>
       </motion.div>
 
+      {/* Trust model */}
+      <section className="mb-14">
+        <SectionHeader
+          label="00 — Trust Model"
+          title="Custody & Signing Paths"
+          sub="Honest disclosure for judges — dashboard relay is non-custodial; Telegram uses hosted signing on server decrypt."
+        />
+        <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--glass-border)" }}>
+          <table className="w-full text-sm">
+            <thead>
+              <tr style={{ background: "var(--glass-bg)" }}>
+                {["Path", "Custody", "Signing", "Audit"].map((h) => (
+                  <th key={h} className="text-left px-4 py-3 text-[10px] uppercase tracking-wider font-bold" style={{ color: "var(--text-muted)" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                ["Dashboard relay", "Non-custodial", "MetaMask EIP-712", "signed_orders"],
+                ["Telegram bot", "Hosted", "Server decrypt on confirm", "Chat log + order ID"],
+                ["MCP / API house", "Operator", "Env SODEX_PRIVATE_KEY", "Disabled in public deploy"],
+              ].map(([path, custody, signing, audit]) => (
+                <tr key={path} className="border-t" style={{ borderColor: "var(--glass-border)" }}>
+                  <td className="px-4 py-3 font-semibold" style={{ color: "var(--text-primary)" }}>{path}</td>
+                  <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>{custody}</td>
+                  <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--text-muted)" }}>{signing}</td>
+                  <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--text-muted)" }}>{audit}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       {/* ── Section 1: Sector Intelligence ── */}
       <section className="mb-14">
         <SectionHeader

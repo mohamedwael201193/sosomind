@@ -7,6 +7,7 @@ import { GlassCard } from "@/components/GlassCard";
 import { CacheBadge } from "@/components/CacheBadge";
 import { CryptoIcon } from "@/components/CryptoIcon";
 import { ArrowUpRight, ArrowDownRight, Sparkles, Layers, ShieldCheck, TrendingUp, Brain, Activity } from "lucide-react";
+import { LabsPreviewBanner } from "@/components/LabsPreviewBanner";
 
 interface SSIProduct {
   ticker: string;
@@ -215,6 +216,7 @@ export default function StrategiesPage() {
 
   return (
     <div className="min-h-screen px-6 lg:px-10 py-8" style={{ background: 'var(--bg-base)' }}>
+      <LabsPreviewBanner feature="Strategies & SSI products" />
       {/* Hero */}
       <motion.div
         initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}

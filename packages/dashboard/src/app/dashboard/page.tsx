@@ -13,8 +13,12 @@ import Link from "next/link";
 import {
   TrendingUp, TrendingDown, Wallet, Zap, Globe2, BarChart3,
   Activity, ArrowRight, Send, Radio, ArrowUpDown,
-  Bell, Search, Layers, ExternalLink,
+  Bell, Search, Layers, ExternalLink, Target, CandlestickChart,
 } from "lucide-react";
+import { SetupProgress } from "@/components/SetupProgress";
+import { useSetupProgress } from "@/hooks/useSetupProgress";
+import { startJudgePath } from "@/components/JudgePathBanner";
+import { fetchWithMeta } from "@/lib/api";
 
 // -- Stat Card
 function StatCard({
@@ -190,8 +194,30 @@ export default function DashboardPage() {
   const totalVal = Number(summary?.totalValueUsd ?? 0);
   const pnl = Number(summary?.totalPnlUsd ?? 0);
   const pnlPct = Number(summary?.totalPnlPct ?? 0);
+  const { data: trackRaw } = useQuery({
+    queryKey: ["track-record-summary"],
+    queryFn: () => fetchWithMeta<any>("/api/signals/track-record"),
+    refetchInterval: 120_000,
+  });
+  const { isComplete: setupComplete, nextStep } = useSetupProgress();
+
+  const trSummary = (trackRaw as { data?: Record<string, unknown> })?.data ?? {};
+  const hitRatePct = trSummary.hit_rate != null ? (Number(trSummary.hit_rate) * 100).toFixed(0) : null;
+  const topSignal = signals[0];
+  const topAsset = String(topSignal?.asset ?? topSignal?.symbol ?? "ETH").replace(/USDT|USDC|\/.*/, "");
   const activeSignals = signals.filter((s) => s.status === "active" || s.status === "pending").length || signals.length;
   const topSector = [...sectors].sort((a, b) => Number(b.change_pct_24h ?? 0) - Number(a.change_pct_24h ?? 0))[0];
+
+  const primaryCtaHref = !setupComplete && nextStep?.href
+    ? nextStep.href
+    : topSignal?.id
+      ? `/trade?signalId=${topSignal.id}&asset=${topAsset}`
+      : `/trade?asset=${topAsset}`;
+  const primaryCtaLabel = !setupComplete
+    ? "Continue Setup"
+    : topSignal
+      ? `Trade Latest · ${topAsset}`
+      : "Open Trade Desk";
 
   const containerV = {
     hidden: {},
@@ -231,7 +257,7 @@ export default function DashboardPage() {
             initial="hidden"
             animate="visible"
           >
-            {"Dashboard".split("").map((char, i) => (
+            {"Overview".split("").map((char, i) => (
               <motion.span
                 key={i}
                 className="inline-block"
@@ -291,6 +317,60 @@ export default function DashboardPage() {
           </Link>
         </motion.div>
       </div>
+
+      {/* Loop hero — single primary CTA */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="grid grid-cols-1 lg:grid-cols-3 gap-4"
+      >
+        <GlassCard padding="md" className="lg:col-span-2" animate spotlight>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)] mb-1">Trustworthy Trading Loop</p>
+              <h2 className="text-lg font-black text-[var(--text-primary)]">
+                {hitRatePct ? `${hitRatePct}% hit rate` : "Live proof ledger"} · {activeSignals} signals
+              </h2>
+              <p className="text-xs mt-1 text-[var(--text-muted)]">
+                SoSoValue intel → explainable signal → risk preflight → signed SoDEX order → public outcomes
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href={primaryCtaHref}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold"
+                style={{ background: "var(--accent)", color: "#fff" }}
+              >
+                <CandlestickChart className="w-4 h-4" />
+                {primaryCtaLabel}
+              </Link>
+              <button
+                type="button"
+                onClick={() => startJudgePath()}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border"
+                style={{ borderColor: "var(--glass-border)", color: "var(--text-secondary)" }}
+              >
+                <Target className="w-4 h-4" />
+                Judge Path
+              </button>
+              <Link href="/track-record" className="inline-flex items-center gap-1 px-3 py-2.5 text-xs font-semibold text-[var(--accent)]">
+                Track Record <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+          </div>
+        </GlassCard>
+        {!setupComplete ? (
+          <SetupProgress variant="card" />
+        ) : (
+          <GlassCard padding="md" animate>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--green)] mb-2">Ready</p>
+            <p className="text-sm font-bold text-[var(--text-primary)]">SoDEX testnet connected</p>
+            <Link href="/portfolio" className="text-xs font-semibold mt-2 inline-flex items-center gap-1 text-[var(--accent)]">
+              View portfolio <ArrowRight className="w-3 h-3" />
+            </Link>
+          </GlassCard>
+        )}
+      </motion.div>
 
       {/* Live Ticker */}
       <LiveTicker />

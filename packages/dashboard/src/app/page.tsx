@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 
-/** Root avoids compiling the heavy landing bundle on first dev request. */
+/** OS home — proof + setup + primary CTA. */
 export default function Home() {
-  redirect('/track-record');
+  redirect('/dashboard');
 }

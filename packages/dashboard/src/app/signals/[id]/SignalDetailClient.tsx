@@ -12,6 +12,7 @@ import {
   ShieldCheck, BookOpen, ExternalLink, Clock,
 } from "lucide-react";
 import Link from "next/link";
+import { FreshnessBadge } from "@/components/FreshnessBadge";
 
 // â”€â”€â”€ Citation rendering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -160,9 +161,10 @@ export default function SignalDetailClient({ id }: { id: string }) {
                 <div>
                   <div className="text-xl font-black tracking-tight">{asset}</div>
                   {signal.created_at && (
-                    <div className="flex items-center gap-1 text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+                    <div className="flex items-center gap-2 text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
                       <Clock className="w-3 h-3" />
                       {fmtDate(signal.created_at)}
+                      <FreshnessBadge timestamp={signal.created_at} />
                     </div>
                   )}
                 </div>
@@ -313,9 +315,36 @@ export default function SignalDetailClient({ id }: { id: string }) {
                   </span>
                 )}
               </div>
+              {signal.outcome === "DRIFT" && (
+                <p className="text-xs mt-3 leading-relaxed" style={{ color: "var(--text-muted)" }}>
+                  DRIFT means the signal direction held but neither take-profit nor stop-loss was hit within the evaluation window (72h). It is not counted as a loss in hit rate.
+                </p>
+              )}
+            </GlassCard>
+          )}
+
+          {sources.length === 0 && citations.length === 0 && (
+            <GlassCard padding="md">
+              <p className="text-xs text-[var(--text-muted)]">
+                Source citations pending for this signal. New signals include SoSoValue module chips with timestamps.
+              </p>
             </GlassCard>
           )}
         </motion.div>
+      )}
+
+      {signal && (
+        <div className="fixed bottom-20 md:bottom-8 left-0 right-0 md:left-[240px] z-40 px-4 md:px-6 pointer-events-none">
+          <div className="max-w-3xl mx-auto pointer-events-auto flex gap-2 justify-end">
+            <Link
+              href={`/trade?signalId=${id}&asset=${asset}`}
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold shadow-lg"
+              style={{ background: "var(--accent)", color: "#fff" }}
+            >
+              Copy to Trade
+            </Link>
+          </div>
+        </div>
       )}
     </div>
   );

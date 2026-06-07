@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { fetcher } from "@/lib/api";
+import { LabsPreviewBanner } from "@/components/LabsPreviewBanner";
 import { GlassCard } from "@/components/GlassCard";
 import { cn } from "@/lib/utils";
 import { PieChart, RefreshCw, TrendingUp, TrendingDown, Minus, Target, Activity } from "lucide-react";
@@ -76,6 +77,7 @@ export default function RebalancePage() {
 
   return (
     <div className="space-y-5">
+      <LabsPreviewBanner feature="Portfolio Rebalance" />
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.16,1,0.3,1] }}>
         <div className="flex items-center justify-between flex-wrap gap-3">

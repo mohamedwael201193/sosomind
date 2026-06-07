@@ -2432,16 +2432,18 @@ export function createBot(): Bot | null {
       `<b>SoDEX Account:</b> ${sodexStatus}\n` +
       `<b>Spot Balance:</b> ${balanceLine}\n\n` +
       `━━━━━━━━━━━━━━━━━━━━━\n` +
-      `<b>4-Step Activation Checklist:</b>\n\n` +
-      `① 📤 Export private key → import to MetaMask\n` +
-      `② 🌐 Add ValueChain Testnet network\n` +
-      `③ 💰 Connect wallet → Claim testnet → Enable Trading\n` +
-      `④ 🚀 Place your first trade from this bot!\n\n` +
+      `<b>5-Step Activation (mirrors dashboard):</b>\n\n` +
+      `① 🔗 Connect wallet (MetaMask path: sosomind.vercel.app/profile)\n` +
+      `② 🌐 Add ValueChain Testnet (chain 138565)\n` +
+      `③ 💰 Faucet + Enable Trading on SoDEX\n` +
+      `④ 📤 Transfer Funding → Spot USDC\n` +
+      `⑤ 🚀 Place first trade (/trade or bot)\n\n` +
       `<i>Tap any step to jump straight to its instructions.</i>`;
 
     const kb = new InlineKeyboard()
       .text('① Wallet & Key', 'setup:step1').text('② Add Network', 'setup:step2').row()
       .text('③ Claim & Enable', 'setup:step3').text('④ First Trade', 'setup:step4').row()
+      .url('🌐 Dashboard Setup', 'https://sosomind.vercel.app/dashboard').row()
       .url('🚰 Faucet', 'https://testnet.sodex.com/faucet').url('📊 Portfolio', 'https://testnet.sodex.com/portfolio').row()
       .text('🔄 Refresh Status', 'setup:start').text('🏠 Main Menu', 'menu:main');
 

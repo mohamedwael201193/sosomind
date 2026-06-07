@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { fetchWithMeta, api } from "@/lib/api";
+import { LabsPreviewBanner } from "@/components/LabsPreviewBanner";
 import { GlassCard } from "@/components/GlassCard";
 import { CacheBadge } from "@/components/CacheBadge";
 import { Newspaper, Database, Send, RefreshCw, ExternalLink, FileText, Zap, Clock, AlertCircle } from "lucide-react";
@@ -124,6 +125,7 @@ export default function NewsletterPage() {
 
   return (
     <div className="min-h-screen px-6 lg:px-10 py-8" style={{ background: 'var(--bg-base)' }}>
+      <LabsPreviewBanner feature="Newsletter & briefings" />
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
         className="mb-6 flex items-end justify-between flex-wrap gap-4">
         <div>

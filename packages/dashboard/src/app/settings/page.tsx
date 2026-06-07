@@ -72,7 +72,12 @@ export default function SettingsPage() {
   }, [address]);
   return (
     <div>
-      <PageHeader title="Settings" subtitle="Configure AI providers, risk parameters and notification preferences" />
+      <PageHeader title="Settings" subtitle="Configure risk parameters and notification preferences" />
+
+      <div className="card mb-4 text-xs leading-relaxed" style={{ color: 'var(--text-muted)', borderColor: 'var(--accent-border)' }}>
+        <strong style={{ color: 'var(--text-primary)' }}>AI providers:</strong> Active cascade is configured server-side (OpenRouter → Groq → Gemini → …).
+        Toggles below are UI preferences only until wired to backend.
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
         <div>

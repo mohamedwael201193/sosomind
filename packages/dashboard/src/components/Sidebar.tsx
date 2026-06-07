@@ -14,6 +14,7 @@ import {
   Target, ChevronDown, Beaker,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SetupProgress } from "@/components/SetupProgress";
 
 type NavItem = {
   href: string;
@@ -31,12 +32,17 @@ type NavSection = {
 
 const navSections: NavSection[] = [
   {
+    label: "OVERVIEW",
+    items: [
+      { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+    ],
+  },
+  {
     label: "PROVE",
     items: [
-      { href: "/signals", label: "Signals", icon: Zap, badge: true },
       { href: "/track-record", label: "Track Record", icon: Target },
+      { href: "/signals", label: "Signals", icon: Zap, badge: true },
       { href: "/methodology", label: "Methodology", icon: FlaskConical },
-      { href: "/research", label: "Research", icon: Search },
     ],
   },
   {
@@ -44,12 +50,12 @@ const navSections: NavSection[] = [
     items: [
       { href: "/trade", label: "Trade", icon: CandlestickChart },
       { href: "/sectors", label: "SSI Sectors", icon: Grid3X3 },
+      { href: "/research", label: "Research", icon: Search },
     ],
   },
   {
     label: "MONITOR",
     items: [
-      { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
       { href: "/portfolio", label: "Portfolio", icon: PieChart },
       { href: "/agents", label: "Market Regime", icon: BarChart3 },
     ],
@@ -217,6 +223,7 @@ export function Sidebar() {
       </nav>
 
       <div className="border-t p-2 space-y-1" style={{ borderColor: 'var(--glass-border)' }}>
+        {!collapsed && <SetupProgress variant="compact" className="mb-1" />}
         {!collapsed && address && (
           <div className="px-3 py-2 text-[10px] font-mono truncate" style={{ color: 'var(--text-muted)' }}>
             {address.slice(0, 6)}…{address.slice(-4)}

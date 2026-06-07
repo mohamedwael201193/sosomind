@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { fetcher } from "@/lib/api";
+import { LabsPreviewBanner } from "@/components/LabsPreviewBanner";
 import { GlassCard } from "@/components/GlassCard";
 import { cn } from "@/lib/utils";
 import { User, Zap, Shield, BarChart2, TrendingUp, Clock, CheckCircle, ChevronRight, RefreshCw } from "lucide-react";
@@ -134,6 +135,7 @@ export default function PersonaPage() {
 
   return (
     <div className="space-y-5">
+      <LabsPreviewBanner feature="Trader Persona" />
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.16,1,0.3,1] }}>
         <div className="flex items-center justify-between flex-wrap gap-3">

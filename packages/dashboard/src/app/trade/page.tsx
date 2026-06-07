@@ -202,6 +202,7 @@ function TradeInner() {
   const initQty = searchParams.get('qty') ?? '';
   const initPrice = searchParams.get('price') ?? '';
   const initAsset = searchParams.get('asset') ?? '';
+  const initSignalId = searchParams.get('signalId') ?? '';
   const [side, setSide] = useState<'buy' | 'sell'>(initSide);
   const [orderType, setOrderType] = useState<'limit' | 'market'>(initType);
   const [symbolId, setSymbolId] = useState<number | null>(null);
@@ -434,13 +435,20 @@ function TradeInner() {
     setStrategyLoading(true);
     try {
       if (strategy === 'copy') {
-        // 1. Try stored signals first.
-        // NOTE: /api/agents/signals returns { data: [...] } envelope — unwrap before accessing [0].
-        const sigsResp: any = await fetcher('/api/agents/signals?limit=5');
-        const sigsArr: any[] = Array.isArray(sigsResp) ? sigsResp : (sigsResp?.data ?? []);
-        let sig: any = sigsArr[0] ?? null;
+        let sig: any = null;
+        if (initSignalId) {
+          try {
+            const one = await fetcher(`/api/signals/${initSignalId}`);
+            sig = (one as any)?.data ?? one;
+          } catch { /* fall through */ }
+        }
+        if (!sig) {
+          const sigsResp: any = await fetcher('/api/agents/signals?limit=5');
+          const sigsArr: any[] = Array.isArray(sigsResp) ? sigsResp : (sigsResp?.data ?? []);
+          sig = sigsArr[0] ?? null;
+        }
 
-        // 2. No stored signal — use fast live endpoint (Binance-backed, < 3s, no AI timeout)
+        // 2. No stored signal — use fast live endpoint
         if (!sig) {
           const researchAsset = activeSymbol?.baseCoin?.replace(/^v/, '') ?? 'ETH';
           try {
@@ -951,7 +959,7 @@ function TradeInner() {
                     {([
                       { id: 'copy' as Strategy, icon: <Zap className="w-4 h-4" />, label: 'Copy Signal', desc: 'Mirror the latest AI-generated trade signal — fetched live from the research agent if none are cached' },
                       { id: 'ssi' as Strategy, icon: <BarChart2 className="w-4 h-4" />, label: 'Follow SSI Basket', desc: 'Execute based on SoSoValue Sector Sentiment Index momentum — uses BTC/ETH proxy when basket assets aren\'t on SoDEX Testnet' },
-                      { id: 'manual' as Strategy, icon: <SlidersHorizontal className="w-4 h-4" />, label: 'Manual Order', desc: 'Set your own price, size, and order type' },
+                      { id: 'manual' as Strategy, icon: <SlidersHorizontal className="w-4 h-4" />, label: 'Manual Order', desc: 'Advanced — set your own price, size, and order type' },
                     ] as const).map(({ id, icon, label, desc }) => (
                       <button
                         key={id}
@@ -1030,10 +1038,32 @@ function TradeInner() {
                         detail: info.data?.isTestnet ? 'Testnet (safe to trade)' : info.data ? 'Mainnet' : 'Checking…',
                       },
                       {
+                        label: 'Min notional ($5 USDC)',
+                        pass: estCost >= MIN_NOTIONAL_USDC,
+                        warn: estCost > 0 && estCost < MIN_NOTIONAL_USDC,
+                        detail: estCost >= MIN_NOTIONAL_USDC
+                          ? `$${fmt(estCost, 2)} — meets SoDEX minimum`
+                          : estCost > 0
+                            ? `$${fmt(estCost, 2)} — increase qty to at least $${MIN_NOTIONAL_USDC}`
+                            : 'Set quantity to continue',
+                      },
+                      {
+                        label: 'SoDEX account',
+                        pass: accountID > 0,
+                        warn: false,
+                        detail: accountID > 0 ? `accountID ${accountID}` : 'Enable Trading on testnet.sodex.com',
+                      },
+                      {
                         label: 'Circuit breaker',
                         pass: true,
+                        warn: true,
+                        detail: 'Beta — monitoring only (not wired to outcomes yet)',
+                      },
+                      {
+                        label: 'Custody',
+                        pass: true,
                         warn: false,
-                        detail: 'All limits within normal range',
+                        detail: 'Non-custodial · MetaMask EIP-712 · keys never leave your device',
                       },
                     ].map(({ label, pass, warn, detail }) => (
                       <div key={label} className="flex items-start gap-2.5 p-2.5 rounded-lg"
@@ -1059,8 +1089,8 @@ function TradeInner() {
                       <ChevronLeft className="w-3.5 h-3.5" /> Back
                     </button>
                     <button type="button"
-                      onClick={() => { if (address) setWizardStep(3); }}
-                      disabled={!address}
+                      onClick={() => { if (address && estCost >= MIN_NOTIONAL_USDC && accountID > 0) setWizardStep(3); }}
+                      disabled={!address || estCost < MIN_NOTIONAL_USDC || accountID === 0}
                       className="flex-1 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 disabled:opacity-40"
                       style={{ background: 'var(--accent)', color: '#0a0a0a' }}>
                       Proceed <ChevronRight className="w-4 h-4" />
@@ -1308,6 +1338,11 @@ function TradeInner() {
                             : 'Connect wallet'}
                       </button>
                     </div>
+                    {submitting && (
+                      <p className="text-[10px] text-center mt-2 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                        Approve the EIP-712 signature on your phone or wallet extension — switch to ValueChain Testnet if prompted.
+                      </p>
+                    )}
                     <AnimatePresence>
                       {result && !result.ok && (
                         <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}

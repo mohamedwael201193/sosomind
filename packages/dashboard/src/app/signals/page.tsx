@@ -10,6 +10,7 @@ import { CryptoIcon } from "@/components/CryptoIcon";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { formatUsdPrice } from "@/lib/format-price";
+import { FreshnessBadge } from "@/components/FreshnessBadge";
 
 type Filter = "all" | "long" | "short" | "high-conf";
 
@@ -243,6 +244,7 @@ export default function SignalsPage() {
                               LIVE
                             </span>
                           )}
+                          <FreshnessBadge timestamp={signal.created_at ?? signal.timestamp} />
                           {signal.status && (
                             <span className="text-xs text-[var(--text-muted)]">{String(signal.status)}</span>
                           )}

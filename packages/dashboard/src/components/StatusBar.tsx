@@ -1,20 +1,17 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Wifi, WifiOff, Activity, Database, Cpu } from 'lucide-react';
+import { Wifi, WifiOff } from 'lucide-react';
 import { API_URL } from '@/lib/api';
+import { JudgePathButton } from './JudgePathBanner';
 
 type ServiceStatus = 'up' | 'down' | 'loading';
-
-interface StatusItem {
-  label: string;
-  status: ServiceStatus;
-  icon: React.ReactNode;
-}
 
 export function StatusBar() {
   const [wsStatus, setWsStatus] = useState<ServiceStatus>('loading');
   const [apiStatus, setApiStatus] = useState<ServiceStatus>('loading');
+  const [sosoStatus, setSosoStatus] = useState<ServiceStatus>('loading');
+  const [sodexStatus, setSodexStatus] = useState<ServiceStatus>('loading');
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [wsConnections, setWsConnections] = useState<number>(0);
 
@@ -27,10 +24,16 @@ export function StatusBar() {
         const ws = json?.services?.websocket;
         setWsStatus(ws?.status === 'ok' || ws?.status === 'running' ? 'up' : 'down');
         setWsConnections(ws?.connections ?? 0);
+        const sv = json?.services?.sosovalue?.status;
+        setSosoStatus(sv === 'ok' ? 'up' : sv === 'down' ? 'down' : 'up');
+        const sd = json?.services?.sodex?.status;
+        setSodexStatus(sd === 'ok' ? 'up' : sd === 'down' ? 'down' : 'up');
         setLastUpdate(new Date());
       } catch {
         setApiStatus('down');
         setWsStatus('down');
+        setSosoStatus('down');
+        setSodexStatus('down');
       }
     };
     check();
@@ -48,6 +51,7 @@ export function StatusBar() {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      className="hidden md:flex"
       style={{
         position: 'fixed', bottom: 0, left: 240, right: 0,
         height: 36,
@@ -56,9 +60,9 @@ export function StatusBar() {
         WebkitBackdropFilter: 'blur(24px) saturate(180%)',
         borderTop: '1px solid var(--glass-border)',
         boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
-        display: 'flex', alignItems: 'center',
+        alignItems: 'center',
         padding: '0 20px',
-        gap: 20,
+        gap: 16,
         zIndex: 100,
         fontFamily: 'var(--font-mono)',
         fontSize: 11,
@@ -68,37 +72,31 @@ export function StatusBar() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text-secondary)' }}>
         {dot(apiStatus)}
         <span>API</span>
-        <span style={{ color: apiStatus === 'up' ? 'var(--green)' : apiStatus === 'down' ? 'var(--red)' : 'var(--text-muted)' }}>
-          {apiStatus === 'up' ? 'connected' : apiStatus === 'down' ? 'offline' : 'checking'}
-        </span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text-secondary)' }}>
         {dot(wsStatus)}
-        <span>WS</span>
-        <span style={{ color: wsStatus === 'up' ? 'var(--green)' : wsStatus === 'down' ? 'var(--red)' : 'var(--text-muted)' }}>
-          {wsStatus === 'up' ? `live · ${wsConnections} conn` : wsStatus === 'down' ? 'offline' : '…'}
+        <span>WS{wsStatus === 'up' ? ` · ${wsConnections}` : ''}</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text-secondary)' }}>
+        {dot(sosoStatus)}
+        <span>SoSoValue</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text-secondary)' }}>
+        {dot(sodexStatus)}
+        <span>SoDEX</span>
+      </div>
+      <span
+        className="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+        style={{ background: 'var(--accent-soft)', color: 'var(--accent)', border: '1px solid var(--accent-border)' }}
+      >
+        Testnet
+      </span>
+      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <JudgePathButton />
+        <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+          {apiStatus === 'up' ? <Wifi className="w-3 h-3" style={{ color: 'var(--green)' }} /> : <WifiOff className="w-3 h-3" style={{ color: 'var(--red)' }} />}
+          {lastUpdate ? lastUpdate.toLocaleTimeString() : '…'}
         </span>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text-secondary)' }}>
-        <span className="dot dot-green dot-pulse" /> SoSoValue
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text-secondary)' }}>
-        <span className="dot dot-green dot-pulse" /> SoDEX
-      </div>
-      <div style={{
-        marginLeft: 'auto',
-        color: 'var(--text-muted)',
-        display: 'flex', alignItems: 'center', gap: 4,
-      }}>
-        <span
-          style={{
-            display: 'inline-block', width: 4, height: 4,
-            borderRadius: '50%', background: 'var(--green)',
-            boxShadow: '0 0 6px var(--green)',
-            animation: 'glowPulse 2s ease-in-out infinite',
-          }}
-        />
-        {lastUpdate ? `Updated ${lastUpdate.toLocaleTimeString()}` : 'Connecting…'}
       </div>
     </motion.div>
   );

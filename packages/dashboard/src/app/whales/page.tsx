@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { fetcher } from "@/lib/api";
+import { LabsPreviewBanner } from "@/components/LabsPreviewBanner";
 import { GlassCard } from "@/components/GlassCard";
 import {
   AlertTriangle, TrendingUp, TrendingDown, RefreshCw, Waves,
@@ -108,6 +109,7 @@ export default function WhalesPage() {
 
   return (
     <div className="space-y-6">
+      <LabsPreviewBanner feature="Whale Tracker" />
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -12 }}
