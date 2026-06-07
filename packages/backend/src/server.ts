@@ -204,10 +204,11 @@ export async function startServer() {
   startResearchLoop();
 
   // Auto-generate market brief every 30 minutes (newsletter feed).
-  // runContentPipeline always persists to DB — no bot or channel ID required.
-  // On startup we run immediately so the feed is fresh after a cold start.
+  // Defer first run so cold-start SoSoValue burst does not trip the circuit breaker.
   const BRIEFING_MS = 30 * 60 * 1000;
-  runContentPipeline(); // immediate on startup
+  setTimeout(() => {
+    runContentPipeline().catch((e) => console.error('briefing startup error', e));
+  }, 45_000);
   setInterval(() => {
     runContentPipeline().catch((e) => console.error('briefing tick error', e));
   }, BRIEFING_MS);

@@ -69,9 +69,14 @@ router.get('/', async (_req, res) => {
     })(),
   };
 
-  const anyDegraded = Object.values(services).some((s: any) => s.status === 'degraded');
-  const anyDown = Object.values(services).some((s: any) => s.status === 'down');
-  const overallStatus = anyDown ? 'unhealthy' : anyDegraded ? 'degraded' : 'healthy';
+  // Only core infra failures are "unhealthy". SoSoValue/Binance fallbacks keep the app usable.
+  const criticalDown = ['backend', 'supabase', 'sodex', 'websocket'].some(
+    (k) => (services as Record<string, { status?: string }>)[k]?.status === 'down',
+  );
+  const anyDegraded = Object.values(services).some(
+    (s: any) => s.status === 'degraded' || s.status === 'down' || s.status === 'unconfigured',
+  );
+  const overallStatus = criticalDown ? 'unhealthy' : anyDegraded ? 'degraded' : 'healthy';
 
   res.json({
     status: overallStatus,

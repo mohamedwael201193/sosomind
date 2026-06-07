@@ -59,7 +59,11 @@ const CB_OPEN_MS = 60_000;
 const responseCache = new Map<string, { data: any; at: number }>();
 const CACHE_FALLBACK_MS = 60_000;
 
-function recordSuccess(): void { cbFailures = 0; cbLastSuccess = new Date(); }
+function recordSuccess(): void {
+  cbFailures = 0;
+  cbOpenUntil = 0; // close circuit on any successful call
+  cbLastSuccess = new Date();
+}
 function recordFailure(): void {
   cbFailures++;
   if (cbFailures >= CB_THRESHOLD) cbOpenUntil = Date.now() + CB_OPEN_MS;
@@ -68,8 +72,24 @@ function isCircuitOpen(): boolean { return Date.now() < cbOpenUntil; }
 
 // ===================== Health export =====================
 export function getSoSoValueHealth(): { status: 'ok' | 'degraded' | 'down'; lastSuccess: Date | null; errorRate: number } {
-  const status = isCircuitOpen() ? 'down' : cbFailures > 2 ? 'degraded' : 'ok';
-  const errorRate = cbFailures / (cbFailures + (cbLastSuccess ? 1 : 0));
+  const recentSuccess =
+    cbLastSuccess != null && Date.now() - cbLastSuccess.getTime() < 120_000;
+
+  let status: 'ok' | 'degraded' | 'down';
+  if (cbLastSuccess == null && cbFailures >= CB_THRESHOLD) {
+    status = 'down'; // never succeeded and circuit tripped
+  } else if (isCircuitOpen() && !recentSuccess) {
+    status = 'down';
+  } else if (recentSuccess && cbFailures === 0) {
+    status = 'ok';
+  } else if (recentSuccess || cbFailures <= 2) {
+    status = 'degraded';
+  } else {
+    status = 'down';
+  }
+
+  const denom = cbFailures + (cbLastSuccess ? 1 : 0);
+  const errorRate = denom > 0 ? cbFailures / denom : cbFailures > 0 ? 1 : 0;
   return { status, lastSuccess: cbLastSuccess, errorRate: Math.min(1, errorRate) };
 }
 
