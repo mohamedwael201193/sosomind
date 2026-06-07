@@ -425,11 +425,11 @@ function TradeInner() {
     }
   }, [strategy, copySignalData, ssiBasketData, activeSymbol, usdcBalance, bestAsk, lastPx]);
 
-  // Reset auto-fill flag and proxy when user switches strategy
+  // Reset auto-fill when strategy or market changes so qty recalculates after symbol switch
   useEffect(() => {
     autoFilledStrategyRef.current = null;
     setSsiProxyAsset(null);
-  }, [strategy]);
+  }, [strategy, symbolId]);
 
   async function handleStrategyProceed() {
     setStrategyLoading(true);
@@ -1089,8 +1089,8 @@ function TradeInner() {
                       <ChevronLeft className="w-3.5 h-3.5" /> Back
                     </button>
                     <button type="button"
-                      onClick={() => { if (address && estCost >= MIN_NOTIONAL_USDC && accountID > 0) setWizardStep(3); }}
-                      disabled={!address || estCost < MIN_NOTIONAL_USDC || accountID === 0}
+                      onClick={() => { if (address && accountID > 0) setWizardStep(3); }}
+                      disabled={!address || accountID === 0}
                       className="flex-1 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 disabled:opacity-40"
                       style={{ background: 'var(--accent)', color: '#0a0a0a' }}>
                       Proceed <ChevronRight className="w-4 h-4" />
