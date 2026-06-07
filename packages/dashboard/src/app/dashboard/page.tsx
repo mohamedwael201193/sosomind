@@ -141,6 +141,17 @@ export default function DashboardPage() {
     queryFn: () => fetcher("/api/agents/macro"),
     refetchInterval: 120000,
   });
+  const { data: health } = useQuery({
+    queryKey: ["health"],
+    queryFn: () => fetcher("/api/health"),
+    refetchInterval: 30_000,
+  });
+  const svcDisplay = (status?: string, okLabel = "online") => {
+    if (status === "ok") return { status: okLabel, color: "var(--green)" };
+    if (status === "degraded") return { status: "degraded", color: "#eab308" };
+    if (status === "down") return { status: "offline", color: "var(--red)" };
+    return { status: okLabel, color: "var(--green)" };
+  };
   const { data: sectorsRaw } = useQuery({
     queryKey: ["sectors"],
     queryFn: () => fetcher("/api/sectors"),
@@ -513,10 +524,10 @@ export default function DashboardPage() {
               </div>
               <div className="space-y-2.5">
                 {[
-                  { label: "SoSoValue API", status: "online", color: "var(--green)" },
-                  { label: "SoDEX Feed",    status: "online", color: "var(--green)" },
-                  { label: "AI Agents",     status: "online", color: "var(--green)" },
-                  { label: "WebSocket",     status: "live",   color: "var(--green)" },
+                  { label: "SoSoValue API", ...svcDisplay((health as any)?.services?.sosovalue?.status) },
+                  { label: "SoDEX Feed", ...svcDisplay((health as any)?.services?.sodex?.status) },
+                  { label: "AI Agents", ...svcDisplay((health as any)?.services?.ai?.status, "online") },
+                  { label: "WebSocket", ...svcDisplay((health as any)?.services?.websocket?.status, "live") },
                 ].map((item) => (
                   <div key={item.label} className="flex items-center justify-between text-xs">
                     <span style={{ color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>{item.label}</span>

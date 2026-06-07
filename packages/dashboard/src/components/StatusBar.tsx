@@ -5,7 +5,7 @@ import { Wifi, WifiOff } from 'lucide-react';
 import { API_URL } from '@/lib/api';
 import { JudgePathButton } from './JudgePathBanner';
 
-type ServiceStatus = 'up' | 'down' | 'loading';
+type ServiceStatus = 'up' | 'down' | 'warn' | 'loading';
 
 export function StatusBar() {
   const [wsStatus, setWsStatus] = useState<ServiceStatus>('loading');
@@ -25,7 +25,7 @@ export function StatusBar() {
         setWsStatus(ws?.status === 'ok' || ws?.status === 'running' ? 'up' : 'down');
         setWsConnections(ws?.connections ?? 0);
         const sv = json?.services?.sosovalue?.status;
-        setSosoStatus(sv === 'ok' ? 'up' : sv === 'down' ? 'down' : 'up');
+        setSosoStatus(sv === 'down' ? 'down' : sv === 'degraded' ? 'warn' : 'up');
         const sd = json?.services?.sodex?.status;
         setSodexStatus(sd === 'ok' ? 'up' : sd === 'down' ? 'down' : 'up');
         setLastUpdate(new Date());
@@ -43,6 +43,7 @@ export function StatusBar() {
 
   const dot = (s: ServiceStatus) =>
     s === 'up' ? <span className="dot dot-green dot-pulse" /> :
+    s === 'warn' ? <span className="dot dot-yellow" /> :
     s === 'down' ? <span className="dot dot-red" /> :
     <span className="dot dot-gray dot-pulse" />;
 

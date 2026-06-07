@@ -339,6 +339,7 @@ tr:hover td { background: rgba(255,255,255,0.015); }
 /* ── Dot indicators ── */
 .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .dot-green { background: var(--green); box-shadow: 0 0 5px var(--green-glow); }
+.dot-yellow { background: #eab308; box-shadow: 0 0 5px rgba(234, 179, 8, 0.45); }
 .dot-red   { background: var(--red);   box-shadow: 0 0 6px var(--red); }
 .dot-gray  { background: var(--muted); }
 .dot-pulse { animation: pulse-dot 2s infinite; }

@@ -54,35 +54,66 @@ function apiLog(method: string, url: string, status: number, ms: number, error?:
 let cbFailures = 0;
 let cbOpenUntil = 0;
 let cbLastSuccess: Date | null = null;
+let activeKeyLabel: 'primary' | 'fallback' | null = null;
+let lastFailureKind: 'rate_limit' | 'error' | null = null;
 const CB_THRESHOLD = 5;
 const CB_OPEN_MS = 60_000;
 const responseCache = new Map<string, { data: any; at: number }>();
 const CACHE_FALLBACK_MS = 60_000;
 
-function recordSuccess(): void {
-  cbFailures = 0;
-  cbOpenUntil = 0; // close circuit on any successful call
-  cbLastSuccess = new Date();
+function isRateLimitError(err: unknown): boolean {
+  const ax = err as AxiosError & { message?: string };
+  const status = ax?.response?.status;
+  if (status === 429) return true;
+  const body = ax?.response?.data as { code?: number; message?: string } | undefined;
+  if (body?.code === 402901) return true;
+  const msg = String(ax?.message ?? err ?? '');
+  return /402901|rate limit|too many requests/i.test(msg);
 }
-function recordFailure(): void {
+
+function recordSuccess(keyLabel: 'primary' | 'fallback'): void {
+  cbFailures = 0;
+  cbOpenUntil = 0;
+  cbLastSuccess = new Date();
+  activeKeyLabel = keyLabel;
+  lastFailureKind = null;
+}
+
+function recordFailure(kind: 'rate_limit' | 'error'): void {
+  lastFailureKind = kind;
+  // Rate limits on primary should not open circuit — fallback key may still work
+  if (kind === 'rate_limit') return;
   cbFailures++;
   if (cbFailures >= CB_THRESHOLD) cbOpenUntil = Date.now() + CB_OPEN_MS;
 }
+
 function isCircuitOpen(): boolean { return Date.now() < cbOpenUntil; }
 
 // ===================== Health export =====================
-export function getSoSoValueHealth(): { status: 'ok' | 'degraded' | 'down'; lastSuccess: Date | null; errorRate: number } {
+export function getSoSoValueHealth(): {
+  status: 'ok' | 'degraded' | 'down';
+  lastSuccess: Date | null;
+  errorRate: number;
+  activeKey: 'primary' | 'fallback' | null;
+  lastError: 'rate_limit' | 'error' | null;
+  fallbackConfigured: boolean;
+} {
   const recentSuccess =
     cbLastSuccess != null && Date.now() - cbLastSuccess.getTime() < 120_000;
+  const fallbackConfigured = Boolean(process.env.SOSO_API_KEY_FALLBACK?.trim());
 
   let status: 'ok' | 'degraded' | 'down';
-  if (cbLastSuccess == null && cbFailures >= CB_THRESHOLD) {
-    status = 'down'; // never succeeded and circuit tripped
-  } else if (isCircuitOpen() && !recentSuccess) {
-    status = 'down';
-  } else if (recentSuccess && cbFailures === 0) {
+  if (recentSuccess && activeKeyLabel === 'primary') {
     status = 'ok';
-  } else if (recentSuccess || cbFailures <= 2) {
+  } else if (recentSuccess && activeKeyLabel === 'fallback') {
+    status = 'degraded'; // working via fallback key
+  } else if (lastFailureKind === 'rate_limit' && fallbackConfigured) {
+    status = 'degraded';
+  } else if (cbLastSuccess == null && cbFailures >= CB_THRESHOLD && !fallbackConfigured) {
+    status = 'down';
+  } else if (isCircuitOpen() && !recentSuccess && !fallbackConfigured) {
+    status = 'down';
+  } else if (recentSuccess || cbFailures <= 2 || lastFailureKind === 'rate_limit') {
     status = 'degraded';
   } else {
     status = 'down';
@@ -90,7 +121,14 @@ export function getSoSoValueHealth(): { status: 'ok' | 'degraded' | 'down'; last
 
   const denom = cbFailures + (cbLastSuccess ? 1 : 0);
   const errorRate = denom > 0 ? cbFailures / denom : cbFailures > 0 ? 1 : 0;
-  return { status, lastSuccess: cbLastSuccess, errorRate: Math.min(1, errorRate) };
+  return {
+    status,
+    lastSuccess: cbLastSuccess,
+    errorRate: Math.min(1, errorRate),
+    activeKey: activeKeyLabel,
+    lastError: lastFailureKind,
+    fallbackConfigured,
+  };
 }
 
 // ===================== Retry helper =====================
@@ -113,23 +151,32 @@ let cacheLoadedAt = 0;
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
 export class SoSoValueClient {
-  private client: AxiosInstance;
   private readonly baseURL = process.env.SOSO_BASE_URL || 'https://openapi.sosovalue.com/openapi/v1';
+  private readonly keyClients: Array<{ label: 'primary' | 'fallback'; client: AxiosInstance }>;
 
-  constructor(apiKey: string) {
-    this.client = axios.create({
-      baseURL: this.baseURL,
-      headers: {
-        'x-soso-api-key': apiKey,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      timeout: 20000,
-    });
+  constructor(keys: Array<{ label: 'primary' | 'fallback'; key: string }>) {
+    const usable = keys.filter((k) => k.key?.trim());
+    this.keyClients = usable.map(({ label, key }) => ({
+      label,
+      client: axios.create({
+        baseURL: this.baseURL,
+        headers: {
+          'x-soso-api-key': key.trim(),
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        timeout: 20000,
+      }),
+    }));
   }
 
   private unwrap<T>(data: any): T {
     if (data && typeof data === 'object' && 'code' in data && 'data' in data) {
+      if (data.code === 402901) {
+        const e = new Error(`SoSoValue 402901: ${data.message || 'Rate limit exceeded'}`) as AxiosError;
+        (e as any).response = { status: 429, data };
+        throw e;
+      }
       if (data.code !== 0 && data.code !== 200) {
         throw new Error(`SoSoValue ${data.code}: ${data.message || 'error'}`);
       }
@@ -138,36 +185,54 @@ export class SoSoValueClient {
     return data as T;
   }
 
-  // Rate-limited, retried, logged, circuit-broken request wrapper
+  // Rate-limited, retried, logged, circuit-broken request wrapper with key failover
   private async request<T>(method: 'get' | 'post', url: string, config?: any, cacheKey?: string): Promise<T> {
-    // Circuit breaker: return cached data if open
     if (isCircuitOpen() && cacheKey && responseCache.has(cacheKey)) {
       const cached = responseCache.get(cacheKey)!;
       if (Date.now() - cached.at < CACHE_FALLBACK_MS * 60) return cached.data as T;
     }
+    if (!this.keyClients.length) {
+      throw new Error('SoSoValue: no API keys configured (SOSO_API_KEY)');
+    }
+
     await sosoSem.acquire();
     const t0 = Date.now();
+    let lastErr: unknown;
+
     try {
-      const result = await withRetry(async () => {
-        const r = method === 'get'
-          ? await this.client.get(url, config)
-          : await this.client.post(url, config);
-        return this.unwrap<T>(r.data);
-      });
-      const ms = Date.now() - t0;
-      apiLog(method.toUpperCase(), url, 200, ms);
-      recordSuccess();
-      if (cacheKey) responseCache.set(cacheKey, { data: result, at: Date.now() });
-      await new Promise((r) => setTimeout(r, INTER_REQUEST_MS));
-      return result;
-    } catch (err: any) {
-      const ms = Date.now() - t0;
-      const status = err?.response?.status ?? 0;
-      apiLog(method.toUpperCase(), url, status, ms, String(err?.message || err));
-      recordFailure();
-      // Serve stale cache if available
-      if (cacheKey && responseCache.has(cacheKey)) return responseCache.get(cacheKey)!.data as T;
-      throw err;
+      for (let i = 0; i < this.keyClients.length; i++) {
+        const { label, client } = this.keyClients[i];
+        const hasNextKey = i < this.keyClients.length - 1;
+        try {
+          const result = await withRetry(async () => {
+            const r = method === 'get'
+              ? await client.get(url, config)
+              : await client.post(url, config);
+            return this.unwrap<T>(r.data);
+          });
+          const ms = Date.now() - t0;
+          apiLog(method.toUpperCase(), url, 200, ms, label === 'fallback' ? 'fallback_key' : undefined);
+          recordSuccess(label);
+          if (cacheKey) responseCache.set(cacheKey, { data: result, at: Date.now() });
+          await new Promise((r) => setTimeout(r, INTER_REQUEST_MS));
+          return result;
+        } catch (err: unknown) {
+          lastErr = err;
+          const ms = Date.now() - t0;
+          const status = (err as AxiosError)?.response?.status ?? 0;
+          apiLog(method.toUpperCase(), url, status, ms, String((err as Error)?.message || err));
+          if (isRateLimitError(err)) {
+            recordFailure('rate_limit');
+            if (hasNextKey) continue;
+          } else {
+            recordFailure('error');
+          }
+          if (cacheKey && responseCache.has(cacheKey)) {
+            return responseCache.get(cacheKey)!.data as T;
+          }
+        }
+      }
+      throw lastErr ?? new Error('SoSoValue request failed');
     } finally {
       sosoSem.release();
     }
@@ -339,4 +404,23 @@ export class SoSoValueClient {
   }
 }
 
-export const sosovalue = new SoSoValueClient(process.env.SOSO_API_KEY || '');
+function buildSoSoValueClient(): SoSoValueClient {
+  const keys: Array<{ label: 'primary' | 'fallback'; key: string }> = [];
+  const primary = process.env.SOSO_API_KEY?.trim();
+  const fallback = process.env.SOSO_API_KEY_FALLBACK?.trim();
+  if (primary) keys.push({ label: 'primary', key: primary });
+  if (fallback && fallback !== primary) keys.push({ label: 'fallback', key: fallback });
+  return new SoSoValueClient(keys);
+}
+
+export const sosovalue = buildSoSoValueClient();
+
+/** Lightweight live probe — single /macro/events call (no currency resolve). */
+export async function probeSoSoValueConnection(): Promise<ReturnType<typeof getSoSoValueHealth>> {
+  try {
+    await sosovalue.getMacroEvents();
+  } catch {
+    /* recordSuccess/Failure updated inside client */
+  }
+  return getSoSoValueHealth();
+}
