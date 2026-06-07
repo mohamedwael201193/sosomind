@@ -53,6 +53,7 @@ router.get('/', async (_req, res) => {
       errorRate: sosoHealth.errorRate,
       activeKey: sosoHealth.activeKey,
       lastError: sosoHealth.lastError,
+      keysConfigured: sosoHealth.keysConfigured,
       fallbackConfigured: sosoHealth.fallbackConfigured,
       modulesAvailable: 9,
     },

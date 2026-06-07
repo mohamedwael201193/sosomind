@@ -54,8 +54,9 @@ function apiLog(method: string, url: string, status: number, ms: number, error?:
 let cbFailures = 0;
 let cbOpenUntil = 0;
 let cbLastSuccess: Date | null = null;
-let activeKeyLabel: 'primary' | 'fallback' | null = null;
+let activeKeyLabel: string | null = null;
 let lastFailureKind: 'rate_limit' | 'error' | null = null;
+let configuredKeyCount = 0;
 const CB_THRESHOLD = 5;
 const CB_OPEN_MS = 60_000;
 const responseCache = new Map<string, { data: any; at: number }>();
@@ -71,7 +72,15 @@ function isRateLimitError(err: unknown): boolean {
   return /402901|rate limit|too many requests/i.test(msg);
 }
 
-function recordSuccess(keyLabel: 'primary' | 'fallback'): void {
+function shouldFailoverToNextKey(err: unknown): boolean {
+  if (isRateLimitError(err)) return true;
+  const status = (err as AxiosError)?.response?.status;
+  if (status === 401 || status === 403) return true;
+  const msg = String((err as Error)?.message ?? err ?? '');
+  return /invalid.*key|unauthorized|forbidden|402901/i.test(msg);
+}
+
+function recordSuccess(keyLabel: string): void {
   cbFailures = 0;
   cbOpenUntil = 0;
   cbLastSuccess = new Date();
@@ -94,24 +103,25 @@ export function getSoSoValueHealth(): {
   status: 'ok' | 'degraded' | 'down';
   lastSuccess: Date | null;
   errorRate: number;
-  activeKey: 'primary' | 'fallback' | null;
+  activeKey: string | null;
   lastError: 'rate_limit' | 'error' | null;
+  keysConfigured: number;
   fallbackConfigured: boolean;
 } {
   const recentSuccess =
     cbLastSuccess != null && Date.now() - cbLastSuccess.getTime() < 120_000;
-  const fallbackConfigured = Boolean(process.env.SOSO_API_KEY_FALLBACK?.trim());
+  const hasBackupKeys = configuredKeyCount > 1;
 
   let status: 'ok' | 'degraded' | 'down';
   if (recentSuccess && activeKeyLabel === 'primary') {
     status = 'ok';
-  } else if (recentSuccess && activeKeyLabel === 'fallback') {
-    status = 'degraded'; // working via fallback key
-  } else if (lastFailureKind === 'rate_limit' && fallbackConfigured) {
+  } else if (recentSuccess && activeKeyLabel && activeKeyLabel !== 'primary') {
+    status = 'degraded'; // working via backup key
+  } else if (lastFailureKind === 'rate_limit' && hasBackupKeys) {
     status = 'degraded';
-  } else if (cbLastSuccess == null && cbFailures >= CB_THRESHOLD && !fallbackConfigured) {
+  } else if (cbLastSuccess == null && cbFailures >= CB_THRESHOLD && !hasBackupKeys) {
     status = 'down';
-  } else if (isCircuitOpen() && !recentSuccess && !fallbackConfigured) {
+  } else if (isCircuitOpen() && !recentSuccess && !hasBackupKeys) {
     status = 'down';
   } else if (recentSuccess || cbFailures <= 2 || lastFailureKind === 'rate_limit') {
     status = 'degraded';
@@ -127,7 +137,8 @@ export function getSoSoValueHealth(): {
     errorRate: Math.min(1, errorRate),
     activeKey: activeKeyLabel,
     lastError: lastFailureKind,
-    fallbackConfigured,
+    keysConfigured: configuredKeyCount,
+    fallbackConfigured: hasBackupKeys,
   };
 }
 
@@ -152,10 +163,17 @@ const CACHE_TTL_MS = 60 * 60 * 1000;
 
 export class SoSoValueClient {
   private readonly baseURL = process.env.SOSO_BASE_URL || 'https://openapi.sosovalue.com/openapi/v1';
-  private readonly keyClients: Array<{ label: 'primary' | 'fallback'; client: AxiosInstance }>;
+  private readonly keyClients: Array<{ label: string; client: AxiosInstance }>;
 
-  constructor(keys: Array<{ label: 'primary' | 'fallback'; key: string }>) {
-    const usable = keys.filter((k) => k.key?.trim());
+  constructor(keys: Array<{ label: string; key: string }>) {
+    const seen = new Set<string>();
+    const usable = keys.filter((k) => {
+      const trimmed = k.key?.trim();
+      if (!trimmed || seen.has(trimmed)) return false;
+      seen.add(trimmed);
+      return true;
+    });
+    configuredKeyCount = usable.length;
     this.keyClients = usable.map(({ label, key }) => ({
       label,
       client: axios.create({
@@ -200,6 +218,7 @@ export class SoSoValueClient {
     let lastErr: unknown;
 
     try {
+      let sawRateLimit = false;
       for (let i = 0; i < this.keyClients.length; i++) {
         const { label, client } = this.keyClients[i];
         const hasNextKey = i < this.keyClients.length - 1;
@@ -211,7 +230,7 @@ export class SoSoValueClient {
             return this.unwrap<T>(r.data);
           });
           const ms = Date.now() - t0;
-          apiLog(method.toUpperCase(), url, 200, ms, label === 'fallback' ? 'fallback_key' : undefined);
+          apiLog(method.toUpperCase(), url, 200, ms, label !== 'primary' ? `key:${label}` : undefined);
           recordSuccess(label);
           if (cacheKey) responseCache.set(cacheKey, { data: result, at: Date.now() });
           await new Promise((r) => setTimeout(r, INTER_REQUEST_MS));
@@ -220,18 +239,15 @@ export class SoSoValueClient {
           lastErr = err;
           const ms = Date.now() - t0;
           const status = (err as AxiosError)?.response?.status ?? 0;
-          apiLog(method.toUpperCase(), url, status, ms, String((err as Error)?.message || err));
-          if (isRateLimitError(err)) {
-            recordFailure('rate_limit');
-            if (hasNextKey) continue;
-          } else {
-            recordFailure('error');
-          }
+          apiLog(method.toUpperCase(), url, status, ms, `${label}: ${(err as Error)?.message || err}`);
+          if (isRateLimitError(err)) sawRateLimit = true;
+          if (shouldFailoverToNextKey(err) && hasNextKey) continue;
           if (cacheKey && responseCache.has(cacheKey)) {
             return responseCache.get(cacheKey)!.data as T;
           }
         }
       }
+      recordFailure(sawRateLimit ? 'rate_limit' : 'error');
       throw lastErr ?? new Error('SoSoValue request failed');
     } finally {
       sosoSem.release();
@@ -404,13 +420,28 @@ export class SoSoValueClient {
   }
 }
 
+/** Collect up to 3 SoSoValue API keys (deduped). Order = failover priority. */
+export function collectSoSoApiKeys(): Array<{ label: string; key: string }> {
+  const listEnv = process.env.SOSO_API_KEYS?.split(',').map((k) => k.trim()).filter(Boolean);
+  if (listEnv?.length) {
+    return listEnv.map((key, i) => ({ label: i === 0 ? 'primary' : `fallback_${i}`, key }));
+  }
+
+  const keys: Array<{ label: string; key: string }> = [];
+  const add = (label: string, value: string | undefined) => {
+    const k = value?.trim();
+    if (!k) return;
+    if (keys.some((x) => x.key === k)) return;
+    keys.push({ label, key: k });
+  };
+  add('primary', process.env.SOSO_API_KEY);
+  add('fallback', process.env.SOSO_API_KEY_FALLBACK);
+  add('fallback_2', process.env.SOSO_API_KEY_FALLBACK_2);
+  return keys;
+}
+
 function buildSoSoValueClient(): SoSoValueClient {
-  const keys: Array<{ label: 'primary' | 'fallback'; key: string }> = [];
-  const primary = process.env.SOSO_API_KEY?.trim();
-  const fallback = process.env.SOSO_API_KEY_FALLBACK?.trim();
-  if (primary) keys.push({ label: 'primary', key: primary });
-  if (fallback && fallback !== primary) keys.push({ label: 'fallback', key: fallback });
-  return new SoSoValueClient(keys);
+  return new SoSoValueClient(collectSoSoApiKeys());
 }
 
 export const sosovalue = buildSoSoValueClient();
