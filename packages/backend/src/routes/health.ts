@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getSoSoValueHealth } from '../clients/sosovalue';
+import { getSoSoValueHealth, sosovalue } from '../clients/sosovalue';
 import { getSoDexHealth } from '../clients/sodex';
 import { aiProviderStatus, hasAI } from '../clients/ai';
 import { supabase } from '../db/supabase';
@@ -7,12 +7,37 @@ import { getWsStats } from '../ws/server';
 
 const router = Router();
 
+let sosoProbeCache: { at: number; health: ReturnType<typeof getSoSoValueHealth> } | null = null;
+
+async function resolveSoSoValueHealth() {
+  let health = getSoSoValueHealth();
+  const stale =
+    health.lastSuccess == null ||
+    Date.now() - health.lastSuccess.getTime() > 300_000 ||
+    health.status === 'down';
+
+  if (!stale && health.status === 'ok') return health;
+  if (sosoProbeCache && Date.now() - sosoProbeCache.at < 30_000) return sosoProbeCache.health;
+
+  try {
+    await Promise.race([
+      sosovalue.getMarketSnapshot('BTC'),
+      new Promise((_r, rej) => setTimeout(() => rej(new Error('probe_timeout')), 8_000)),
+    ]);
+    health = getSoSoValueHealth();
+  } catch {
+    /* keep in-memory breaker state */
+  }
+  sosoProbeCache = { at: Date.now(), health };
+  return health;
+}
+
 router.get('/', async (_req, res) => {
   const mem = process.memoryUsage();
   const memUsedMB = Math.round(mem.heapUsed / 1024 / 1024);
   const memTotalMB = Math.round(mem.heapTotal / 1024 / 1024);
 
-  const sosoHealth = getSoSoValueHealth();
+  const sosoHealth = await resolveSoSoValueHealth();
   const sodexHealth = getSoDexHealth();
   const aiStatus = aiProviderStatus();
 

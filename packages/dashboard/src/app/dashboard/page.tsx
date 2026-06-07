@@ -382,7 +382,7 @@ export default function DashboardPage() {
             icon={<Wallet className="w-3.5 h-3.5" />}
             label="Portfolio Value"
             href="/portfolio"
-            value={totalVal > 0 ? `$${totalVal.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "&#8212;"}
+            value={totalVal > 0 ? `$${totalVal.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "—"}
             sub={totalVal > 0 ? `${(summary?.positions as number) ?? 0} positions active` : undefined}
             pnl={pnl !== 0 ? pnl : undefined}
             pnlPct={pnlPct !== 0 ? pnlPct : undefined}
@@ -395,7 +395,7 @@ export default function DashboardPage() {
             icon={<Zap className="w-3.5 h-3.5" />}
             label="Active Signals"
             href="/signals"
-            value={activeSignals > 0 ? String(activeSignals) : "&#8212;"}
+            value={activeSignals > 0 ? String(activeSignals) : "—"}
             sub={activeSignals > 0 ? "AI-generated \u00b7 live" : "Awaiting market data"}
             color="var(--purple)"
           />
@@ -405,7 +405,7 @@ export default function DashboardPage() {
             icon={<Globe2 className="w-3.5 h-3.5" />}
             label="Macro Score"
             href="/agents"
-            value={macroScore > 0 ? String(macroScore) : "&#8212;"}
+            value={macroScore > 0 ? String(macroScore) : "—"}
             sub={macroScore > 0 ? `${macroRegime} regime` : "Loading\u2026"}
             color={macroScore > 0 ? macroColor : "var(--orange)"}
           />
@@ -415,7 +415,7 @@ export default function DashboardPage() {
             icon={<BarChart3 className="w-3.5 h-3.5" />}
             label="Top Sector 24h"
             href="/sectors"
-            value={topSector ? String(topSector.name ?? "&#8212;") : "&#8212;"}
+            value={topSector ? String(topSector.name ?? "—") : "—"}
             sub={topSector ? `+${Number(topSector.change_pct_24h ?? 0).toFixed(2)}% change` : "Loading sectors\u2026"}
             color="var(--blue)"
           />
@@ -486,7 +486,7 @@ export default function DashboardPage() {
                   {macroScore > 0 ? macroRegime : "Calculating\u2026"}
                 </span>
                 <span className="text-xs font-bold tabular-nums" style={{ color: macroColor, fontFamily: "var(--font-mono)" }}>
-                  {macroScore > 0 ? `${macroScore}/100` : "&#8212;"}
+                  {macroScore > 0 ? `${macroScore}/100` : "—"}
                 </span>
               </div>
 

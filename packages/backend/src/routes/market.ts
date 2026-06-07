@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { sosovalue } from '../clients/sosovalue';
 import { sodex } from '../clients/sodex';
-import { getBinanceKlines, getBinanceTicker, getSpotPrice, getKrakenKlines } from '../clients/market';
+import { getBinanceKlines, getBinanceTicker, getKrakenKlines, getPriceFromAnyExchange } from '../clients/market';
 import { asyncHandler, validate } from '../utils/http';
 
 const router = Router();
@@ -23,15 +23,23 @@ router.get('/price/:symbol', asyncHandler(async (req, res) => {
   } catch { /* fall through */ }
 
   if (price == null || !Number.isFinite(price) || price <= 0) {
-    // Use full Binance 24hr ticker — includes price + priceChangePercent
-    const ticker = await getBinanceTicker(symbol);
-    if (ticker && ticker.price > 0) {
-      price = ticker.price;
-      change24h = ticker.priceChangePercent;
-      source = 'binance';
-    } else {
-      price = await getSpotPrice(symbol);
-      source = 'binance';
+    try {
+      const ticker = await getBinanceTicker(symbol);
+      if (ticker && ticker.price > 0) {
+        price = ticker.price;
+        change24h = ticker.priceChangePercent;
+        source = 'binance';
+      }
+    } catch { /* Binance 451 from Render — fall through */ }
+
+    if (price == null || !Number.isFinite(price) || price <= 0) {
+      const base = symbol.replace(/(USDT|USDC|BUSD|USD)$/i, '');
+      const fx = await getPriceFromAnyExchange(base);
+      if (fx && fx.price > 0) {
+        price = fx.price;
+        change24h = fx.change24h;
+        source = fx.source;
+      }
     }
   }
 

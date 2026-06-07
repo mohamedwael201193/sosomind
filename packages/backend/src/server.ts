@@ -112,6 +112,8 @@ export async function startServer() {
   app.use('/api/analyses', charts);
   app.use('/api/sodex/relay', sodexRelay);
   app.use('/api/sodex', sodex);
+  // features before agents legacy mount — /api/signals/funding must not hit /signals/:id
+  app.use('/api', features);
   app.use('/api/agents', agents); // dashboard expects /api/agents/* prefix
   app.use('/api', agents);        // legacy / direct path compat
   app.use('/api/portfolio', portfolio);
@@ -127,7 +129,6 @@ export async function startServer() {
   app.use('/api/market', market);
   app.use('/api', extras);
   app.use('/api/auth', auth);
-  app.use('/api', features);
   app.use('/api', featureRoutes);
 
   // Prometheus-style metrics endpoint
