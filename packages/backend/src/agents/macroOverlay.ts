@@ -20,12 +20,14 @@ export async function getMacroOutlook(): Promise<MacroOutlook> {
   const drivers: string[] = [];
   let riskScore = 50; // Start neutral
 
-  // Check BTC ETF flows
+  // Check BTC ETF flows — fetch all histories in parallel for speed
   const etfs = Array.isArray(etfList) ? etfList : [];
+  const etfHistories = await Promise.all(
+    etfs.slice(0, 5).map((etf) => safe(sosovalue.getETFHistory(etf.ticker, { limit: 3 })))
+  );
   let etfNetFlow = 0;
-  for (const etf of etfs.slice(0, 5)) {
-    const history: any[] = await safe(sosovalue.getETFHistory(etf.ticker, { limit: 3 })) ?? [];
-    for (const h of history) {
+  for (const history of etfHistories) {
+    for (const h of history ?? []) {
       etfNetFlow += Number(h?.net_flow ?? h?.daily_flow ?? 0);
     }
   }

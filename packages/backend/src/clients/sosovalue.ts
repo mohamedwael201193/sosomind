@@ -109,24 +109,23 @@ export function getSoSoValueHealth(): {
   fallbackConfigured: boolean;
 } {
   const recentSuccess =
-    cbLastSuccess != null && Date.now() - cbLastSuccess.getTime() < 120_000;
+    cbLastSuccess != null && Date.now() - cbLastSuccess.getTime() < 300_000;
   const hasBackupKeys = configuredKeyCount > 1;
 
   let status: 'ok' | 'degraded' | 'down';
-  if (recentSuccess && activeKeyLabel === 'primary') {
+  if (isCircuitOpen()) {
+    status = hasBackupKeys ? 'degraded' : 'down';
+  } else if (recentSuccess && (activeKeyLabel === 'primary' || activeKeyLabel == null)) {
     status = 'ok';
-  } else if (recentSuccess && activeKeyLabel && activeKeyLabel !== 'primary') {
-    status = 'degraded'; // working via backup key
-  } else if (lastFailureKind === 'rate_limit' && hasBackupKeys) {
-    status = 'degraded';
-  } else if (cbLastSuccess == null && cbFailures >= CB_THRESHOLD && !hasBackupKeys) {
-    status = 'down';
-  } else if (isCircuitOpen() && !recentSuccess && !hasBackupKeys) {
-    status = 'down';
-  } else if (recentSuccess || cbFailures <= 2 || lastFailureKind === 'rate_limit') {
+  } else if (recentSuccess) {
+    status = 'degraded'; // serving via backup key
+  } else if (cbFailures === 0) {
+    // No failures recorded — key is healthy even if no traffic has hit it recently
+    status = 'ok';
+  } else if (cbFailures <= 2 || lastFailureKind === 'rate_limit') {
     status = 'degraded';
   } else {
-    status = 'down';
+    status = hasBackupKeys ? 'degraded' : 'down';
   }
 
   const denom = cbFailures + (cbLastSuccess ? 1 : 0);

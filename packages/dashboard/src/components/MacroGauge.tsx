@@ -231,7 +231,7 @@ function BreakdownBars({ breakdown }: { breakdown: Record<string, number> }) {
   const entries = Object.entries(breakdown);
 
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-3">
       {entries.map(([key, val], i) => {
         const meta = BREAKDOWN_META[key] ?? {
           label: key.replace(/_/g, " "),
@@ -242,39 +242,49 @@ function BreakdownBars({ breakdown }: { breakdown: Record<string, number> }) {
         const n = Math.max(0, Math.min(100, Number(val) || 0));
 
         return (
-          <div key={key}>
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <span className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-secondary)]">
+          <div key={key} className="group">
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <span className="flex items-center gap-2 text-[11px] font-semibold text-[var(--text-secondary)]">
                 <span
-                  className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
-                  style={{ background: `${meta.color}18`, color: meta.color }}
+                  className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110"
+                  style={{ background: `${meta.color}16`, color: meta.color, boxShadow: `0 0 0 1px ${meta.color}22 inset` }}
                 >
-                  <Icon className="w-3 h-3" />
+                  <Icon className="w-3.5 h-3.5" />
                 </span>
                 {meta.label}
               </span>
               <span
-                className="text-[11px] font-bold tabular-nums"
-                style={{ color: meta.color, fontFamily: "var(--font-mono)" }}
+                className="text-xs font-bold tabular-nums px-1.5 py-0.5 rounded-md"
+                style={{ color: meta.color, background: `${meta.color}12`, fontFamily: "var(--font-mono)" }}
               >
                 {n}
               </span>
             </div>
             <div
-              className="h-1 rounded-full overflow-hidden"
-              style={{ background: "rgba(255,255,255,0.06)" }}
+              className="h-2 rounded-full overflow-hidden relative"
+              style={{ background: "rgba(255,255,255,0.05)", boxShadow: "inset 0 1px 2px rgba(0,0,0,0.35)" }}
             >
               <motion.div
-                className="h-full rounded-full"
-                style={{ background: meta.color, boxShadow: `0 0 10px ${meta.color}55` }}
+                className="h-full rounded-full relative overflow-hidden"
+                style={{
+                  background: `linear-gradient(90deg, ${meta.color}66, ${meta.color})`,
+                  boxShadow: `0 0 12px ${meta.color}70`,
+                }}
                 initial={{ width: reduceMotion ? `${n}%` : "0%" }}
                 animate={{ width: `${n}%` }}
                 transition={{
-                  delay: reduceMotion ? 0 : 0.15 + i * 0.08,
-                  duration: reduceMotion ? 0 : 0.75,
+                  delay: reduceMotion ? 0 : 0.1 + i * 0.07,
+                  duration: reduceMotion ? 0 : 0.8,
                   ease: [0.16, 1, 0.3, 1],
                 }}
-              />
+              >
+                <motion.div
+                  className="absolute inset-y-0 left-0 w-8 -skew-x-12"
+                  style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)" }}
+                  animate={reduceMotion ? undefined : { x: ["-40%", "140%"] }}
+                  transition={reduceMotion ? undefined : { duration: 2.2, repeat: Infinity, ease: "linear", delay: 1 + i * 0.2 }}
+                />
+              </motion.div>
             </div>
           </div>
         );
@@ -297,11 +307,16 @@ export function MacroRegimePanel({ data, isLoading, isFetching }: MacroRegimePan
 
   if (isLoading) {
     return (
-      <div className="space-y-4 animate-pulse">
-        <div className="h-[168px] rounded-xl" style={{ background: "rgba(255,255,255,0.04)" }} />
-        <div className="space-y-2">
+      <div className="space-y-4">
+        <div className="relative h-[168px] rounded-xl overflow-hidden flex items-center justify-center skeleton">
+          <div className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "rgba(249,115,22,0.35)", borderTopColor: "transparent" }} />
+        </div>
+        <div className="rounded-xl p-3 space-y-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--glass-border)" }}>
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-6 rounded-md" style={{ background: "rgba(255,255,255,0.04)" }} />
+            <div key={i} className="space-y-1.5">
+              <div className="h-2.5 w-2/3 skeleton" />
+              <div className="h-2 w-full skeleton" />
+            </div>
           ))}
         </div>
       </div>
@@ -322,23 +337,25 @@ export function MacroRegimePanel({ data, isLoading, isFetching }: MacroRegimePan
   return (
     <div className="space-y-4">
       <div className="relative">
-        <RegimeGauge score={displayScore} color={meta.color} glow={meta.glow} />
-
-        <div className="absolute top-0 right-0 flex flex-col items-end gap-1">
+        <div className="absolute top-0 left-0 right-0 flex items-center justify-center gap-1.5">
           {isFetching && (
-            <RefreshCw className="w-3.5 h-3.5 text-[var(--text-muted)] animate-spin" aria-hidden />
+            <RefreshCw className="w-3 h-3 text-[var(--text-muted)] animate-spin" aria-hidden />
           )}
           <span
-            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider"
             style={{
               background: `${meta.color}14`,
               color: meta.color,
               border: `1px solid ${meta.color}35`,
             }}
           >
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: meta.color }} />
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: meta.color, boxShadow: `0 0 6px ${meta.color}` }} />
             {meta.label}
           </span>
+        </div>
+
+        <div className="pt-8">
+          <RegimeGauge score={displayScore} color={meta.color} glow={meta.glow} />
         </div>
 
         <p
@@ -351,17 +368,23 @@ export function MacroRegimePanel({ data, isLoading, isFetching }: MacroRegimePan
 
       {Object.keys(breakdown).length > 0 && (
         <div
-          className="rounded-xl p-3"
+          className="rounded-xl p-3.5"
           style={{
-            background: "rgba(255,255,255,0.03)",
+            background: "linear-gradient(160deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015))",
             border: "1px solid var(--glass-border)",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
           }}
         >
-          <div
-            className="text-[10px] font-semibold uppercase tracking-wider mb-3"
-            style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}
-          >
-            Score inputs
+          <div className="flex items-center justify-between mb-3.5">
+            <div
+              className="text-[10px] font-bold uppercase tracking-wider"
+              style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}
+            >
+              Score inputs
+            </div>
+            <span className="text-[10px] font-semibold" style={{ color: "var(--text-muted)" }}>
+              {Object.keys(breakdown).length} signals
+            </span>
           </div>
           <BreakdownBars breakdown={breakdown} />
         </div>

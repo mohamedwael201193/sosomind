@@ -4,7 +4,7 @@ import { getLeaderboard } from '../social/leaderboard';
 import { runStressTest, listPresetScenarios } from '../simulation/stress';
 import { getMacroOutlook } from '../agents/macroOverlay';
 import { generateVoiceBrief, briefingScript, hasVoice } from '../agents/voice';
-import { asyncHandler } from '../utils/http';
+import { asyncHandler, cached } from '../utils/http';
 import { getBinanceKlines, getKrakenKlines } from '../clients/market';
 import { supabase } from '../db/supabase';
 import { chatComplete, ChatMessage } from '../clients/ai';
@@ -42,7 +42,7 @@ router.post('/simulation/run', asyncHandler(async (req, res) => {
 
 // ─── Macro outlook (agents/* alias) ──────────────────────────────────────────
 router.get('/agents/macro', asyncHandler(async (_req, res) => {
-  const outlook = await getMacroOutlook();
+  const outlook = await cached('soso:macro:outlook', 90, () => getMacroOutlook());
   res.json({ data: outlook });
 }));
 
