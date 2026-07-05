@@ -2,193 +2,268 @@
 
 # SoSoMind
 
-**The Agentic Finance OS for Serious Crypto Traders**
+**Research → Signals → Risk → Trade → Portfolio → Track Record**
 
-[![Live](https://img.shields.io/badge/dashboard-sosomind.vercel.app-f97316?style=flat-square)](https://sosomind.vercel.app)
-[![Bot](https://img.shields.io/badge/telegram-%40SosoMindbot-0088cc?style=flat-square&logo=telegram)](https://t.me/SosoMindbot)
-[![Backend](https://img.shields.io/badge/backend-render.com-46e3b7?style=flat-square)](https://render.com)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?style=flat-square&logo=typescript)](https://www.typescriptlang.org)
-[![Vite](https://img.shields.io/badge/Vite-6-646cff?style=flat-square&logo=vite)](https://vitejs.dev)
-[![React](https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react)](https://react.dev)
+[![Dashboard](https://img.shields.io/badge/dashboard-sosomind.vercel.app-f97316?style=flat-square)](https://sosomind.vercel.app)
+[![Backend](https://img.shields.io/badge/API-sosomind--backend.onrender.com-46e3b7?style=flat-square)](https://sosomind-backend.onrender.com/api/health/live)
+[![Telegram](https://img.shields.io/badge/bot-%40SosoMindbot-0088cc?style=flat-square&logo=telegram)](https://t.me/SosoMindbot)
+[![SoDEX Mainnet](https://img.shields.io/badge/SoDEX-Mainnet%20%2B%20Testnet-22c55e?style=flat-square)](https://sodex.com)
+[![Docs](https://img.shields.io/badge/full%20docs-SOSOMIND_DOCUMENTATION.md-6366f1?style=flat-square)](#documentation)
 
-Multi-agent AI research · Real-time sector intelligence · EIP-712 DEX execution · Telegram trading bot · **32 live spot pairs**
+Real SoDEX Mainnet trading · Non-custodial EIP-712 execution · Live SoSoValue intelligence · Public outcome ledger
 
 </div>
 
 ---
 
-## Overview
+## What is SoSoMind?
 
-SoSoMind turns live SoSoValue intelligence into risk-checked, user-approved SoDEX trades — with a public HIT/STOP/DRIFT outcome ledger. **Dashboard signing is non-custodial (MetaMask relay).** Telegram uses a **hosted encrypted wallet** with explicit disclosure.
+SoSoMind is a **production agentic trading platform** that closes the loop between market intelligence and on-chain execution. Every recommendation is evidence-backed, every trade passes a risk gate, and every outcome is tracked publicly.
 
-**Current deployment status:** Production stack on Render (backend) and Vercel (dashboard). SoDEX mainnet trading enabled. Bot reachable at [@SosoMindbot](https://t.me/SosoMindbot). **32 spot markets** across crypto, synthetic stocks, and SSI indexes.
+| Principle | In practice |
+|-----------|-------------|
+| **Evidence first** | Signals carry citations, confidence explanations, and invalidation theses |
+| **Risk gated** | 4-check preflight + circuit breaker before any order reaches SoDEX |
+| **Non-custodial** | Dashboard trades sign in MetaMask via EIP-712 relay |
+| **Environment aware** | Mainnet-limited by default; testnet opt-in in Settings |
+| **No mock data** | When data is unavailable, the UI shows **Unavailable** |
+
+**Full reference:** [SOSOMIND_DOCUMENTATION.md](./SOSOMIND_DOCUMENTATION.md) (Wave 3, July 2026)
+
+---
+
+## Live surfaces
+
+| Surface | URL | Role |
+|---------|-----|------|
+| **Dashboard** | [sosomind.vercel.app](https://sosomind.vercel.app) | Web terminal (Vite + React 19) |
+| **Backend API** | [sosomind-backend.onrender.com](https://sosomind-backend.onrender.com) | Express + agents + relay |
+| **Telegram** | [@SosoMindbot](https://t.me/SosoMindbot) | Mobile research + testnet execution |
+| **SoDEX Mainnet** | [sodex.com](https://sodex.com) | Default execution (chainId `286623`) |
+| **SoDEX Testnet** | [testnet.sodex.com](https://testnet.sodex.com) | Optional via Settings (chainId `138565`) |
 
 ---
 
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                            CLIENT SURFACES                                   │
-│                                                                              │
-│   Vite Dashboard             MCP Clients           Telegram App              │
-│   sosomind.vercel.app        (Claude / Cursor)      @SosoMindbot             │
-│   React 19 + Vite + TS       stdio transport        grammY + EIP-712         │
-└────────┬──────────────────────────┬─────────────────────────┬───────────────┘
-         │ HTTPS/REST               │ MCP stdio               │ Bot Webhook
-         ▼                          ▼                         ▼
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                    BACKEND  (Express · Node 20 · TypeScript)                 │
-│                    Render.com · Port 10000 · Port 10001 (WS)                 │
-│                                                                              │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐    │
-│  │ Orchestrator│  │ Research    │  │ Risk Engine │  │ Macro Overlay   │    │
-│  │ Agent       │  │ Agent       │  │ (4-check)   │  │ Agent           │    │
-│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └────────┬────────┘    │
-│         │                │                │                   │             │
-│  ┌──────▼──────────────────────────────────────────────────────▼────────┐   │
-│  │                     ROUTE LAYER (30+ endpoints)                      │   │
-│  │  /agents  /signals  /sectors  /trades  /portfolio  /macro  /health  │   │
-│  │  /currencies  /etf  /news  /fundraising  /audit  /stats  /sodex     │   │
-│  └──────┬──────────────────────────────────────────────────────┬────────┘   │
-│         │                                                       │            │
-│  ┌──────▼──────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────▼──────┐    │
-│  │ SoSoValue   │  │ SoDEX       │  │ AI Client   │  │ Supabase       │    │
-│  │ Client      │  │ EIP-712     │  │ 6-provider  │  │ 9 tables       │    │
-│  │ 35 methods  │  │ Client      │  │ fallback    │  │ PostgreSQL     │    │
-│  └──────┬──────┘  └──────┬──────┘  └─────────────┘  └────────────────┘    │
-└─────────┼────────────────┼─────────────────────────────────────────────────┘
-          │                │
-┌─────────▼────┐  ┌────────▼──────────┐
-│ SoSoValue API│  │ SoDEX Testnet     │
-│ 9 modules    │  │ testnet-gw.sodex  │
-│ 35 endpoints │  │ EIP-712 signed    │
-└──────────────┘  └───────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│  CLIENTS                                                                 │
+│  Vercel Dashboard  │  Telegram Bot  │  MCP (Cursor / Claude)           │
+└─────────┬──────────────────┬──────────────────────┬─────────────────────┘
+          │ HTTPS + JWT      │ grammY               │ stdio MCP
+          ▼                  ▼                      ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Render Backend (port 10000, always-on)                                  │
+│  Express REST  │  WebSocket /ws  │  Agent Pipeline  │  Cron Jobs       │
+└─────────┬──────────────────┬──────────────────────┬─────────────────────┘
+          │                  │                      │
+          ▼                  ▼                      ▼
+┌──────────────┐  ┌──────────────┐  ┌──────────────────────────────────┐
+│ SoSoValue    │  │ SoDEX GW     │  │ Supabase PostgreSQL + Upstash    │
+│ 35 API methods│  │ Mainnet/Test │  │ Redis cache                       │
+└──────────────┘  └──────────────┘  └──────────────────────────────────┘
 ```
+
+### Agent pipeline
+
+```
+Orchestrator → Research (13+ sources) → Risk (4 checks) → Macro Overlay → Execution
+```
+
+**AI fallback chain:** Cerebras → SambaNova → Together → OpenRouter → Groq → Gemini
 
 ---
 
-## Repository Structure
+## Production features
+
+### Trading & execution
+
+- **SoDEX Mainnet trading** — default profile `mainnet-limited`, $100 notional cap per order
+- **4-step trade wizard** — Strategy → Risk Preflight → EIP-712 Sign → Execution Proof
+- **Non-custodial relay** — `POST /api/sodex/relay` with MetaMask typed-data signing
+- **Limit + IOC orders** — market-style fills with slippage buffer (+0.5% buy / -0.5% sell)
+- **Sell balance guard** — blocks sells above available balance (fee reserved)
+- **Relay audit trail** — every order logged in `signed_orders`; merged into trade/portfolio history
+- **Live status polling** — timeline endpoint refreshes fill status from SoDEX
+
+### Intelligence
+
+- **AI Research** — parallel SoSoValue + market fetches, multi-provider synthesis
+- **Evidence-first signals** — citations, confidence bands, invalidation thesis
+- **Track Record** — public HIT / STOP / DRIFT outcome ledger (`/track-record`)
+- **SSI 13-sector scoring** — DeFi, AI, L1, L2, RWA, MAG7, Meme, and more
+- **Macro Regime panel** — ETF flows, BTC momentum, macro safety, composite score (0–100)
+- **Portfolio Terminal** — live balances, open orders, history, fills from SoDEX API
+
+### Infrastructure
+
+- **Environment profiles** — `mainnet-limited` (default), `testnet`, `mainnet-readonly`
+- **Health monitoring** — live probes, circuit breakers, SoSoValue failover keys
+- **WebSocket feeds** — prices, orderbook, signals, alerts on `wss://…/ws`
+- **MCP servers** — 35 SoSoValue tools + 19 SoDEX tools for AI assistants
+- **Telegram bot** — research, signals, testnet trade, embedded wallet (encrypted)
+
+### Labs (preview)
+
+Arbitrage, Whales, Persona, Playbook, Rebalance, Strategies, Leaderboard — preview quality with banner shown in UI.
+
+---
+
+## Dashboard routes
+
+| Route | Purpose |
+|-------|---------|
+| `/` | Landing (marketing, production-accurate copy) |
+| `/dashboard` | Overview hub + user journey |
+| `/trade` | 4-step non-custodial trading wizard |
+| `/portfolio` | Balances, orders, fills |
+| `/signals` | AI signal feed |
+| `/research` | On-demand asset analysis |
+| `/sectors` | SSI sector intelligence |
+| `/agents` | Macro Regime scoring + breakdown |
+| `/track-record` | Public outcome ledger |
+| `/perps` | Perps read-only terminal |
+| `/settings` | Mainnet / Testnet switch |
+| `/docs` | In-app API reference |
+| `/status` | System health |
+
+---
+
+## Trading flow (dashboard)
+
+1. **Connect wallet** — Reown AppKit / MetaMask
+2. **Choose strategy** — Copy Signal, Follow SSI Basket, or Manual Order
+3. **Preflight** — wallet, balance, min notional, market status, risk checks
+4. **Sign EIP-712** — client-side typed data in MetaMask
+5. **Relay submit** — backend verifies signature, forwards to SoDEX gateway
+6. **Execution proof** — poll audit timeline; link to SoDEX Portfolio for fills
+
+Spot orders settle on the **SoDEX appchain** (not ValueChain EVM explorer). Proof links point to [SoDEX Portfolio → Order History](https://sodex.com/portfolio).
+
+---
+
+## Risk & safety
+
+| Layer | Mechanism |
+|-------|-----------|
+| **Preflight** | Daily cap, concentration (30%), ATR filter, drawdown halt |
+| **Circuit breaker** | 3 global losses → 1h halt; 2 per-asset → 24h block |
+| **Kill switch** | `KILL_SWITCH_TRADING=true` halts all trading instantly |
+| **Notional cap** | $100/order on `mainnet-limited` profile |
+| **Rate limits** | 120 req/min global, 30 relay/min per wallet |
+| **Production guards** | Strong `JWT_SECRET` + `WALLET_ENCRYPT_KEY` required |
+
+---
+
+## Repository structure
 
 ```
 sosomind/
 ├── packages/
-│   ├── backend/              Express API + Agent System
+│   ├── backend/           Express API, agents, bot, WebSocket, cron
 │   │   └── src/
-│   │       ├── server.ts     Entry point, route registration, background tasks
-│   │       ├── agents/       Orchestrator, Research, Risk, CircuitBreaker,
-│   │       │                 Execution, SectorRotation, MacroOverlay
-│   │       ├── routes/       30+ Express route modules
-│   │       ├── clients/      SoSoValue (35 EP), SoDEX (EIP-712), AI (6-chain),
-│   │       │                 Redis, OpenAI
-│   │       ├── bot/          grammY Telegram bot — wallet, trading, commands
-│   │       ├── ws/           WebSocket server :10001 (5 live channels)
-│   │       ├── cron/         Heartbeat (5m), AnomalyScanner (4h)
-│   │       ├── content/      Autonomous briefing generation + publishing
-│   │       └── db/           Supabase typed CRUD, migrations
-│   │
-│   ├── dashboard/            Vite 6 + React 19 + React Router + TailwindCSS
-│   │   └── src/
-│   │       ├── app/          Page modules: landing, trade, signals, sectors,
-│   │       │                 research, portfolio, roadmap, docs, methodology
-│   │       ├── components/   SpotlightCard, GlassCard, Logo, Charts
-│   │       ├── context/      WalletContext, ThemeContext
-│   │       └── lib/          api.ts, env.ts (VITE_*), websocket.ts
-│   │
-│   ├── mcp-sosovalue/        35 MCP tools over stdio (all 9 SoSoValue modules)
-│   ├── mcp-sodex/            25 MCP tools over stdio (spot, perps, account, writes)
-│   └── openclaw-skills/      5 OpenClaw SKILL.md packs
-│
-├── skills/                   Mirrored skills (market-research, portfolio-briefing,
-│                             risk-monitor, trade-execution, content-studio)
-├── docker-compose.yml        Orchestrates backend + dashboard containers
-├── render.yaml               Render.com service definition
-├── vercel.json               Vercel deployment config
-└── ARCHITECTURE.md           Full system architecture reference
+│   │       ├── agents/    Research, Risk, Execution, Macro, SSI
+│   │       ├── routes/    REST + sodex-relay + trading timeline
+│   │       ├── clients/   SoSoValue, SoDEX, AI (6-provider chain)
+│   │       ├── bot/       grammY Telegram bot
+│   │       └── ws/        WebSocket server
+│   ├── dashboard/         Vite 6 + React 19 + Tailwind 4
+│   │   └── src/app/       Pages: trade, portfolio, agents, landing, …
+│   ├── mcp-sosovalue/     35 MCP tools
+│   └── mcp-sodex/         19 MCP tools
+├── render.yaml            Render backend + heartbeat cron
+├── SOSOMIND_DOCUMENTATION.md   Full production reference
+└── README.md              This file
 ```
 
 ---
 
-## Features
+## Quick start
 
-### Core Trading Capabilities
+### Prerequisites
 
-| Feature | Description | Status |
-|---|---|---|
-| **NLP Intent Trading** | Type in plain English, execute with precision | ✅ Live |
-| **Signal Marketplace** | Curated signal streams with live performance tracking | ✅ Live |
-| **Copy Signal** | Copy high-confidence AI research signals to trade | ✅ Live |
-| **SSI Basket Trading** | Trade top sector basket assets via ETH/BTC proxy | ✅ Live |
-| **Manual Order** | Direct limit/market order entry on SoDEX | ✅ Live |
-| **Arbitrage Scanner** | Cross-exchange spread detection with slippage paths | 🔧 Partial |
-| **Whale Tracker** | On-chain wallet movement alerts | 🔧 Partial |
-| **Portfolio Rebalancer** | Target allocation auto-rebalancing | ✅ Live |
-| **Paper Trading** | Full simulation with live prices | 🔧 Partial |
-| **Confluence Engine** | 5+ signal combination for high-confidence ideas | ✅ Live |
-| **Voice Trading** | ElevenLabs voice command execution | 🔧 Partial |
-| **Kelly Criterion** | Optimal position sizing by edge + risk tolerance | ✅ Live |
-| **Social Sentiment** | Twitter/X, Telegram, Reddit aggregation | 🔧 Partial |
-| **Tax Reporting** | Capital gains reports, FIFO accounting | 🔧 Partial |
-| **MEV Protection** | MEV-resistant RPC routing | 🔧 Partial |
-| **Trader Persona** | AI-built risk profile from trading history | ✅ Live |
-| **Funding Signals** | Perpetual funding rate monitoring | ✅ Live |
-| **Macro Playbook** | Regime-aware strategy selection | ✅ Live |
+- Node.js 20+
+- Supabase project
+- SoSoValue API key (`SOSO-...`)
+- SoDEX wallet + account (for trading)
 
-### Intelligence Layer
+### Local development
 
-| System | Description |
-|---|---|
-| **Sector Intelligence (SSI)** | 13 crypto sectors scored 0–100 (S1 + S2 + S3 composite) |
-| **Signal Outcome Tracker** | Automated HIT/STOP/DRIFT classification |
-| **My Edge Analytics** | Per-user win rate, peak hours, asset performance |
-| **Smart-Money Brief** | AI-generated daily market newsletter |
-| **Macro Overlay** | ETF flows + macro events + BTC momentum → risk regime |
+```bash
+git clone https://github.com/mohamedwael201193/sosomind.git
+cd sosomind
+npm install
 
----
+# Backend
+cp packages/backend/.env.example packages/backend/.env   # add your keys
+cd packages/backend && npm run dev
+# → http://localhost:10000
 
-## Agent System
+# Dashboard (new terminal)
+cp packages/dashboard/.env.example packages/dashboard/.env.local
+# VITE_API_URL=http://localhost:10000
+cd packages/dashboard && npm run dev
+# → http://127.0.0.1:3000
 
-| Agent | Role | Confidence |
-|---|---|---|
-| **Orchestrator** | Routes intent to specialist agents, enforces circuit breakers | Central |
-| **Research** | 13+ parallel data sources → AI synthesis → structured signal | ✅ |
-| **Risk** | 4-check gatekeeper: daily cap, concentration, ATR, drawdown | ✅ |
-| **CircuitBreaker** | Consecutive loss tracking, per-asset 24h blocks | ✅ |
-| **Execution** | EIP-712 limit+IOC order placement on SoDEX | ✅ |
-| **SectorRotation** | Fundraising + price + news momentum scoring | ✅ |
-| **MacroOverlay** | Risk regime: `risk-on` / `risk-off` / `neutral` | ✅ |
-
-### AI Provider Fallback Chain
-
-```
-Cerebras → SambaNova → Together → OpenRouter → Groq → Gemini
+# Verify
+curl http://localhost:10000/api/health/live
 ```
 
-Each provider has cooldown tracking (429/5xx → 30s, 4xx → 5 min). 5-min Redis cache per prompt hash.
+### Production deploy
+
+| Service | Platform | Trigger |
+|---------|----------|---------|
+| Backend | [Render](https://render.com) | Push to `main` → `render.yaml` |
+| Dashboard | [Vercel](https://vercel.app) | Push to `main` → `packages/dashboard` |
 
 ---
 
-## Data Sources
+## API quick reference
 
-| Source | Tools | Type | Module |
-|---|---|---|---|
-| **SoSoValue** | 35 | REST + MCP | Currencies, ETF, Indices, Stocks, BTC Treasuries, News, Fundraising, Macro, Analysis |
-| **SoDEX** | 25 | REST + MCP + EIP-712 | Spot, Perps, Account, Writes |
-| Macro Events | 8 | Feed | FOMC, CPI, Non-Farm, Fed speeches |
-| ETF Flows | 7 | Feed | BTC/ETH ETF daily/weekly flows |
-| Sector Indices | 8 | Feed | 13 SSI sector composites |
-| BTC Treasuries | 4 | Feed | Corporate BTC holdings |
-| Crypto Stocks | 6 | REST | MSTR, COIN, RIOT, CLSK, etc. |
-| News Feed | 11 | AI | Hot news, featured, search |
-| Fundraising DB | 6 | Feed | VC rounds, token sales |
+**Base:** `https://sosomind-backend.onrender.com`
+
+**Headers:**
+- `X-SoSoMind-Environment: mainnet|testnet` (dashboard sends automatically)
+- `Authorization: Bearer <jwt>` (wallet-authenticated routes)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/health/live` | Fast liveness probe |
+| GET | `/api/config/environment` | Active profile + trading controls |
+| POST | `/api/agents/research/:asset` | Run research pipeline |
+| GET | `/api/agents/macro` | Macro regime outlook (cached 90s) |
+| GET | `/api/signals/track-record` | HIT/STOP/DRIFT counts |
+| GET | `/api/public/signals` | Public track record (landing) |
+| GET | `/api/risk/preflight` | Trade preflight gate |
+| POST | `/api/sodex/relay` | EIP-712 order relay (JWT) |
+| GET | `/api/trading/orders/:id/timeline` | Order audit + live status |
+| GET | `/api/sodex/user/:address/balances` | Spot balances |
+
+Interactive reference: [sosomind.vercel.app/docs](https://sosomind.vercel.app/docs)
 
 ---
 
-## MCP Tools
+## WebSocket
 
-SoSoMind ships two MCP servers for AI assistant integration (Claude Desktop, Cursor, VS Code).
+**URL:** `wss://sosomind-backend.onrender.com/ws`
 
-### mcp-sosovalue (35 tools)
+```json
+{ "subscribe": "prices" }
+```
+
+| Channel | Frequency | Data |
+|---------|-----------|------|
+| `prices` | 15s | BTC / ETH / SOL snapshots |
+| `orderbook` | 10s | BTC_vUSDC depth |
+| `signals` | 30s + realtime | Latest signals |
+| `alerts` | 60s | Triggered alerts |
+
+---
+
+## MCP integration
+
+### SoSoValue (35 tools)
 
 ```json
 {
@@ -201,347 +276,133 @@ SoSoMind ships two MCP servers for AI assistant integration (Claude Desktop, Cur
 }
 ```
 
-| Module | Tools |
-|---|---|
-| Currencies | `get_currencies`, `get_currency_info`, `get_market_snapshot`, `get_token_economics`, `get_klines`, `get_supply`, `get_pairs`, `get_sector_spotlight`, `get_currency_fundraising` |
-| ETF | `get_etf_list`, `get_etf_summary_history`, `get_etf_market_snapshot`, `get_etf_history` |
-| Indices | `get_indices`, `get_index_constituents`, `get_index_market_snapshot`, `get_index_klines` |
-| Crypto Stocks | `get_crypto_stock_list`, `get_crypto_stock_snapshot`, `get_crypto_stock_market_cap`, `get_crypto_stock_klines`, `get_crypto_stock_sectors`, `get_crypto_sector_index` |
-| BTC Treasuries | `get_btc_treasuries`, `get_btc_purchase_history` |
-| News | `get_news_feed`, `get_hot_news`, `get_featured_news`, `search_news` |
-| Fundraising | `get_fundraising_projects`, `get_fundraising_project_detail` |
-| Macro | `get_macro_events`, `get_macro_event_history` |
-| Analysis | `get_analysis_charts`, `get_analysis_chart_data` |
+Modules: Currencies, ETF, Indices, Crypto Stocks, BTC Treasuries, News, Fundraising, Macro, Analysis.
 
-### mcp-sodex (19 tools)
+### SoDEX (19 tools)
 
-```json
-{
-  "mcpServers": {
-    "sodex": {
-      "command": "node",
-      "args": ["packages/mcp-sodex/dist/index.js"]
-    }
-  }
-}
-```
-
-| Category | Tools |
-|---|---|
-| Spot Reads | `get_spot_symbols`, `get_spot_tickers`, `get_spot_orderbook`, `get_spot_trades`, `get_spot_klines` |
-| Perps Reads | `get_perps_symbols`, `get_perps_mark_prices`, `get_perps_orderbook`, `get_perps_klines`, `get_perps_trades` |
-| Account | `get_account_balances`, `get_perps_balances`, `get_perps_positions`, `get_spot_orders`, `get_perps_orders` |
-| Writes | `place_spot_order`, `cancel_spot_order`, `place_perps_order`, `cancel_perps_order` |
-
-All write tools use EIP-712 non-custodial signing.
+Spot/perps reads, account balances, and EIP-712 write tools (`place_spot_order`, etc.).
 
 ---
 
-## OpenClaw Skills
+## Environment variables
 
-Five domain-specific SKILL.md packs in `packages/openclaw-skills/`:
-
-| Skill | Trigger | Key MCP Tools Used |
-|---|---|---|
-| `market-research` | "Research BTC" / "What's the outlook for ETH?" | `get_market_snapshot`, `get_sector_spotlight`, `get_macro_events`, `get_hot_news` |
-| `portfolio-briefing` | "Morning briefing" / "Portfolio summary" | `get_etf_history`, `get_index_market_snapshot`, `get_crypto_stock_snapshot` |
-| `risk-monitor` | "Check my risk" / "Any danger signals?" | `get_market_snapshot`, `get_macro_events`, circuit breaker state |
-| `trade-execution` | "Buy 0.01 BTC" / "Execute long ETH" | `place_spot_order`, `get_spot_orderbook`, EIP-712 sign |
-| `content-studio` | "Generate market brief" / "Publish daily report" | `get_sector_spotlight`, `get_hot_news`, `get_etf_summary_history` |
-
----
-
-## Backend API Reference
-
-Base URL: `https://api.sosomind.app` (Render) or `http://localhost:10000`
-
-### Agents
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/agents/signals` | Fetch latest AI signals from Supabase |
-| `POST` | `/api/agents/research/:asset` | Generate signal for asset on-demand |
-| `GET` | `/api/agents/macro` | Get macro regime classification |
-| `GET` | `/api/signals/track-record` | Public win/loss statistics |
-
-### Market Data (via SoSoValue)
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/currencies/snapshot?symbol=BTC` | Live price + volume |
-| `GET` | `/api/etf/list?symbol=BTC&country_code=US` | ETF products |
-| `GET` | `/api/macro/events` | Upcoming macro events |
-| `GET` | `/api/news/hot` | Hot crypto news |
-| `GET` | `/api/sectors/intel` | All 13 SSI sectors scored |
-| `GET` | `/api/sectors/intel/:ticker/basket` | Top 3 assets for sector |
-
-### SoDEX (Testnet)
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/sodex/spot/symbols` | All spot markets |
-| `GET` | `/api/sodex/spot/orderbook?market=vBTC_vUSDC&depth=5` | Live orderbook |
-| `GET` | `/api/sodex/account/balances` | Wallet balances |
-
-### Operations
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/health` | Full service health (backend, SoSoValue, SoDEX, AI, Supabase, Telegram) |
-| `GET` | `/api/audit/logs` | Paginated agent activity logs |
-| `GET` | `/api/stats/accuracy` | Signal accuracy metrics |
-| `GET` | `/api/stats/performance` | Portfolio performance |
-
----
-
-## WebSocket Server
-
-Port `:10001`. Subscribe with `{"subscribe": "channel"}`.
-
-| Channel | Push Interval | Data |
-|---|---|---|
-| `prices` | 15s | BTC/ETH/SOL live prices |
-| `orderbook` | 10s | SoDEX vBTC_vUSDC top 10 levels |
-| `signals` | 30s | Latest 5 AI signals |
-| `alerts` | 60s | Triggered alerts (last 5) |
-
-```javascript
-const ws = new WebSocket('wss://api.sosomind.app/ws')
-ws.send(JSON.stringify({ subscribe: 'prices' }))
-ws.onmessage = (e) => console.log(JSON.parse(e.data))
-// → { channel: 'prices', ts: 1720000000000, data: [...] }
-```
-
----
-
-## Telegram Bot
-
-**[@SosoMindbot](https://t.me/SosoMindbot)** — full trading interface from any device.
-
-### Commands
-
-| Command | Description |
-|---|---|
-| `/start` | Welcome + persistent reply keyboard |
-| `/research [asset]` | Deep AI research on any crypto asset |
-| `/signal [asset]` | Live signal with entry, TP, SL, confidence |
-| `/trade [asset]` | Execute spot order on SoDEX |
-| `/basket` | SSI sector basket trading |
-| `/methodology` | Signal scoring explanation |
-| `/wallet` | View embedded wallet address + balance |
-| `/setup` | Full account setup flow |
-| `/portfolio` | Positions + recent trades |
-| `/briefing` | AI-generated daily market brief |
-| `/macro` | Macro regime + upcoming events |
-| `/sector` | SSI sector scores |
-| `/track_record` | Signal win/loss history |
-| `/intel` | Sector intelligence dashboard |
-
-### Embedded Wallet System
-
-Every Telegram user gets an embedded EVM wallet on first `/start`:
-- AES-256-GCM encrypted with `WALLET_ENCRYPT_KEY` (required in production)
-- **Hosted signing** — server decrypts and signs only after you confirm a trade
-- For **non-custodial** execution, use Dashboard + MetaMask via `/api/sodex/relay`
-- Stores wallet address in `telegram_wallets` Supabase table
-- Reset flow if decrypt fails (user can trigger with confirmation)
-
----
-
-## Database Schema (Supabase)
-
-| Table | Purpose |
-|---|---|
-| `signals` | AI-generated trading signals with direction, confidence, entry/TP/SL, outcome |
-| `telegram_wallets` | Per-user encrypted embedded wallets |
-| `agent_logs` | Timestamped agent activity + results |
-| `agent_meta` | Key-value store for agent state (win rates, track record) |
-| `user_profiles` | Trader persona, preferences, risk settings |
-| `trades` | Trade history with fill details |
-| `alerts` | User-configured price alerts |
-| `content_posts` | Published briefings + channel posts |
-| `portfolio_snapshots` | Daily portfolio value snapshots |
-
----
-
-## Quick Start
-
-### Prerequisites
-
-- Node.js 20+
-- A Supabase project (free tier works)
-- SoSoValue API key (`SOSO-...`)
-- Telegram bot token (from [@BotFather](https://t.me/BotFather))
-
-### Local Development
+<details>
+<summary><strong>Backend (Render)</strong></summary>
 
 ```bash
-# 1. Clone and install
-git clone https://github.com/your-org/sosomind.git
-cd sosomind
-npm install
+# Core
+NODE_ENV=production
+PORT=10000
+FRONTEND_URL=https://sosomind.vercel.app
+CORS_ALLOWED_ORIGINS=https://sosomind.vercel.app
 
-# 2. Configure environment
-cp .env.example .env
-# Edit .env with your keys (see Environment Variables below)
+# SoSoValue
+SOSO_API_KEY=SOSO-...
+SOSO_BASE_URL=https://openapi.sosovalue.com/openapi/v1
 
-# 3. Apply Supabase migrations
-# Open: https://supabase.com/dashboard/project/<your-project>/sql/new
-# Run: packages/backend/supabase/migrations/001_init.sql
+# SoDEX
+SODEX_CHAIN_ID=286623
+SODEX_MAINNET_URL=https://mainnet-gw.sodex.dev/api/v1
+SODEX_TESTNET_URL=https://testnet-gw.sodex.dev/api/v1
+SOSOMIND_DEFAULT_PROFILE=mainnet-limited
+TRADING_MAX_NOTIONAL_USD=100
+KILL_SWITCH_TRADING=false
 
-# 4. Start backend
-cd packages/backend
-npm run dev
-# Backend runs on :10000, WebSocket on :10001
+# Database + cache
+SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+UPSTASH_REDIS_REST_URL=...
+UPSTASH_REDIS_REST_TOKEN=...
 
-# 5. Start dashboard (new terminal)
-cd packages/dashboard
-cp .env.example .env.local
-# Set VITE_API_URL=http://localhost:10000 and VITE_WS_URL=ws://localhost:10001
-npm run dev
-# Dashboard runs on http://127.0.0.1:3000
+# Auth + security
+JWT_SECRET=...
+WALLET_ENCRYPT_KEY=...
 
-# 6. Verify
-curl http://localhost:10000/api/health
+# AI (6-provider chain)
+CEREBRAS_API_KEY=...
+SAMBANOVA_API_KEY=...
+TOGETHER_API_KEY=...
+OPENROUTER_API_KEY=...
+GROQ_API_KEY=...
+GEMINI_API_KEY=...
+
+# Telegram
+TELEGRAM_BOT_TOKEN=...
+TELEGRAM_ALLOWED_CHAT_IDS=...
 ```
 
-### Production (Docker)
+</details>
+
+<details>
+<summary><strong>Frontend (Vercel)</strong></summary>
 
 ```bash
-docker compose up -d --build
-# Backend: :10000, Dashboard: :3000
+VITE_API_URL=https://sosomind-backend.onrender.com
+VITE_DEFAULT_ENVIRONMENT=mainnet
+VITE_REOWN_PROJECT_ID=...
 ```
 
-### Deploy to Render + Vercel
-
-**Backend (Render):** Push to main → Render auto-deploys from `render.yaml`
-
-**Dashboard (Vercel):**
-```bash
-cd packages/dashboard
-vercel --prod
-```
+</details>
 
 ---
 
-## Environment Variables
+## Documentation
 
-| Variable | Required | Description |
-|---|---|---|
-| `SOSOVALUE_API_KEY` | ✅ | SoSoValue API key (`SOSO-...`) |
-| `SODEX_CHAIN_ID` | ✅ | `138565` (testnet) or `286623` (mainnet) |
-| `SODEX_PRIVATE_KEY` | ✅ | Trading wallet private key (0x...) |
-| `SODEX_ADDRESS` | ✅ | Trading wallet address |
-| `SODEX_ACCOUNT_ID` | ✅ | SoDEX account ID (from `/accounts/{addr}/state`) |
-| `WALLET_ENCRYPT_KEY` | ✅ | AES-256-GCM key for Telegram wallet encryption |
-| `TELEGRAM_BOT_TOKEN` | ✅ | Bot token from BotFather |
-| `TELEGRAM_ALLOWED_CHAT_ID` | ✅ | Your private Telegram chat ID |
-| `TELEGRAM_CHANNEL_ID` | Optional | Channel ID for publishing briefings |
-| `SUPABASE_URL` | ✅ | Supabase project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Supabase service role key |
-| `REDIS_URL` | ✅ | Upstash Redis URL |
-| `DASHBOARD_URL` | ✅ | Public dashboard URL |
-| `OPENAI_API_KEY` | Optional | OpenAI key (GPT-4o fallback) |
-| `GROQ_API_KEY` | Optional | Groq key (Llama fallback) |
-| `OPENROUTER_API_KEY` | Optional | OpenRouter key (multi-model) |
-| `DRY_RUN` | Optional | Set `true` to block live trades |
+| Document | Contents |
+|----------|----------|
+| **[SOSOMIND_DOCUMENTATION.md](./SOSOMIND_DOCUMENTATION.md)** | Complete production reference (31 sections) |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | System architecture deep-dive |
+| [In-app docs](https://sosomind.vercel.app/docs) | Interactive API reference |
 
 ---
 
-## Risk Management
+## Recent updates (Wave 3)
 
-### Risk Agent (4-check Gatekeeper)
-
-| Check | Threshold | Response |
-|---|---|---|
-| Daily trade cap | 10 trades/day | `REJECTED` |
-| Portfolio concentration | 30% max per asset | `ADJUSTED` (reduced size) |
-| ATR volatility filter | >15% ATR | `REJECTED` |
-| Daily drawdown | <-5% of portfolio | `HALT` |
-
-### Circuit Breaker
-
-- **Global:** 3 consecutive losses → 1h trading pause
-- **Per-asset:** >2 losses in 24h OR >15% price drop → 24h asset block
-- Manual reset via API: `POST /api/agents/circuit-breaker/reset`
-
-### SoDEX Order Safety
-
-- Market orders are forbidden (use limit+IOC to avoid oracle price errors)
-- `DRY_RUN=true` blocks all live write calls
-- Min notional: 5 USDC per order
-- All quantities: 8 decimal places, no trailing zeros
-- Retry-doubled-qty: automatic single retry on quantity rejection
+| Area | Change |
+|------|--------|
+| **Mainnet** | Production default `mainnet-limited`; real SoDEX Mainnet trading |
+| **Landing** | Full rewrite from production docs; root URL opens landing |
+| **Macro Regime** | Premium radial gauge, parallel ETF fetches, 90s API cache |
+| **Sell orders** | Balance guard, limit+IOC market path, relay rejection detection |
+| **Health** | Live endpoint fallback, SoSoValue failover status fix |
+| **Overview** | User journey flow with animated SVG diagrams |
+| **Research** | Real AI analysis with premium click-to-analyze UX |
+| **History** | Relay audit orders merged with SoDEX order history |
+| **Docs** | `SOSOMIND_DOCUMENTATION.md` as single source of truth |
 
 ---
 
-## Sector Intelligence System (SSI)
+## Production limitations
 
-13 crypto sectors, each scored 0–100 from three signals:
-
-| Signal | Weight | Source |
-|---|---|---|
-| S1 — ETF Flows | 30% | BTC/ETH ETF 7-day flow |
-| S2 — Sector Momentum | 35% | `getIndexMarketSnapshot(ticker)` roi_7d |
-| S3 — Sector Trend | 35% | `getIndexKlines(ticker, limit:30)` 30-day price trend |
-
-**Verdict thresholds:** STRONG_BUY ≥75 · BUY ≥55 · NEUTRAL ≥35 · SELL <35
-
-**Sectors:** `ssiDeFi` · `ssiAI` · `ssiLayer1` · `ssiLayer2` · `ssiRWA` · `ssiNFT` · `ssiMeme` · `ssiGameFi` · `ssiMAG7` · `ssiPayFi` · `ssiCeFi` · `ssiSocialFi` · `ssiDePIN`
-
-**Cache:** 5-min Redis TTL. Force refresh: `GET /api/sectors/intel?refresh=1`
-
----
-
-## SoDEX Integration Notes
-
-| Detail | Value |
-|---|---|
-| Testnet base URL | `https://testnet-gw.sodex.dev/api/v1` |
-| Chain ID | `138565` |
-| Auth | EIP-712 headers: `X-API-Sign`, `X-API-Nonce`, `X-API-Chain` |
-| EIP-712 Domain | `{name:"spot"|"futures", version:"1", chainId, verifyingContract:0x000...}` |
-| payloadHash | `keccak256(JSON({type:actionName, params:body}))` |
-| Spot symbols | `vBTC_vUSDC` (id=1), `vETH_vUSDC` (id=2), `TESTBTC_vUSDC` (id=18) |
-| BTC price precision | 0 (integer string prices only) |
-| BTC quantity precision | 5 decimal places |
-| Order type | Limit+IOC (type=1, timeInForce=3) |
-
----
-
-## Commit History (Recent)
-
-| Commit | Description |
-|---|---|
-| `ba75c07` | Rev 47: Copy Signal live-generates; SSI Basket proxy |
-| `cbf1f68` | Rev 46e: Multi-field qty fallbacks + retry-doubled-qty |
-| `785f93a` | Rev 46d: marketMinQuantity enforcement + 8dp precision |
-| `2a6fd87` | Rev 46c: Dynamic market resolution + inline wallet balance |
-| `4310b6f` | Rev 46b: Auto-register SoDEX account + qty precision |
-| `57a3ea4` | Rev 46: Decrypt fix + copy signal + SSI basket |
-| `3ae7de4` | Rev 45: Strategy differentiation + bot basket/methodology |
+| Limit | Detail |
+|-------|--------|
+| Mainnet notional | $100 per order (`mainnet-limited`) |
+| Perps execution | Read-only UI |
+| Aggregate spot PnL | Not exposed by SoDEX API |
+| Telegram mainnet | Execution disabled; use dashboard + MetaMask |
+| Labs pages | Preview quality |
 
 ---
 
 ## Contributing
 
-This is an actively developed project. All contributions should:
-
-1. Pass TypeScript strict mode (`npx tsc --noEmit` — 0 errors in all 4 packages)
-2. Use real API calls only — no mocks, no hardcoded sample data
-3. Full file replacements only — no partial TODOs
-4. Test against the live SoSoValue API and SoDEX Testnet before PR
-5. Update `summary.md` with a new Rev section describing all changes
+1. TypeScript strict — `npm run build` in affected packages
+2. Real APIs only — no mocks or hardcoded demo data on production surfaces
+3. Match [SOSOMIND_DOCUMENTATION.md](./SOSOMIND_DOCUMENTATION.md) for behavior claims
+4. Test against live SoSoValue + SoDEX before PR
 
 ---
 
 ## License
 
-Private — all rights reserved. Contact the SoSoMind team for licensing.
+Private — all rights reserved.
 
 ---
 
 <div align="center">
-Built with precision for the serious crypto trader.<br>
-<a href="https://sosomind.vercel.app">Dashboard</a> · <a href="https://t.me/SosoMindbot">Telegram Bot</a> · <a href="ARCHITECTURE.md">Full Architecture</a>
+
+**Built for traders who want evidence, not hype.**
+
+[Dashboard](https://sosomind.vercel.app) · [Telegram](https://t.me/SosoMindbot) · [Full Docs](./SOSOMIND_DOCUMENTATION.md) · [Track Record](https://sosomind.vercel.app/track-record)
+
 </div>
