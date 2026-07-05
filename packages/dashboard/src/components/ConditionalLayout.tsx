@@ -25,7 +25,7 @@ export function ConditionalLayout({ children }: { children: React.ReactNode }) {
     <>
       <Sidebar />
       <MobileNav />
-      <main className="md:ml-[240px] min-h-screen p-6 pb-20 md:pb-24 relative z-10">
+      <main className="md:ml-[240px] min-h-[100dvh] px-4 py-6 md:px-8 md:py-8 pb-24 md:pb-10 relative z-10 max-w-[1600px]">
         <PageTransition>{children}</PageTransition>
       </main>
       <StatusBar />

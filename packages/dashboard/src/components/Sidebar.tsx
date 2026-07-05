@@ -38,33 +38,39 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    label: "PROVE",
-    items: [
-      { href: "/track-record", label: "Track Record", icon: Target },
-      { href: "/signals", label: "Signals", icon: Zap, badge: true },
-      { href: "/methodology", label: "Methodology", icon: FlaskConical },
-    ],
-  },
-  {
-    label: "ACT",
+    label: "TRADING",
     items: [
       { href: "/trade", label: "Trade", icon: CandlestickChart },
-      { href: "/sectors", label: "SSI Sectors", icon: Grid3X3 },
-      { href: "/research", label: "Research", icon: Search },
+      { href: "/portfolio", label: "Portfolio", icon: PieChart },
+      { href: "/perps", label: "Perps", icon: Activity },
     ],
   },
   {
-    label: "MONITOR",
+    label: "INTELLIGENCE",
     items: [
-      { href: "/portfolio", label: "Portfolio", icon: PieChart },
-      { href: "/perps", label: "Perps (Read-only)", icon: Activity },
+      { href: "/signals", label: "Signals", icon: Zap, badge: true },
+      { href: "/research", label: "Research", icon: Search },
+      { href: "/sectors", label: "SSI Sectors", icon: Grid3X3 },
       { href: "/agents", label: "Market Regime", icon: BarChart3 },
     ],
   },
   {
-    label: "LABS",
+    label: "ACCOUNT",
+    items: [
+      { href: "/account", label: "Account & Funding", icon: Wallet },
+      { href: "/profile", label: "Profile", icon: User },
+      { href: "/settings", label: "Settings", icon: Settings },
+    ],
+  },
+  {
+    label: "ADVANCED",
     collapsible: true,
     items: [
+      { href: "/track-record", label: "Track Record", icon: Target },
+      { href: "/methodology", label: "Methodology", icon: FlaskConical },
+      { href: "/status", label: "System Status", icon: Activity },
+      { href: "/docs", label: "API Docs", icon: Code2 },
+      { href: "/roadmap", label: "Roadmap", icon: Map },
       { href: "/strategies", label: "Strategies", icon: Layers, labs: true },
       { href: "/rebalance", label: "Rebalance", icon: Scale, labs: true },
       { href: "/newsletter", label: "Newsletter", icon: Newspaper, labs: true },
@@ -76,27 +82,11 @@ const navSections: NavSection[] = [
       { href: "/alerts", label: "Alerts", icon: Bell, labs: true },
     ],
   },
-  {
-    label: "ACCOUNT",
-    items: [
-      { href: "/account", label: "Account & Funding", icon: Wallet },
-      { href: "/profile", label: "Profile", icon: User },
-      { href: "/status", label: "System Status", icon: Activity },
-      { href: "/settings", label: "Settings", icon: Settings },
-    ],
-  },
-  {
-    label: "RESOURCES",
-    items: [
-      { href: "/docs", label: "API Docs", icon: Code2 },
-      { href: "/roadmap", label: "Roadmap", icon: Map },
-    ],
-  },
 ];
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
-  const [labsOpen, setLabsOpen] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const { pathname } = useLocation();
   const { theme, toggle } = useTheme();
   const { address, disconnect, connect, isConnecting } = useWallet();
@@ -142,7 +132,7 @@ export function Sidebar() {
                   className="text-[10px] mt-0.5 whitespace-nowrap"
                   style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', letterSpacing: '0.02em' }}
                 >
-                  Trustworthy Trading Loop
+                  Trustworthy Trading OS
                 </span>
               </motion.div>
             )}
@@ -152,25 +142,25 @@ export function Sidebar() {
 
       <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4 scrollbar-thin">
         {navSections.map((section) => {
-          const isLabs = section.label === "LABS";
-          if (isLabs && !labsOpen && !collapsed) {
-            const labsActive = section.items.some((i) => pathname === i.href || pathname.startsWith(i.href + "/"));
+          const isAdvanced = section.label === "ADVANCED";
+          if (isAdvanced && !advancedOpen && !collapsed) {
+            const advancedActive = section.items.some((i) => pathname === i.href || pathname.startsWith(i.href + "/"));
             return (
               <div key={section.label}>
                 <button
                   type="button"
-                  onClick={() => setLabsOpen(true)}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider"
-                  style={{ color: labsActive ? 'var(--accent)' : 'var(--text-muted)' }}
+                  onClick={() => setAdvancedOpen(true)}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors hover:text-[var(--text-primary)]"
+                  style={{ color: advancedActive ? 'var(--accent)' : 'var(--text-muted)' }}
                 >
                   <Beaker className="w-3.5 h-3.5" />
-                  Labs (Preview)
+                  Advanced
                   <ChevronDown className="w-3 h-3 ml-auto" />
                 </button>
               </div>
             );
           }
-          if (isLabs && collapsed) return null;
+          if (isAdvanced && collapsed) return null;
 
           return (
             <div key={section.label}>
@@ -179,8 +169,8 @@ export function Sidebar() {
                   <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
                     {section.label}
                   </p>
-                  {isLabs && (
-                    <button type="button" onClick={() => setLabsOpen(false)} className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                  {isAdvanced && (
+                    <button type="button" onClick={() => setAdvancedOpen(false)} className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
                       hide
                     </button>
                   )}

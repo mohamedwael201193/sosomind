@@ -1,31 +1,32 @@
 @import "tailwindcss";
 
 :root {
-  /* ── Dark Navy Palette (Extej-inspired) ── */
-  --bg-deep:        #080910;
-  --bg-base:        #0d0e16;
-  --bg-card:        rgba(18, 22, 33, 0.95);
-  --bg-glass:       rgba(255, 255, 255, 0.03);
-  --bg-glass-hover: rgba(255, 255, 255, 0.06);
-  --bg-elevated:    rgba(22, 26, 40, 0.98);
-  --bg-sidebar:     rgba(12, 14, 22, 0.98);
+  /* ── Luxury Fintech: Deep Black + Graphite + Orange ── */
+  --bg-deep:        #030303;
+  --bg-base:        #070708;
+  --bg-card:        rgba(14, 14, 16, 0.82);
+  --bg-glass:       rgba(255, 255, 255, 0.025);
+  --bg-glass-hover: rgba(255, 255, 255, 0.05);
+  --bg-elevated:    rgba(18, 18, 20, 0.94);
+  --bg-sidebar:     rgba(8, 8, 10, 0.96);
 
   /* Legacy aliases */
-  --bg:             #0d0e16;
-  --bg-elev:        #161925;
-  --bg-card2:       #1a1e2e;
-  --surface-2:      rgba(255, 255, 255, 0.04);
-  --border:         rgba(255, 255, 255, 0.10);
-  --border-glow:    rgba(249, 115, 22, 0.40);
-  --text:           #f0f0f4;
-  --muted:          #505060;
-  --muted2:         #8888a0;
+  --bg:             #070708;
+  --bg-elev:        #111114;
+  --bg-card2:       #141418;
+  --surface-2:      rgba(255, 255, 255, 0.035);
+  --border:         rgba(255, 255, 255, 0.08);
+  --border-glow:    rgba(249, 115, 22, 0.35);
+  --text:           #f5f5f7;
+  --muted:          #5c5c66;
+  --muted2:         #8e8e98;
 
   /* ── Glass effect ── */
-  --glass-border:        rgba(255, 255, 255, 0.08);
-  --glass-border-strong: rgba(255, 255, 255, 0.16);
-  --glass-blur:          blur(24px) saturate(180%);
-  --glass-blur-light:    blur(12px) saturate(150%);
+  --glass-border:        rgba(255, 255, 255, 0.07);
+  --glass-border-strong: rgba(255, 255, 255, 0.14);
+  --glass-blur:          blur(28px) saturate(160%);
+  --glass-blur-light:    blur(14px) saturate(140%);
+  --glass-inner:         inset 0 1px 0 rgba(255, 255, 255, 0.06);
 
   /* ── Functional accent colors (keep semantic meaning) ── */
   --green:       #22c55e;
@@ -37,15 +38,15 @@
   --blue:        #60a5fa;
   --blue-glow:   rgba(96, 165, 250, 0.25);
   --blue-soft:   rgba(96, 165, 250, 0.10);
-  --purple:      #a78bfa;
-  --purple-glow: rgba(167, 139, 250, 0.25);
-  --purple-soft: rgba(167, 139, 250, 0.10);
+  --purple:      #9ca3af;
+  --purple-glow: rgba(156, 163, 175, 0.15);
+  --purple-soft: rgba(156, 163, 175, 0.08);
   --orange:      #fb923c;
   --yellow:      #fbbf24;
   --accent:      #f97316;
-  --accent-glow: rgba(249, 115, 22, 0.30);
-  --accent-soft: rgba(249, 115, 22, 0.10);
-  --accent-border: rgba(249, 115, 22, 0.35);
+  --accent-glow: rgba(249, 115, 22, 0.28);
+  --accent-soft: rgba(249, 115, 22, 0.09);
+  --accent-border: rgba(249, 115, 22, 0.32);
 
   /* ── Text ── */
   --text-primary:   #f0f0f0;
@@ -63,10 +64,10 @@
   --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
 
   /* ── Radius ── */
-  --radius-sm:   6px;
-  --radius-md:   10px;
-  --radius-lg:   14px;
-  --radius-xl:   20px;
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-xl:   22px;
   --radius-full: 9999px;
 
   /* Legacy radius aliases */
@@ -92,9 +93,11 @@
   --grad-orange: linear-gradient(135deg,#f97316 0%,#ea580c 100%);
 
   /* ── Typography ── */
-  --font-display: 'Syne', system-ui, sans-serif;
-  --font-body:    'Space Grotesk', system-ui, sans-serif;
-  --font-mono:    'JetBrains Mono', 'Fira Code', monospace;
+  --font-display: 'Syne', 'Geist', system-ui, sans-serif;
+  --font-body:    'Geist', 'Space Grotesk', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', 'Geist Mono', monospace;
+  --text-hero:    clamp(2.25rem, 5vw, 3.25rem);
+  --text-body-fluid: clamp(0.9375rem, 2vw, 1.0625rem);
 
   /* ── Animation ── */
   --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);

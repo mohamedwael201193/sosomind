@@ -19,6 +19,7 @@ import {
 import { SetupProgress } from "@/components/SetupProgress";
 import { useSetupProgress } from "@/hooks/useSetupProgress";
 import { useWallet } from "@/context/WalletContext";
+import { useEnvironment } from "@/context/EnvironmentContext";
 
 // -- Stat Card
 function StatCard({
@@ -114,6 +115,8 @@ function StatCard({
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { address } = useWallet();
+  const { selector, config } = useEnvironment();
+  const envLabel = config?.active?.label ?? (selector === 'testnet' ? 'Testnet' : 'Mainnet');
   const walletInitials = address ? address.slice(2, 4).toUpperCase() : null;
   const [nlpInput, setNlpInput] = useState("");
   const [nlpResult, setNlpResult] = useState<Record<string, unknown> | null>(null);
@@ -149,12 +152,14 @@ export default function DashboardPage() {
   const { data: macro } = useQuery({
     queryKey: ["macro"],
     queryFn: () => fetcher("/api/agents/macro"),
-    refetchInterval: 120000,
+    staleTime: 120_000,
+    refetchInterval: 180_000,
   });
   const { data: health } = useQuery({
     queryKey: ["health"],
     queryFn: () => fetcher("/api/health"),
-    refetchInterval: 30_000,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
   });
   const svcDisplay = (status?: string, okLabel = "online") => {
     if (status === "ok") return { status: okLabel, color: "var(--green)" };
@@ -165,22 +170,26 @@ export default function DashboardPage() {
   const { data: sectorsRaw } = useQuery({
     queryKey: ["sectors"],
     queryFn: () => fetcher("/api/sectors"),
-    refetchInterval: 120000,
+    staleTime: 120_000,
+    refetchInterval: 180_000,
   });
   const { data: signalsRaw } = useQuery({
     queryKey: ["signals-recent"],
     queryFn: () => fetcher("/api/signals?limit=8"),
-    refetchInterval: 30000,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
   });
   const { data: portfolioRaw } = useQuery({
     queryKey: ["portfolio-summary"],
     queryFn: () => fetcher("/api/portfolio"),
-    refetchInterval: 60000,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
   });
   const { data: fundingRaw } = useQuery({
     queryKey: ["funding-signals"],
     queryFn: () => fetcher("/api/signals/funding?limit=6"),
-    refetchInterval: 30000,
+    staleTime: 30_000,
+    refetchInterval: 90_000,
   });
 
   const funding: Array<Record<string, unknown>> = (() => {
@@ -218,7 +227,8 @@ export default function DashboardPage() {
   const { data: trackRaw } = useQuery({
     queryKey: ["track-record-summary"],
     queryFn: () => fetchWithMeta<any>("/api/signals/track-record"),
-    refetchInterval: 120_000,
+    staleTime: 120_000,
+    refetchInterval: 300_000,
   });
   const { isComplete: setupComplete, nextStep } = useSetupProgress();
 
@@ -237,7 +247,7 @@ export default function DashboardPage() {
   const primaryCtaLabel = !setupComplete
     ? "Continue Setup"
     : topSignal
-      ? `Trade Latest ? ${topAsset}`
+      ? `Trade ${topAsset}`
       : "Open Trade Desk";
 
   const containerV = {
@@ -253,68 +263,53 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
 
-      {/* Page Header */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      {/* Header */}
+      <div className="flex items-end justify-between gap-4 flex-wrap">
         <motion.div
-          initial={{ opacity: 0, y: -14 }}
+          initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
         >
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-2">
             <span
               className="inline-flex items-center gap-1.5 text-[10px] font-semibold tracking-wide px-2.5 py-1 rounded-full"
               style={{ color: "var(--accent)", background: "var(--accent-soft)", border: "1px solid var(--accent-border)", fontFamily: "var(--font-mono)" }}
             >
-              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--accent)" }} />
-              Live ? testnet loop
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--accent)" }} />
+              Live · {envLabel}
             </span>
           </div>
-          <motion.h1
+          <h1
             className="font-black leading-none text-balance"
-            style={{ fontFamily: "var(--font-display)", fontSize: "clamp(2rem, 5vw, 3.5rem)", letterSpacing: "-0.05em", color: "var(--text-primary)" }}
-            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.04, delayChildren: 0.1 } } }}
-            initial="hidden"
-            animate="visible"
+            style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-hero)", letterSpacing: "-0.045em", color: "var(--text-primary)" }}
           >
-            {"Overview".split("").map((char, i) => (
-              <motion.span
-                key={i}
-                className="inline-block"
-                variants={{
-                  hidden: { opacity: 0, y: 18, filter: "blur(6px)" },
-                  visible: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] } },
-                }}
-              >
-                {char === " " ? "\u00A0" : char}
-              </motion.span>
-            ))}
-          </motion.h1>
-          <p className="text-sm mt-2 max-w-md leading-relaxed" style={{ color: "var(--text-secondary)", fontFamily: "var(--font-body)" }}>
-            SoSoValue intel, explainable signals, and signed SoDEX execution on one screen.
+            Overview
+          </h1>
+          <p className="text-sm mt-3 max-w-lg leading-relaxed" style={{ color: "var(--text-secondary)", fontFamily: "var(--font-body)" }}>
+            Portfolio, risk, and opportunities from live SoDEX and SoSoValue data.
           </p>
         </motion.div>
 
-        {/* Search + Actions */}
         <motion.div
-          initial={{ opacity: 0, x: 20 }}
+          initial={{ opacity: 0, x: 12 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ delay: 0.12, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
           className="flex items-center gap-3"
         >
           <form onSubmit={handleSearch}>
             <div
-              className="flex items-center gap-2 px-3 py-2 rounded-xl transition-colors duration-200 focus-within:border-[var(--accent-border)]"
-              style={{ background: "var(--bg-card)", border: "1px solid var(--glass-border)", minWidth: 200 }}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 focus-within:border-[var(--accent-border)]"
+              style={{ background: "var(--bg-card)", border: "1px solid var(--glass-border)", minWidth: 220 }}
             >
               <Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "var(--text-muted)" }} />
               <input
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search assets or themes?"
-                aria-label="Search ? press Enter to open research"
+                placeholder="Search assets or themes"
+                aria-label="Search, press Enter to open research"
                 className="text-sm bg-transparent outline-none w-full placeholder:text-[var(--text-muted)]"
                 style={{ color: "var(--text-primary)", fontFamily: "var(--font-body)" }}
               />
@@ -330,46 +325,102 @@ export default function DashboardPage() {
           </Link>
           <Link
             to="/profile"
-            aria-label={address ? `Profile ? ${address.slice(0, 6)}?${address.slice(-4)}` : "View profile"}
-            className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs transition-all duration-200 hover:-translate-y-0.5 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-border)]"
-            style={{ background: "var(--grad-orange)", color: "#fff", boxShadow: "0 4px 12px rgba(249,115,22,0.30)", fontFamily: "var(--font-mono)" }}
+            aria-label={address ? `Profile ${address.slice(0, 6)}…${address.slice(-4)}` : "View profile"}
+            className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-border)]"
+            style={{ background: "var(--grad-orange)", color: "#fff", boxShadow: "0 4px 16px rgba(249,115,22,0.25)", fontFamily: "var(--font-mono)" }}
           >
             {walletInitials ?? "?"}
           </Link>
         </motion.div>
       </div>
 
-      {/* Loop hero ? single primary CTA */}
+      {/* Primary story: 5 focus metrics */}
+      <motion.div className="grid grid-cols-2 xl:grid-cols-5 gap-4" variants={containerV} initial="hidden" animate="visible">
+        <motion.div variants={itemV}>
+          <StatCard
+            icon={<Wallet className="w-3.5 h-3.5" />}
+            label="Portfolio"
+            href="/portfolio"
+            value={totalVal > 0 ? `$${totalVal.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "Unavailable"}
+            sub={totalVal > 0 ? `${(summary?.positions as number) ?? 0} positions` : "Connect wallet for SoDEX balances"}
+            color="var(--accent)"
+            empty={totalVal === 0 ? "No portfolio data" : undefined}
+          />
+        </motion.div>
+        <motion.div variants={itemV}>
+          <StatCard
+            icon={<Globe2 className="w-3.5 h-3.5" />}
+            label="Current risk"
+            href="/agents"
+            value={macroScore > 0 ? macroRegime : "Unavailable"}
+            sub={macroScore > 0 ? `Macro score ${macroScore}/100` : "Awaiting macro feed"}
+            color={macroScore > 0 ? macroColor : "var(--text-muted)"}
+          />
+        </motion.div>
+        <motion.div variants={itemV}>
+          <StatCard
+            icon={<Zap className="w-3.5 h-3.5" />}
+            label="AI recommendation"
+            href={topSignal?.id ? `/signals/${topSignal.id}` : "/signals"}
+            value={topSignal ? String(topAsset) : "Unavailable"}
+            sub={topSignal ? `${String(topSignal.direction ?? "signal").toUpperCase()} · ${activeSignals} active` : "No active signals"}
+            color="var(--accent)"
+          />
+        </motion.div>
+        <motion.div variants={itemV}>
+          <StatCard
+            icon={<BarChart3 className="w-3.5 h-3.5" />}
+            label="Market regime"
+            href="/agents"
+            value={macroScore > 0 ? `${macroScore}` : "—"}
+            sub={macroScore > 0 ? macroRegime : "Loading"}
+            color={macroColor}
+          />
+        </motion.div>
+        <motion.div variants={itemV} className="col-span-2 xl:col-span-1">
+          <StatCard
+            icon={<Layers className="w-3.5 h-3.5" />}
+            label="Opportunities"
+            href="/sectors"
+            value={topSector ? String(topSector.name ?? "—") : "—"}
+            sub={topSector ? `+${Number(topSector.change_pct_24h ?? 0).toFixed(2)}% 24h` : "SSI sectors loading"}
+            color="var(--accent)"
+          />
+        </motion.div>
+      </motion.div>
+
+      {/* AI action strip */}
       <motion.div
-        initial={{ opacity: 0, y: 12 }}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.08, duration: 0.45 }}
         className="grid grid-cols-1 lg:grid-cols-3 gap-4"
       >
-        <GlassCard padding="md" className="lg:col-span-2" animate spotlight>
-          <div className="flex flex-wrap items-start justify-between gap-4">
+        <GlassCard padding="md" className="lg:col-span-2" animate={false} spotlight>
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="text-[10px] font-semibold tracking-wide text-[var(--accent)] mb-1">Trustworthy trading loop</p>
-              <h2 className="text-lg font-black text-[var(--text-primary)] text-balance leading-snug">
-                {hitRatePct ? `${hitRatePct}% hit rate` : "Live proof ledger"} ? {activeSignals} signals
+              <h2 className="text-base font-bold text-[var(--text-primary)] leading-snug">
+                {topSignal ? `Suggested action on ${topAsset}` : "Ready to trade"}
               </h2>
-              <p className="text-sm mt-2 max-w-xl leading-relaxed text-[var(--text-secondary)]">
-                Intel, signal, preflight, signed order, and public outcomes on Supabase.
+              <p className="text-sm mt-1.5 max-w-xl text-[var(--text-secondary)]">
+                {hitRatePct ? `${hitRatePct}% resolved hit rate on track record.` : "Evidence-backed signals with signed SoDEX execution."}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Link
                 to={primaryCtaHref}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-border)]"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-border)]"
                 style={{ background: "var(--accent)", color: "#fff" }}
               >
                 <CandlestickChart className="w-4 h-4" />
                 {primaryCtaLabel}
               </Link>
               <Link
-                to="/track-record"
-                className="inline-flex items-center gap-1 px-3 py-2.5 text-xs font-semibold text-[var(--accent)] transition-all duration-200 hover:gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-border)] rounded-lg"
+                to="/signals"
+                className="inline-flex items-center gap-1 px-3 py-2.5 text-xs font-semibold text-[var(--text-secondary)] rounded-xl border transition-colors hover:border-[var(--accent-border)] hover:text-[var(--accent)]"
+                style={{ borderColor: "var(--glass-border)" }}
               >
-                Track record <ArrowRight className="w-3 h-3" />
+                All signals <ArrowRight className="w-3 h-3" />
               </Link>
             </div>
           </div>
@@ -377,65 +428,17 @@ export default function DashboardPage() {
         {!setupComplete ? (
           <SetupProgress variant="card" />
         ) : (
-          <GlassCard padding="md" animate>
-            <p className="text-[10px] font-semibold tracking-wide text-[var(--green)] mb-2">Ready</p>
-            <p className="text-sm font-bold text-[var(--text-primary)]">Trading account ready</p>
+          <GlassCard padding="md" animate={false}>
+            <p className="text-[10px] font-semibold tracking-wide text-[var(--green)] mb-2">Account ready</p>
+            <p className="text-sm font-bold text-[var(--text-primary)]">Trading preflight passed</p>
             <Link to="/portfolio" className="text-xs font-semibold mt-2 inline-flex items-center gap-1 text-[var(--accent)]">
-              View portfolio <ArrowRight className="w-3 h-3" />
+              Open portfolio <ArrowRight className="w-3 h-3" />
             </Link>
           </GlassCard>
         )}
       </motion.div>
 
-      {/* Live Ticker */}
       <LiveTicker />
-
-      {/* Stat Cards */}
-      <motion.div className="grid grid-cols-2 lg:grid-cols-4 gap-4" variants={containerV} initial="hidden" animate="visible">
-        <motion.div variants={itemV}>
-          <StatCard
-            icon={<Wallet className="w-3.5 h-3.5" />}
-            label="Portfolio value"
-            href="/portfolio"
-            value={totalVal > 0 ? `$${totalVal.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "?"}
-            sub={totalVal > 0 ? `${(summary?.positions as number) ?? 0} positions active` : undefined}
-            pnl={pnl !== 0 ? pnl : undefined}
-            pnlPct={pnlPct !== 0 ? pnlPct : undefined}
-            color="var(--accent)"
-            empty={totalVal === 0 ? "No positions yet" : undefined}
-          />
-        </motion.div>
-        <motion.div variants={itemV}>
-          <StatCard
-            icon={<Zap className="w-3.5 h-3.5" />}
-            label="Active signals"
-            href="/signals"
-            value={activeSignals > 0 ? String(activeSignals) : "?"}
-            sub={activeSignals > 0 ? "AI-generated ? live" : "Awaiting market data"}
-            color="var(--accent)"
-          />
-        </motion.div>
-        <motion.div variants={itemV}>
-          <StatCard
-            icon={<Globe2 className="w-3.5 h-3.5" />}
-            label="Macro score"
-            href="/agents"
-            value={macroScore > 0 ? String(macroScore) : "?"}
-            sub={macroScore > 0 ? `${macroRegime} regime` : "Loading\u2026"}
-            color={macroScore > 0 ? macroColor : "var(--orange)"}
-          />
-        </motion.div>
-        <motion.div variants={itemV}>
-          <StatCard
-            icon={<BarChart3 className="w-3.5 h-3.5" />}
-            label="Top sector 24h"
-            href="/sectors"
-            value={topSector ? String(topSector.name ?? "?") : "?"}
-            sub={topSector ? `+${Number(topSector.change_pct_24h ?? 0).toFixed(2)}% change` : "Loading sectors?"}
-            color="var(--accent)"
-          />
-        </motion.div>
-      </motion.div>
 
       {/* Main bento grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -488,7 +491,7 @@ export default function DashboardPage() {
                     Macro regime
                   </h2>
                   <p className="text-[11px]" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-                    Risk score ? ETF + events
+                    Risk score · ETF + events
                   </p>
                 </div>
                 <Link to="/agents"><ExternalLink className="w-3.5 h-3.5" style={{ color: "var(--text-muted)" }} /></Link>
@@ -557,7 +560,7 @@ export default function DashboardPage() {
                   <Radio className="w-4 h-4" style={{ color: "var(--accent)" }} />
                   Funding rate signals
                 </h2>
-                <p className="text-[11px]" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>Extreme funding ? mean reversion watch</p>
+                <p className="text-[11px]" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>Extreme funding · mean reversion watch</p>
               </div>
               <Link to="/research" className="flex items-center gap-1 text-xs font-medium transition-all hover:gap-2" style={{ color: "var(--accent)" }}>
                 More <ArrowRight className="w-3 h-3" />
@@ -606,7 +609,7 @@ export default function DashboardPage() {
               value={nlpInput}
               onChange={(e) => setNlpInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && parseNlp()}
-              placeholder='e.g. "buy 0.003 ETH market on testnet"'
+              placeholder='e.g. "buy 0.003 ETH market"'
               className="flex-1 px-4 py-2.5 rounded-xl text-sm placeholder:text-[var(--text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-border)] transition-colors duration-200"
               style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--glass-border)", color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}
               onFocus={(e) => (e.currentTarget.style.borderColor = "var(--accent-border)")}

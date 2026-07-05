@@ -5,25 +5,26 @@ import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Zap, PieChart, CandlestickChart, Menu, X,
-  Target, Grid3X3, Search, BarChart3, User, Activity, Beaker,
+  Target, Grid3X3, Search, BarChart3, User, Settings, Beaker,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const primaryItems = [
-  { href: '/dashboard', label: 'Loop', icon: LayoutDashboard },
+  { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
   { href: '/signals', label: 'Signals', icon: Zap },
   { href: '/trade', label: 'Trade', icon: CandlestickChart },
   { href: '/portfolio', label: 'Portfolio', icon: PieChart },
 ];
 
 const moreItems = [
-  { href: '/track-record', label: 'Track Record', icon: Target },
-  { href: '/sectors', label: 'SSI Sectors', icon: Grid3X3 },
   { href: '/research', label: 'Research', icon: Search },
+  { href: '/sectors', label: 'SSI Sectors', icon: Grid3X3 },
   { href: '/agents', label: 'Market Regime', icon: BarChart3 },
-  { href: '/profile', label: 'Profile', icon: User },
-  { href: '/status', label: 'System Status', icon: Activity },
-  { href: '/strategies', label: 'Labs', icon: Beaker },
+  { href: '/perps', label: 'Perps', icon: BarChart3 },
+  { href: '/account', label: 'Account', icon: User },
+  { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/track-record', label: 'Track Record', icon: Target },
+  { href: '/strategies', label: 'Advanced / Labs', icon: Beaker },
 ];
 
 export function MobileNav() {
@@ -43,7 +44,7 @@ export function MobileNav() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[60] md:hidden bg-black/60"
+              className="fixed inset-0 z-[60] md:hidden bg-black/70 backdrop-blur-sm"
               onClick={() => setMoreOpen(false)}
             />
             <motion.div
@@ -70,8 +71,8 @@ export function MobileNav() {
                       to={item.href}
                       onClick={() => setMoreOpen(false)}
                       className={cn(
-                        'flex items-center gap-2 px-3 py-3 rounded-xl text-sm font-semibold',
-                        active ? 'text-[var(--accent)] bg-[var(--accent-soft)]' : 'text-[var(--text-secondary)] bg-[var(--glass-bg)]',
+                        'flex items-center gap-2 px-3 py-3 rounded-xl text-sm font-semibold transition-colors',
+                        active ? 'text-[var(--accent)] bg-[var(--accent-soft)]' : 'text-[var(--text-secondary)] bg-[var(--bg-glass)]',
                       )}
                     >
                       <Icon className="w-4 h-4" />
@@ -93,9 +94,9 @@ export function MobileNav() {
             return (
               <Link key={item.href} to={item.href} className="flex-1">
                 <motion.div
-                  whileTap={{ scale: 0.9 }}
+                  whileTap={{ scale: 0.96 }}
                   className={cn(
-                    'flex flex-col items-center gap-1 py-2 transition-colors',
+                    'flex flex-col items-center gap-1 py-2 transition-colors duration-200',
                     isActive ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]',
                   )}
                 >
@@ -107,9 +108,9 @@ export function MobileNav() {
           })}
           <button type="button" className="flex-1" onClick={() => setMoreOpen(true)}>
             <motion.div
-              whileTap={{ scale: 0.9 }}
+              whileTap={{ scale: 0.96 }}
               className={cn(
-                'flex flex-col items-center gap-1 py-2 transition-colors',
+                'flex flex-col items-center gap-1 py-2 transition-colors duration-200',
                 isMoreActive || moreOpen ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]',
               )}
             >

@@ -39,14 +39,15 @@ export function GlassCard({
 
   return (
     <motion.div
-      initial={animate ? { opacity: 0, y: 20 } : false}
+      initial={animate ? { opacity: 0, y: 12 } : false}
       animate={animate ? { opacity: 1, y: 0 } : false}
-      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
       style={style}
       className={cn(
         'relative overflow-hidden rounded-[var(--radius-lg)] border border-[var(--glass-border)]',
         'bg-[var(--bg-card)] backdrop-blur-xl',
-        hover && 'transition-all duration-300 hover:border-[var(--glass-border-strong)]',
+        'shadow-[var(--glass-inner),0_8px_32px_rgba(0,0,0,0.35)]',
+        hover && 'transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:border-[var(--glass-border-strong)] hover:-translate-y-0.5',
         glowMap[glow],
         paddingMap[padding],
         className
