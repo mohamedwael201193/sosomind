@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Circle, ExternalLink, ChevronRight } from 'lucide-react';
 import { useSetupProgress } from '@/hooks/useSetupProgress';
@@ -20,7 +20,7 @@ export function SetupProgress({ variant = 'card', className }: { variant?: Varia
   if (variant === 'compact') {
     return (
       <Link
-        href="/dashboard"
+        to="/dashboard"
         className={cn('block px-3 py-2 rounded-xl text-left transition-colors hover:bg-[var(--glass-bg)]', className)}
         title="Setup progress"
       >
@@ -93,7 +93,7 @@ export function SetupProgress({ variant = 'card', className }: { variant?: Varia
                 </a>
               )}
               {!step.done && step.href && step.id !== 'connect' && (
-                <Link href={step.href} className="text-[10px] font-semibold mt-1 text-[var(--accent)] block">
+                <Link to={step.href} className="text-[10px] font-semibold mt-1 text-[var(--accent)] block">
                   Continue →
                 </Link>
               )}

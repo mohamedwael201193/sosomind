@@ -8,7 +8,7 @@
  * Opening it pops MetaMask immediately and relays the signed payload.
  */
 import { Suspense, useEffect, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { signAndSubmit } from '@/lib/sodex-client';
 import { useWallet } from '@/context/WalletContext';
@@ -22,8 +22,8 @@ function decodePayload(p: string | null): any {
 }
 
 function SignInner() {
-  const sp = useSearchParams();
-  const router = useRouter();
+  const [sp] = useSearchParams();
+  const navigate = useNavigate();
   const { address, token, connect } = useWallet();
   const [status, setStatus] = useState<'idle' | 'signing' | 'ok' | 'err'>('idle');
   const [message, setMessage] = useState<string>('');
@@ -110,7 +110,7 @@ function SignInner() {
         </div>
       )}
 
-      <button onClick={() => router.push('/trade')}
+      <button onClick={() => navigate('/trade')}
         className="mt-6 text-xs text-[var(--text-muted)] hover:text-blue-400">
         Open full trading desk →
       </button>

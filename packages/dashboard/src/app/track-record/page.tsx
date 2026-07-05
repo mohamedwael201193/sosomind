@@ -1,7 +1,7 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { fetchWithMeta } from "@/lib/api";
 import { GlassCard } from "@/components/GlassCard";
 import { CryptoIcon } from "@/components/CryptoIcon";
@@ -94,7 +94,7 @@ export default function TrackRecordPage() {
             <strong className="text-[var(--text-primary)]"> DRIFT</strong> = neither within 72h (not a loss).
             Hit rate = HIT ÷ (HIT + STOP) only — DRIFT excluded.
             This is a buildathon proof artifact — not financial advice.{" "}
-            <Link href="/methodology" className="underline text-[var(--accent)]">Methodology →</Link>
+            <Link to="/methodology" className="underline text-[var(--accent)]">Methodology →</Link>
           </p>
         </div>
       </GlassCard>
@@ -178,7 +178,7 @@ export default function TrackRecordPage() {
               <p className="text-sm text-[var(--text-muted)] text-center py-8">
                 No resolved outcomes yet. Signals need 24h+ with TP/SL before evaluation.
                 <br />
-                <Link href="/research" className="text-[var(--accent)] underline mt-2 inline-block">
+                <Link to="/research" className="text-[var(--accent)] underline mt-2 inline-block">
                   Run research to generate signals →
                 </Link>
               </p>
@@ -192,7 +192,7 @@ export default function TrackRecordPage() {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: Math.min(i * 0.03, 0.5) }}
                 >
-                  <Link href={`/signals/${sig.id}`}>
+                  <Link to={`/signals/${sig.id}`}>
                     <GlassCard padding="md" className="hover:border-[var(--accent)] transition-colors cursor-pointer">
                       <div className="flex items-center gap-4 flex-wrap">
                         <CryptoIcon symbol={sig.asset} size={32} />
@@ -230,7 +230,7 @@ export default function TrackRecordPage() {
                 {d.last_updated ? new Date(d.last_updated).toLocaleString() : "pending first evaluation"}
               </p>
               <Link
-                href="/trade"
+                to="/trade"
                 className="inline-flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-xl"
                 style={{ background: "var(--accent)", color: "#fff" }}
               >

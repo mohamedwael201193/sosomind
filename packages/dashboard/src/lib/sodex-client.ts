@@ -18,7 +18,7 @@ import {
 } from './sodex-signing';
 import { getActiveWalletProvider } from './wallet-provider';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:10000';
+import { API_URL } from './env';
 
 export interface RelayInfo {
   chainId: number;

@@ -10,7 +10,7 @@ import { Bell, BellOff, Plus, Trash2, RefreshCw, TrendingUp, TrendingDown, Check
 import { useWallet } from "@/context/WalletContext";
 import { CryptoIcon } from "@/components/CryptoIcon";
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:10000";
+import { API_URL as API } from '@/lib/env';
 
 const ALERT_ASSETS = ["BTC", "ETH", "SOL", "BNB", "AVAX", "LINK", "ARB", "OP", "MATIC"];
 const TYPE_CONFIG: Record<string, { label: string; color: string; icon: typeof TrendingUp }> = {

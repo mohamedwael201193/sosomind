@@ -4,8 +4,9 @@ import { createAppKit } from '@reown/appkit/react';
 import { EthersAdapter } from '@reown/appkit-adapter-ethers';
 import { defineChain, mainnet } from '@reown/appkit/networks';
 
-export const REOWN_PROJECT_ID =
-  process.env.NEXT_PUBLIC_REOWN_PROJECT_ID ?? 'a17ffd4eb6bf1a81fcc0fe5e40c1b3b9';
+import { REOWN_PROJECT_ID as ENV_REOWN_PROJECT_ID, APP_ORIGIN } from './env';
+
+export const REOWN_PROJECT_ID = ENV_REOWN_PROJECT_ID;
 
 /** SoDEX / ValueChain testnet — chainId 138565 */
 export const valueChainTestnet = defineChain({
@@ -25,8 +26,8 @@ export const valueChainTestnet = defineChain({
 const metadata = {
   name: 'SoSoMind',
   description: 'The Trustworthy Agentic Trading Loop — SoSoValue intelligence + SoDEX execution',
-  url: 'https://sosomind.vercel.app',
-  icons: ['https://sosomind.vercel.app/logo.png'],
+  url: APP_ORIGIN,
+  icons: [`${APP_ORIGIN}/logo.png`],
 };
 
 let initialized = false;

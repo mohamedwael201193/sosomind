@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useWallet } from "@/context/WalletContext";
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:10000";
+import { API_URL as API } from '@/lib/env';
 
 function RankBadge({ rank }: { rank: number }) {
   if (rank === 1) return <div className="w-8 h-8 rounded-full flex items-center justify-center bg-yellow-400/20 flex-shrink-0"><Trophy className="w-4 h-4 text-yellow-400" /></div>;

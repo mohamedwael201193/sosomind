@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { Link } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Target, Zap, CandlestickChart, PieChart, X, CheckCircle2 } from 'lucide-react';
 
@@ -16,7 +16,7 @@ const STEPS = [
 const STORAGE_KEY = 'sosomind-judge-path';
 
 export function JudgePathBanner() {
-  const pathname = usePathname();
+  const { pathname } = useLocation();
   const [active, setActive] = useState(false);
 
   useEffect(() => {
@@ -60,7 +60,7 @@ export function JudgePathBanner() {
             return (
               <Link
                 key={step.id}
-                href={step.href}
+                to={step.href}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors"
                 style={{
                   background: current ? 'var(--accent-soft)' : 'var(--glass-bg)',
@@ -87,7 +87,7 @@ export function startJudgePath() {
 }
 
 export function JudgePathButton({ className }: { className?: string }) {
-  const pathname = usePathname();
+  const { pathname } = useLocation();
 
   if (pathname === '/landing') return null;
 

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { fetchWithMeta, api } from "@/lib/api";
+import { API_URL } from "@/lib/env";
 import { LabsPreviewBanner } from "@/components/LabsPreviewBanner";
 import { GlassCard } from "@/components/GlassCard";
 import { CacheBadge } from "@/components/CacheBadge";
@@ -95,7 +96,7 @@ export default function NewsletterPage() {
 
   // SSE — auto-refresh feed when new posts are generated server-side
   useEffect(() => {
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL ?? 'https://sosomind-backend.onrender.com';
+    const backendUrl = API_URL;
     setSseStatus('connecting');
     const es = new EventSource(`${backendUrl}/api/content/stream`);
     sseRef.current = es;

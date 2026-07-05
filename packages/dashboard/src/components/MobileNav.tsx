@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { Link } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Zap, PieChart, CandlestickChart, Menu, X,
@@ -27,7 +27,7 @@ const moreItems = [
 ];
 
 export function MobileNav() {
-  const pathname = usePathname();
+  const { pathname } = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
 
   if (pathname === '/landing' || pathname?.startsWith('/docs')) return null;
@@ -67,7 +67,7 @@ export function MobileNav() {
                   return (
                     <Link
                       key={item.href}
-                      href={item.href}
+                      to={item.href}
                       onClick={() => setMoreOpen(false)}
                       className={cn(
                         'flex items-center gap-2 px-3 py-3 rounded-xl text-sm font-semibold',
@@ -91,7 +91,7 @@ export function MobileNav() {
             const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
             const Icon = item.icon;
             return (
-              <Link key={item.href} href={item.href} className="flex-1">
+              <Link key={item.href} to={item.href} className="flex-1">
                 <motion.div
                   whileTap={{ scale: 0.9 }}
                   className={cn(

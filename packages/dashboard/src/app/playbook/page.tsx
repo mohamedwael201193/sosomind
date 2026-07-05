@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useWallet } from "@/context/WalletContext";
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:10000";
+import { API_URL as API } from '@/lib/env';
 const PRESET_EVENTS = ["CPI", "FOMC", "NFP", "ETF_INFLOW", "ETF_OUTFLOW", "GDP", "PCE", "PPI"];
 
 const EVENT_COLOR: Record<string, string> = {

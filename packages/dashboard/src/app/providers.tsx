@@ -1,26 +1,29 @@
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import dynamic from 'next/dynamic';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { ThemeProvider } from '../context/ThemeContext';
 
-/** Reown AppKit must not SSR — avoids Solana/Coinbase optional deps at build time */
-const WalletProvider = dynamic(
-  () => import('../context/WalletContext').then((m) => m.WalletProvider),
-  { ssr: false },
+const WalletProvider = lazy(() =>
+  import('../context/WalletContext').then((m) => ({ default: m.WalletProvider })),
 );
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  const [client] = useState(() => new QueryClient({
-    defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false, retry: 1 } },
-  }));
+  const [client] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: { staleTime: 30_000, refetchOnWindowFocus: false, retry: 1 },
+        },
+      }),
+  );
+
   return (
     <ThemeProvider>
       <QueryClientProvider client={client}>
-        <WalletProvider>
-          {children}
-        </WalletProvider>
+        <Suspense fallback={null}>
+          <WalletProvider>{children}</WalletProvider>
+        </Suspense>
       </QueryClientProvider>
     </ThemeProvider>
   );

@@ -23,10 +23,9 @@ import { BrowserProvider } from 'ethers';
 import { ensureSoDEXChain } from '@/lib/sodex-client';
 import { setActiveWalletProvider } from '@/lib/wallet-provider';
 import { ensureReownAppKit } from '@/lib/reown-config';
+import { API_URL } from '@/lib/env';
 
 ensureReownAppKit();
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:10000';
 const TOKEN_KEY = 'sosomind_token';
 const ADDRESS_KEY = 'sosomind_address';
 

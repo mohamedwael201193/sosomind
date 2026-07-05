@@ -1,8 +1,8 @@
 "use client";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { usePathname } from "next/navigation";
-import Link from "next/link";
+import { useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { LogoMark } from "@/components/Logo";
 import { useTheme } from "@/context/ThemeContext";
 import { useWallet } from "@/context/WalletContext";
@@ -95,7 +95,7 @@ const navSections: NavSection[] = [
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [labsOpen, setLabsOpen] = useState(false);
-  const pathname = usePathname();
+  const { pathname } = useLocation();
   const { theme, toggle } = useTheme();
   const { address, disconnect, connect, isConnecting } = useWallet();
 
@@ -114,7 +114,7 @@ export function Sidebar() {
         className="h-16 flex items-center px-4 border-b"
         style={{ borderColor: 'var(--glass-border)', flexShrink: 0 }}
       >
-        <Link href="/landing" className="flex items-center min-w-0 flex-1 gap-0">
+        <Link to="/landing" className="flex items-center min-w-0 flex-1 gap-0">
           <LogoMark size={collapsed ? 30 : 34} />
           <AnimatePresence>
             {!collapsed && (
@@ -191,7 +191,7 @@ export function Sidebar() {
                   return (
                     <li key={item.href}>
                       <Link
-                        href={item.href}
+                        to={item.href}
                         className={cn(
                           "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
                           active ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--text-secondary)] hover:bg-[var(--glass-bg)]"

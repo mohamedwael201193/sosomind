@@ -11,7 +11,7 @@ import {
   TrendingUp, TrendingDown, Minus, ArrowLeft,
   ShieldCheck, BookOpen, ExternalLink, Clock,
 } from "lucide-react";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { FreshnessBadge } from "@/components/FreshnessBadge";
 
 // â”€â”€â”€ Citation rendering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -118,7 +118,7 @@ export default function SignalDetailClient({ id }: { id: string }) {
     <div>
       <div className="mb-4">
         <Link
-          href="/signals"
+          to="/signals"
           className="inline-flex items-center gap-1.5 text-sm font-medium hover:opacity-80 transition-opacity"
           style={{ color: "var(--text-muted)" }}
         >
@@ -337,7 +337,7 @@ export default function SignalDetailClient({ id }: { id: string }) {
         <div className="fixed bottom-20 md:bottom-8 left-0 right-0 md:left-[240px] z-40 px-4 md:px-6 pointer-events-none">
           <div className="max-w-3xl mx-auto pointer-events-auto flex gap-2 justify-end">
             <Link
-              href={`/trade?signalId=${id}&asset=${asset}`}
+              to={`/trade?signalId=${id}&asset=${asset}`}
               className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold shadow-lg"
               style={{ background: "var(--accent)", color: "#fff" }}
             >

@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { User, Zap, Shield, BarChart2, TrendingUp, Clock, CheckCircle, ChevronRight, RefreshCw } from "lucide-react";
 import { useWallet } from "@/context/WalletContext";
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:10000";
+import { API_URL as API } from '@/lib/env';
 
 const PERSONAS = [
   {

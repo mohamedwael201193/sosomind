@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search } from 'lucide-react';
 
@@ -32,7 +32,7 @@ const ROUTES = [
 ];
 
 export function CommandPalette() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
 
@@ -57,7 +57,7 @@ export function CommandPalette() {
   const go = (href: string) => {
     setOpen(false);
     setQ('');
-    router.push(href);
+    navigate(href);
   };
 
   return (

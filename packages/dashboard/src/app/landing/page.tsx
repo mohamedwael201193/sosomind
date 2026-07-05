@@ -1,6 +1,6 @@
 "use client";
 import { motion, useMotionValue, useSpring, AnimatePresence, useInView, animate as frameAnimate } from "framer-motion";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { LogoMark } from "@/components/Logo";
 import { useWallet } from "@/context/WalletContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -11,6 +11,7 @@ import {
   Network, Cpu, MessageSquare, Star, Check, Bolt,
   X, Code2,
 } from "lucide-react";
+import { API_URL } from '@/lib/env';
 import { useEffect, useRef, useState } from "react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import MCP from "@lobehub/icons/es/MCP";
@@ -309,8 +310,7 @@ export default function LandingPage() {
   const execRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://sosomind-backend.onrender.com';
-    fetch(`${apiUrl}/api/public/signals`)
+    fetch(`${API_URL}/api/public/signals`)
       .then((r) => r.ok ? r.json() : null)
       .then((json) => { if (json?.data && json?.meta) setLiveTrackRecord(json); })
       .catch(() => {/* silently fall back to static data */});
@@ -377,7 +377,7 @@ export default function LandingPage() {
         }}
       >
         <div className="flex items-center gap-8">
-          <Link href="/landing" className="flex items-center gap-2.5">
+          <Link to="/landing" className="flex items-center gap-2.5">
             <LogoMark size={32} />
             <span
               className="font-black text-xl tracking-tight hidden sm:block"
@@ -392,17 +392,17 @@ export default function LandingPage() {
           </Link>
           <div className="hidden md:flex items-center gap-6">
             {NAV_LINKS.map((link) => link.external ? (
-              <Link key={link.label} href={link.href} className="text-sm font-medium transition-colors" style={{ color: "var(--text-secondary)" }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "var(--text-primary)"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "var(--text-secondary)"; }}>
-                {link.label}
-              </Link>
-            ) : (
               <a key={link.label} href={link.href} className="text-sm font-medium transition-colors" style={{ color: "var(--text-secondary)" }}
                 onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "var(--text-primary)"; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "var(--text-secondary)"; }}>
                 {link.label}
               </a>
+            ) : (
+              <Link key={link.label} to={link.href} className="text-sm font-medium transition-colors" style={{ color: "var(--text-secondary)" }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "var(--text-primary)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "var(--text-secondary)"; }}>
+                {link.label}
+              </Link>
             ))}
           </div>
         </div>
@@ -419,7 +419,7 @@ export default function LandingPage() {
             {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
           {address ? (
-            <Link href="/dashboard">
+            <Link to="/dashboard">
               <button className="px-4 py-2 rounded-[20px] text-sm font-bold text-white" style={{ background: "linear-gradient(135deg,#f97316 0%,#ea580c 50%,#c2410c 100%)" }}>
                 Dashboard
               </button>
@@ -555,7 +555,7 @@ export default function LandingPage() {
               transition={{ delay: 0.65, duration: 0.5 }}
               className="flex flex-col sm:flex-row gap-3 mb-10"
             >
-              <Link href="/track-record">
+              <Link to="/track-record">
                 <MagneticButton
                   className="flex items-center gap-2 px-7 py-3.5 rounded-[14px] font-bold text-white text-sm"
                   style={{ background: "linear-gradient(135deg,#f97316 0%,#ea580c 100%)" }}
@@ -563,7 +563,7 @@ export default function LandingPage() {
                   View Track Record <Target className="w-4 h-4" />
                 </MagneticButton>
               </Link>
-              <Link href="/trade">
+              <Link to="/trade">
                 <motion.button
                   whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                   className="flex items-center gap-2 px-7 py-3.5 rounded-[14px] font-medium text-sm border transition-colors"
@@ -2136,7 +2136,7 @@ export default function LandingPage() {
               Connect your wallet and deploy the full AI agent stack in under 60 seconds.
             </p>
             {address ? (
-              <Link href="/dashboard">
+              <Link to="/dashboard">
                 <MagneticButton
                   className="inline-flex items-center gap-3 px-10 py-5 rounded-[20px] font-bold text-white text-lg"
                   style={{ background: "linear-gradient(135deg,#f97316 0%,#ea580c 50%,#c2410c 100%)" }}

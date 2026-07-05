@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { useWallet } from "@/context/WalletContext";
 import { GlassCard } from "@/components/GlassCard";
-import { fetcher } from "@/lib/api";
+import { fetcher, API_URL } from "@/lib/api";
 import {
   Wallet, Copy, Check, LogOut, Link, User, Shield,
   Clock, FileText, Download, BarChart2, RefreshCw,
@@ -97,7 +97,7 @@ export default function ProfilePage() {
     setTaxLoading(true);
     setTaxError(null);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:10000"}/api/tax/report?user_id=${address}&year=${taxYear}${format === "csv" ? "&format=csv" : ""}`);
+      const res = await fetch(`${API_URL}/api/tax/report?user_id=${address}&year=${taxYear}${format === "csv" ? "&format=csv" : ""}`);
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

@@ -1,6 +1,7 @@
 "use client";
+import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Signal {
@@ -24,8 +25,32 @@ export function SignalFeed({ signals, maxItems = 8 }: SignalFeedProps) {
 
   if (!signals || signals.length === 0) {
     return (
-      <div className="text-center py-8 text-[var(--text-muted)] text-sm">
-        No signals yet — AI agents are analyzing the market...
+      <div
+        className="rounded-xl border px-4 py-8 text-center"
+        style={{ borderColor: "var(--border-subtle)", background: "var(--surface-2)" }}
+      >
+        <p className="text-sm font-medium mb-1" style={{ color: "var(--text-primary)" }}>
+          No signals yet
+        </p>
+        <p className="text-xs mb-4 max-w-sm mx-auto leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+          Agents publish here when macro and sector scans produce a tradeable setup.
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Link
+            to="/research"
+            className="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-border)]"
+            style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}
+          >
+            Run research <ArrowRight className="w-3 h-3" />
+          </Link>
+          <Link
+            to="/signals"
+            className="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-border)]"
+            style={{ color: "var(--text-secondary)", border: "1px solid var(--glass-border)" }}
+          >
+            Browse ledger
+          </Link>
+        </div>
       </div>
     );
   }

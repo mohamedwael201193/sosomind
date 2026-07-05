@@ -1,15 +1,16 @@
-﻿"use client";
+"use client";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { useRouter } from "next/navigation";
-import { fetcher } from "@/lib/api";
+import { useNavigate } from "react-router-dom";
+import { fetchWithMeta, fetcher } from "@/lib/api";
+import { API_URL } from "@/lib/env";
 import { GlassCard } from "@/components/GlassCard";
 import { LiveTicker } from "@/components/LiveTicker";
 import { MacroGauge } from "@/components/MacroGauge";
 import { SectorHeatmap } from "@/components/SectorHeatmap";
 import { SignalFeed } from "@/components/SignalFeed";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import {
   TrendingUp, TrendingDown, Wallet, Zap, Globe2, BarChart3,
   Activity, ArrowRight, Send, Radio, ArrowUpDown,
@@ -18,7 +19,7 @@ import {
 import { SetupProgress } from "@/components/SetupProgress";
 import { useSetupProgress } from "@/hooks/useSetupProgress";
 import { startJudgePath } from "@/components/JudgePathBanner";
-import { fetchWithMeta } from "@/lib/api";
+import { useWallet } from "@/context/WalletContext";
 
 // -- Stat Card
 function StatCard({
@@ -39,7 +40,7 @@ function StatCard({
           {icon}
         </div>
         <span
-          className="text-xs font-semibold uppercase tracking-wider"
+          className="text-xs font-semibold tracking-wide"
           style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}
         >
           {label}
@@ -97,13 +98,24 @@ function StatCard({
       />
     </GlassCard>
   );
-  if (href) return <Link href={href} className="block">{inner}</Link>;
+  if (href) {
+    return (
+      <Link
+        to={href}
+        className="block rounded-[var(--radius-lg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-border)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-base)] transition-transform duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99]"
+      >
+        {inner}
+      </Link>
+    );
+  }
   return inner;
 }
 
 // -- Main dashboard page
 export default function DashboardPage() {
-  const router = useRouter();
+  const navigate = useNavigate();
+  const { address } = useWallet();
+  const walletInitials = address ? address.slice(2, 4).toUpperCase() : null;
   const [nlpInput, setNlpInput] = useState("");
   const [nlpResult, setNlpResult] = useState<Record<string, unknown> | null>(null);
   const [nlpLoading, setNlpLoading] = useState(false);
@@ -113,7 +125,7 @@ export default function DashboardPage() {
     e.preventDefault();
     const q = searchQuery.trim();
     if (!q) return;
-    router.push(`/research?q=${encodeURIComponent(q)}`);
+    navigate(`/research?q=${encodeURIComponent(q)}`);
   }
 
   async function parseNlp() {
@@ -121,7 +133,6 @@ export default function DashboardPage() {
     setNlpLoading(true);
     setNlpResult(null);
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:10000";
       const res = await fetch(`${API_URL}/api/nlp/parse`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -227,7 +238,7 @@ export default function DashboardPage() {
   const primaryCtaLabel = !setupComplete
     ? "Continue Setup"
     : topSignal
-      ? `Trade Latest · ${topAsset}`
+      ? `Trade Latest ? ${topAsset}`
       : "Open Trade Desk";
 
   const containerV = {
@@ -254,15 +265,15 @@ export default function DashboardPage() {
         >
           <div className="flex items-center gap-2 mb-1">
             <span
-              className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] px-2.5 py-1 rounded-full"
+              className="inline-flex items-center gap-1.5 text-[10px] font-semibold tracking-wide px-2.5 py-1 rounded-full"
               style={{ color: "var(--accent)", background: "var(--accent-soft)", border: "1px solid var(--accent-border)", fontFamily: "var(--font-mono)" }}
             >
               <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--accent)" }} />
-              Live &middot; Agentic OS
+              Live ? testnet loop
             </span>
           </div>
           <motion.h1
-            className="font-black leading-none"
+            className="font-black leading-none text-balance"
             style={{ fontFamily: "var(--font-display)", fontSize: "clamp(2rem, 5vw, 3.5rem)", letterSpacing: "-0.05em", color: "var(--text-primary)" }}
             variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.04, delayChildren: 0.1 } } }}
             initial="hidden"
@@ -281,8 +292,8 @@ export default function DashboardPage() {
               </motion.span>
             ))}
           </motion.h1>
-          <p className="text-xs mt-1" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-            SoSoValue &middot; SoDEX &middot; Multi-agent crypto intelligence
+          <p className="text-sm mt-2 max-w-md leading-relaxed" style={{ color: "var(--text-secondary)", fontFamily: "var(--font-body)" }}>
+            SoSoValue intel, explainable signals, and signed SoDEX execution on one screen.
           </p>
         </motion.div>
 
@@ -295,7 +306,7 @@ export default function DashboardPage() {
         >
           <form onSubmit={handleSearch}>
             <div
-              className="flex items-center gap-2 px-3 py-2 rounded-xl"
+              className="flex items-center gap-2 px-3 py-2 rounded-xl transition-colors duration-200 focus-within:border-[var(--accent-border)]"
               style={{ background: "var(--bg-card)", border: "1px solid var(--glass-border)", minWidth: 200 }}
             >
               <Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "var(--text-muted)" }} />
@@ -303,33 +314,33 @@ export default function DashboardPage() {
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search assets, news&hellip;"
-                aria-label="Search &mdash; press Enter to research"
-                className="text-sm bg-transparent outline-none w-full"
+                placeholder="Search assets or themes?"
+                aria-label="Search ? press Enter to open research"
+                className="text-sm bg-transparent outline-none w-full placeholder:text-[var(--text-muted)]"
                 style={{ color: "var(--text-primary)", fontFamily: "var(--font-body)" }}
               />
             </div>
           </form>
-          <button
-            aria-label="Notifications"
-            className="relative w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
+          <Link
+            to="/alerts"
+            aria-label="View alerts"
+            className="relative w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 hover:border-[var(--accent-border)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-border)]"
             style={{ background: "var(--bg-card)", border: "1px solid var(--glass-border)" }}
           >
             <Bell className="w-4 h-4" style={{ color: "var(--text-secondary)" }} />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full" style={{ background: "var(--accent)", boxShadow: "0 0 4px var(--accent)" }} />
-          </button>
+          </Link>
           <Link
-            href="/profile"
-            aria-label="View profile"
-            className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm transition-all hover:scale-105"
-            style={{ background: "var(--grad-orange)", color: "#fff", boxShadow: "0 4px 12px rgba(249,115,22,0.30)" }}
+            to="/profile"
+            aria-label={address ? `Profile ? ${address.slice(0, 6)}?${address.slice(-4)}` : "View profile"}
+            className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs transition-all duration-200 hover:-translate-y-0.5 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-border)]"
+            style={{ background: "var(--grad-orange)", color: "#fff", boxShadow: "0 4px 12px rgba(249,115,22,0.30)", fontFamily: "var(--font-mono)" }}
           >
-            A
+            {walletInitials ?? "?"}
           </Link>
         </motion.div>
       </div>
 
-      {/* Loop hero — single primary CTA */}
+      {/* Loop hero ? single primary CTA */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -338,18 +349,18 @@ export default function DashboardPage() {
         <GlassCard padding="md" className="lg:col-span-2" animate spotlight>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)] mb-1">Trustworthy Trading Loop</p>
-              <h2 className="text-lg font-black text-[var(--text-primary)]">
-                {hitRatePct ? `${hitRatePct}% hit rate` : "Live proof ledger"} · {activeSignals} signals
+              <p className="text-[10px] font-semibold tracking-wide text-[var(--accent)] mb-1">Trustworthy trading loop</p>
+              <h2 className="text-lg font-black text-[var(--text-primary)] text-balance leading-snug">
+                {hitRatePct ? `${hitRatePct}% hit rate` : "Live proof ledger"} ? {activeSignals} signals
               </h2>
-              <p className="text-xs mt-1 text-[var(--text-muted)]">
-                SoSoValue intel → explainable signal → risk preflight → signed SoDEX order → public outcomes
+              <p className="text-sm mt-2 max-w-xl leading-relaxed text-[var(--text-secondary)]">
+                Intel ? signal ? preflight ? signed order ? public outcomes on Supabase.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Link
-                href={primaryCtaHref}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold"
+                to={primaryCtaHref}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-border)]"
                 style={{ background: "var(--accent)", color: "#fff" }}
               >
                 <CandlestickChart className="w-4 h-4" />
@@ -358,14 +369,17 @@ export default function DashboardPage() {
               <button
                 type="button"
                 onClick={() => startJudgePath()}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all duration-200 hover:border-[var(--accent-border)] hover:-translate-y-0.5 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-border)]"
                 style={{ borderColor: "var(--glass-border)", color: "var(--text-secondary)" }}
               >
                 <Target className="w-4 h-4" />
-                Judge Path
+                Judge path
               </button>
-              <Link href="/track-record" className="inline-flex items-center gap-1 px-3 py-2.5 text-xs font-semibold text-[var(--accent)]">
-                Track Record <ArrowRight className="w-3 h-3" />
+              <Link
+                to="/track-record"
+                className="inline-flex items-center gap-1 px-3 py-2.5 text-xs font-semibold text-[var(--accent)] transition-all duration-200 hover:gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-border)] rounded-lg"
+              >
+                Track record <ArrowRight className="w-3 h-3" />
               </Link>
             </div>
           </div>
@@ -374,9 +388,9 @@ export default function DashboardPage() {
           <SetupProgress variant="card" />
         ) : (
           <GlassCard padding="md" animate>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--green)] mb-2">Ready</p>
+            <p className="text-[10px] font-semibold tracking-wide text-[var(--green)] mb-2">Ready</p>
             <p className="text-sm font-bold text-[var(--text-primary)]">SoDEX testnet connected</p>
-            <Link href="/portfolio" className="text-xs font-semibold mt-2 inline-flex items-center gap-1 text-[var(--accent)]">
+            <Link to="/portfolio" className="text-xs font-semibold mt-2 inline-flex items-center gap-1 text-[var(--accent)]">
               View portfolio <ArrowRight className="w-3 h-3" />
             </Link>
           </GlassCard>
@@ -391,9 +405,9 @@ export default function DashboardPage() {
         <motion.div variants={itemV}>
           <StatCard
             icon={<Wallet className="w-3.5 h-3.5" />}
-            label="Portfolio Value"
+            label="Portfolio value"
             href="/portfolio"
-            value={totalVal > 0 ? `$${totalVal.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "—"}
+            value={totalVal > 0 ? `$${totalVal.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "?"}
             sub={totalVal > 0 ? `${(summary?.positions as number) ?? 0} positions active` : undefined}
             pnl={pnl !== 0 ? pnl : undefined}
             pnlPct={pnlPct !== 0 ? pnlPct : undefined}
@@ -404,19 +418,19 @@ export default function DashboardPage() {
         <motion.div variants={itemV}>
           <StatCard
             icon={<Zap className="w-3.5 h-3.5" />}
-            label="Active Signals"
+            label="Active signals"
             href="/signals"
-            value={activeSignals > 0 ? String(activeSignals) : "—"}
-            sub={activeSignals > 0 ? "AI-generated \u00b7 live" : "Awaiting market data"}
-            color="var(--purple)"
+            value={activeSignals > 0 ? String(activeSignals) : "?"}
+            sub={activeSignals > 0 ? "AI-generated ? live" : "Awaiting market data"}
+            color="var(--accent)"
           />
         </motion.div>
         <motion.div variants={itemV}>
           <StatCard
             icon={<Globe2 className="w-3.5 h-3.5" />}
-            label="Macro Score"
+            label="Macro score"
             href="/agents"
-            value={macroScore > 0 ? String(macroScore) : "—"}
+            value={macroScore > 0 ? String(macroScore) : "?"}
             sub={macroScore > 0 ? `${macroRegime} regime` : "Loading\u2026"}
             color={macroScore > 0 ? macroColor : "var(--orange)"}
           />
@@ -424,11 +438,11 @@ export default function DashboardPage() {
         <motion.div variants={itemV}>
           <StatCard
             icon={<BarChart3 className="w-3.5 h-3.5" />}
-            label="Top Sector 24h"
+            label="Top sector 24h"
             href="/sectors"
-            value={topSector ? String(topSector.name ?? "—") : "—"}
-            sub={topSector ? `+${Number(topSector.change_pct_24h ?? 0).toFixed(2)}% change` : "Loading sectors\u2026"}
-            color="var(--blue)"
+            value={topSector ? String(topSector.name ?? "?") : "?"}
+            sub={topSector ? `+${Number(topSector.change_pct_24h ?? 0).toFixed(2)}% change` : "Loading sectors?"}
+            color="var(--accent)"
           />
         </motion.div>
       </motion.div>
@@ -442,13 +456,13 @@ export default function DashboardPage() {
             <GlassCard padding="md" animate={false}>
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-base font-bold mb-0.5 flex items-center gap-2" style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)", letterSpacing: "-0.03em" }}>
+                  <h2 className="text-base font-bold mb-0.5 flex items-center gap-2 text-balance" style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)", letterSpacing: "-0.03em" }}>
                     <Zap className="w-4 h-4" style={{ color: "var(--accent)" }} />
-                    AI Signal Feed
+                    Signal feed
                   </h2>
-                  <p className="text-[11px]" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>Real-time agent-generated signals</p>
+                  <p className="text-[11px]" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>Latest agent outputs</p>
                 </div>
-                <Link href="/signals" className="flex items-center gap-1 text-xs font-medium transition-all hover:gap-2" style={{ color: "var(--accent)" }}>
+                <Link to="/signals" className="flex items-center gap-1 text-xs font-medium transition-all hover:gap-2" style={{ color: "var(--accent)" }}>
                   View all <ArrowRight className="w-3 h-3" />
                 </Link>
               </div>
@@ -460,13 +474,13 @@ export default function DashboardPage() {
             <GlassCard padding="md" animate={false}>
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-base font-bold mb-0.5 flex items-center gap-2" style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)", letterSpacing: "-0.03em" }}>
-                    <Layers className="w-4 h-4" style={{ color: "var(--blue)" }} />
-                    Sector Momentum
+                  <h2 className="text-base font-bold mb-0.5 flex items-center gap-2 text-balance" style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)", letterSpacing: "-0.03em" }}>
+                    <Layers className="w-4 h-4" style={{ color: "var(--accent)" }} />
+                    Sector momentum
                   </h2>
-                  <p className="text-[11px]" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>24h sector rotation heat</p>
+                  <p className="text-[11px]" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>24h rotation heat</p>
                 </div>
-                <Link href="/sectors"><BarChart3 className="w-4 h-4" style={{ color: "var(--text-muted)" }} /></Link>
+                <Link to="/sectors"><BarChart3 className="w-4 h-4" style={{ color: "var(--text-muted)" }} /></Link>
               </div>
               <SectorHeatmap sectors={sectors as { name: string; change_pct_24h?: number; market_cap?: number }[]} />
             </GlassCard>
@@ -479,15 +493,15 @@ export default function DashboardPage() {
             <GlassCard padding="md" animate={false} glow="orange">
               <div className="mb-4 flex items-start justify-between">
                 <div>
-                  <h2 className="text-base font-bold mb-0.5 flex items-center gap-2" style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)", letterSpacing: "-0.03em" }}>
+                  <h2 className="text-base font-bold mb-0.5 flex items-center gap-2 text-balance" style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)", letterSpacing: "-0.03em" }}>
                     <Globe2 className="w-4 h-4" style={{ color: "var(--accent)" }} />
-                    Macro Regime
+                    Macro regime
                   </h2>
                   <p className="text-[11px]" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-                    Risk score &middot; ETF + Events
+                    Risk score ? ETF + events
                   </p>
                 </div>
-                <Link href="/agents"><ExternalLink className="w-3.5 h-3.5" style={{ color: "var(--text-muted)" }} /></Link>
+                <Link to="/agents"><ExternalLink className="w-3.5 h-3.5" style={{ color: "var(--text-muted)" }} /></Link>
               </div>
 
               <MacroGauge score={macroScore} />
@@ -497,13 +511,13 @@ export default function DashboardPage() {
                   {macroScore > 0 ? macroRegime : "Calculating\u2026"}
                 </span>
                 <span className="text-xs font-bold tabular-nums" style={{ color: macroColor, fontFamily: "var(--font-mono)" }}>
-                  {macroScore > 0 ? `${macroScore}/100` : "—"}
+                  {macroScore > 0 ? `${macroScore}/100` : "?"}
                 </span>
               </div>
 
               {Array.isArray((macroData as { drivers?: unknown[] })?.drivers) && (
                 <div className="mt-3 space-y-1.5">
-                  <div className="text-[10px] uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>Key Drivers</div>
+                  <div className="text-[10px] tracking-wide mb-2" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>Key drivers</div>
                   {(macroData as { drivers: string[] }).drivers.slice(0, 4).map((d, i) => (
                     <div key={i} className="flex items-start gap-2 text-xs py-1.5 border-b last:border-0" style={{ color: "var(--text-secondary)", borderColor: "var(--border-subtle)" }}>
                       <span className="mt-1.5 w-1 h-1 rounded-full flex-shrink-0" style={{ background: "var(--text-muted)" }} />
@@ -519,8 +533,8 @@ export default function DashboardPage() {
             <GlassCard padding="md" animate={false}>
               <div className="flex items-center gap-2 mb-4">
                 <Activity className="w-4 h-4" style={{ color: "var(--green)" }} />
-                <h2 className="text-base font-bold" style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)", letterSpacing: "-0.03em" }}>System Status</h2>
-                <Link href="/status" className="ml-auto"><ExternalLink className="w-3.5 h-3.5" style={{ color: "var(--text-muted)" }} /></Link>
+                <h2 className="text-base font-bold text-balance" style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)", letterSpacing: "-0.03em" }}>System status</h2>
+                <Link to="/status" className="ml-auto"><ExternalLink className="w-3.5 h-3.5" style={{ color: "var(--text-muted)" }} /></Link>
               </div>
               <div className="space-y-2.5">
                 {[
@@ -549,13 +563,13 @@ export default function DashboardPage() {
           <GlassCard padding="md" animate={false}>
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-base font-bold flex items-center gap-2 mb-0.5" style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)", letterSpacing: "-0.03em" }}>
+                <h2 className="text-base font-bold flex items-center gap-2 mb-0.5 text-balance" style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)", letterSpacing: "-0.03em" }}>
                   <Radio className="w-4 h-4" style={{ color: "var(--accent)" }} />
-                  Funding Rate Signals
+                  Funding rate signals
                 </h2>
-                <p className="text-[11px]" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>Extreme funding = mean reversion opportunity</p>
+                <p className="text-[11px]" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>Extreme funding ? mean reversion watch</p>
               </div>
-              <Link href="/research" className="flex items-center gap-1 text-xs font-medium transition-all hover:gap-2" style={{ color: "var(--accent)" }}>
+              <Link to="/research" className="flex items-center gap-1 text-xs font-medium transition-all hover:gap-2" style={{ color: "var(--accent)" }}>
                 More <ArrowRight className="w-3 h-3" />
               </Link>
             </div>
@@ -590,11 +604,11 @@ export default function DashboardPage() {
       <motion.div initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-40px" }} transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}>
         <GlassCard padding="md" animate={false}>
           <div className="mb-3">
-            <h2 className="text-base font-bold flex items-center gap-2 mb-0.5" style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)", letterSpacing: "-0.03em" }}>
-              <ArrowUpDown className="w-4 h-4" style={{ color: "var(--purple)" }} />
-              AI Trade Assistant
+            <h2 className="text-base font-bold flex items-center gap-2 mb-0.5 text-balance" style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)", letterSpacing: "-0.03em" }}>
+              <ArrowUpDown className="w-4 h-4" style={{ color: "var(--accent)" }} />
+              Trade assistant
             </h2>
-            <p className="text-[11px]" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>Type a trade intent in natural language</p>
+            <p className="text-[11px]" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>Describe a trade in plain language</p>
           </div>
           <div className="flex gap-2">
             <input
@@ -602,8 +616,8 @@ export default function DashboardPage() {
               value={nlpInput}
               onChange={(e) => setNlpInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && parseNlp()}
-              placeholder='e.g. "buy 0.1 BTC with 5x leverage" or "close ETH position"'
-              className="flex-1 px-4 py-2.5 rounded-xl text-sm placeholder:text-[var(--text-muted)] focus:outline-none transition-colors"
+              placeholder='e.g. "buy 0.003 ETH market on testnet"'
+              className="flex-1 px-4 py-2.5 rounded-xl text-sm placeholder:text-[var(--text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-border)] transition-colors duration-200"
               style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--glass-border)", color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}
               onFocus={(e) => (e.currentTarget.style.borderColor = "var(--accent-border)")}
               onBlur={(e) => (e.currentTarget.style.borderColor = "var(--glass-border)")}
@@ -611,7 +625,7 @@ export default function DashboardPage() {
             <button
               onClick={parseNlp}
               disabled={nlpLoading || !nlpInput.trim()}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50 whitespace-nowrap transition-all"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50 whitespace-nowrap transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-border)]"
               style={{ background: "var(--grad-orange)", color: "#fff", boxShadow: "0 4px 16px rgba(249,115,22,0.25)" }}
             >
               <Send className="w-3.5 h-3.5" />
@@ -648,7 +662,7 @@ export default function DashboardPage() {
                         if (r.amount) params.set("qty", String(r.amount));
                         if (r.orderType) params.set("type", r.orderType);
                         if (r.price) params.set("price", String(r.price));
-                        router.push(`/trade?${params.toString()}`);
+                        navigate(`/trade?${params.toString()}`);
                       }}
                       className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold w-full justify-center transition-all hover:opacity-90 active:scale-95"
                       style={{ background: "var(--grad-orange)", color: "#fff", boxShadow: "0 4px 16px rgba(249,115,22,0.3)" }}

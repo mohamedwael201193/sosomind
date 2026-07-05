@@ -8,7 +8,7 @@ import { useWebSocket } from "@/lib/websocket";
 import { TrendingUp, TrendingDown, Minus, Zap, Filter, Target, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
 import { CryptoIcon } from "@/components/CryptoIcon";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { formatUsdPrice } from "@/lib/format-price";
 import { FreshnessBadge } from "@/components/FreshnessBadge";
 
@@ -117,7 +117,7 @@ export default function SignalsPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.1 }}
         >
-          <Link href="/track-record">
+          <Link to="/track-record">
             <GlassCard animate padding="md" glow={evaluated > 0 && hitRate >= 0.6 ? "green" : evaluated > 0 && hitRate >= 0.4 ? "none" : "none"} className="cursor-pointer hover:border-[var(--accent)] transition-colors">
               <div className="flex items-center gap-3 flex-wrap">
                 <Target className="w-4 h-4 text-[var(--text-muted)] flex-shrink-0" />
@@ -325,7 +325,7 @@ export default function SignalsPage() {
                         )}
                         {signal.id && (
                           <Link
-                            href={`/signals/${signal.id}`}
+                            to={`/signals/${signal.id}`}
                             className="flex items-center gap-1 text-[11px] font-semibold hover:opacity-70 transition-opacity"
                             style={{ color: "var(--accent, #3b82f6)" }}
                           >

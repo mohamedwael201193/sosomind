@@ -4,6 +4,7 @@ import { useWebSocket } from "@/lib/websocket";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CryptoIcon } from "@/components/CryptoIcon";
+import { API_URL } from "@/lib/env";
 
 interface TickerItem {
   symbol: string;
@@ -27,7 +28,6 @@ export function LiveTicker() {
 
   // Fetch initial prices: try backend first, fall back to Binance API directly
   useEffect(() => {
-    const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:10000";
     const symbols = DEFAULT_ITEMS.map((i) => i.symbol);
 
     async function fetchPrice(sym: string): Promise<TickerItem> {

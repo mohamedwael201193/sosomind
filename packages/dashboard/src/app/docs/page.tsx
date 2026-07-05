@@ -1,7 +1,7 @@
-﻿"use client";
+"use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import {
   BookOpen, Cpu, Zap, BarChart2, Globe, Bot, Shield, Radio,
   Database, Code2, Server, Map, ChevronRight, Copy, Check,
@@ -237,7 +237,7 @@ export default function DocsPage() {
     <div className="h-screen overflow-hidden flex" style={{ background: "var(--bg-base)" }}>
       <aside className="hidden lg:flex flex-col w-64 xl:w-72 flex-shrink-0 h-full overflow-y-auto py-8 px-4"
         style={{ borderRight: "1px solid var(--glass-border)", background: "var(--bg-base)" }}>
-        <Link href="/landing" className="flex items-center gap-2 px-3 mb-8">
+        <Link to="/landing" className="flex items-center gap-2 px-3 mb-8">
           <div className="w-7 h-7 rounded-[6px] flex items-center justify-center" style={{ background: "rgba(249,115,22,0.15)" }}>
             <BookOpen className="w-3.5 h-3.5" style={{ color: "#f97316" }} />
           </div>
@@ -287,21 +287,21 @@ export default function DocsPage() {
               </div>
               <h1 className="text-4xl font-black mb-4 tracking-tight" style={{ fontFamily: "var(--font-display)", color: "var(--text-primary)" }}>SoSoMind Documentation</h1>
               <p className="text-base leading-relaxed mb-8" style={{ color: "var(--text-secondary)", maxWidth: "60ch" }}>
-                The Trustworthy Agentic Trading Loop — live SoSoValue data, risk-gated SoDEX testnet execution, public HIT/STOP/DRIFT ledger.
+                The Trustworthy Agentic Trading Loop � live SoSoValue data, risk-gated SoDEX testnet execution, public HIT/STOP/DRIFT ledger.
               </p>
               <SubTitle id="feature-matrix">Live Feature Matrix (Wave 2)</SubTitle>
               <Table headers={["Feature", "Status", "Surface"]} rows={[
-                ["SoSoValue 35 API methods", "✅ Live", "Backend + MCP"],
-                ["SoDEX testnet relay (MetaMask)", "✅ Live", "Dashboard /trade"],
-                ["Signal outcome ledger", "✅ Live", "/track-record"],
-                ["Research agent + citations", "✅ Live", "/signals/[id]"],
-                ["Risk preflight gate", "✅ Live", "Relay + Telegram tx:"],
-                ["Circuit breaker", "✅ Wired", "agent_meta persistence"],
-                ["Telegram hosted wallet", "✅ Live", "@SosoMindbot (disclosed)"],
-                ["House POST /api/trades", "🔒 Disabled", "Admin key only"],
-                ["Whales / Arb / Persona", "⚠️ Labs", "Preview nav"],
-                ["Mainnet trading", "❌ Roadmap", "Testnet only"],
-                ["Dashboard perps UI", "❌ Not built", "MCP partial"],
+                ["SoSoValue 35 API methods", "? Live", "Backend + MCP"],
+                ["SoDEX testnet relay (MetaMask)", "? Live", "Dashboard /trade"],
+                ["Signal outcome ledger", "? Live", "/track-record"],
+                ["Research agent + citations", "? Live", "/signals/[id]"],
+                ["Risk preflight gate", "? Live", "Relay + Telegram tx:"],
+                ["Circuit breaker", "? Wired", "agent_meta persistence"],
+                ["Telegram hosted wallet", "? Live", "@SosoMindbot (disclosed)"],
+                ["House POST /api/trades", "?? Disabled", "Admin key only"],
+                ["Whales / Arb / Persona", "?? Labs", "Preview nav"],
+                ["Mainnet trading", "? Roadmap", "Testnet only"],
+                ["Dashboard perps UI", "? Not built", "MCP partial"],
               ]} />
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
                 {[
@@ -350,7 +350,7 @@ export default function DocsPage() {
             <Table headers={["Layer", "Technology", "Status"]} rows={[
               ["Backend", "Express + TypeScript, Node 20, Render.com", <StatusBadge key="l" status="LIVE" />],
               ["Frontend", "Next.js 14, App Router, React 19, Vercel", <StatusBadge key="l" status="LIVE" />],
-              ["AI Chain", "Cerebras → SambaNova → Together → OpenRouter → Groq → Gemini", <StatusBadge key="l" status="LIVE" />],
+              ["AI Chain", "Cerebras ? SambaNova ? Together ? OpenRouter ? Groq ? Gemini", <StatusBadge key="l" status="LIVE" />],
               ["Signing", "EIP-712, ethers.js v6 (non-custodial)", <StatusBadge key="l" status="LIVE" />],
               ["DEX", "SoDEX testnet (chainId 138565)", <StatusBadge key="t" status="TESTNET" />],
               ["Database", "Supabase PostgreSQL, 9 tables", <StatusBadge key="l" status="LIVE" />],
@@ -367,7 +367,7 @@ export default function DocsPage() {
             </p>
             <SubTitle id="agents-orchestrator">Orchestrator</SubTitle>
             <InfoBox>The Orchestrator runs a 4-hour research loop. It coordinates the agent pipeline, enforces the circuit breaker, and routes outputs to Supabase, WebSocket, and Telegram.</InfoBox>
-            <CodeBlock lang="typescript" code={"// Orchestrator loop — every 4 hours\nasync function runCycle(asset: string) {\n  if (circuitBreaker.isHalted(asset)) return;\n  const research = await ResearchAgent.run(asset);    // 13+ parallel fetches\n  const risk     = await RiskAgent.preflight(research); // 4-check gate\n  if (!risk.approved) return;\n  const macro    = await MacroOverlayAgent.run(research);\n  const signal   = await synthesise(research, macro);\n  await ExecutionAgent.execute(signal);                 // EIP-712 + SoDEX\n  await supabase.from('signals').insert(signal);\n  wsServer.broadcast('signals', signal);\n}"} />
+            <CodeBlock lang="typescript" code={"// Orchestrator loop � every 4 hours\nasync function runCycle(asset: string) {\n  if (circuitBreaker.isHalted(asset)) return;\n  const research = await ResearchAgent.run(asset);    // 13+ parallel fetches\n  const risk     = await RiskAgent.preflight(research); // 4-check gate\n  if (!risk.approved) return;\n  const macro    = await MacroOverlayAgent.run(research);\n  const signal   = await synthesise(research, macro);\n  await ExecutionAgent.execute(signal);                 // EIP-712 + SoDEX\n  await supabase.from('signals').insert(signal);\n  wsServer.broadcast('signals', signal);\n}"} />
             <SubTitle id="agents-research">Research Agent</SubTitle>
             <p className="text-sm leading-relaxed mb-4" style={{ color: "var(--text-secondary)" }}>Fetches 13+ data sources in parallel using Promise.allSettled. Never throws on partial failure.</p>
             <Table headers={["Source","Data Fetched","Caching"]} rows={[
@@ -392,14 +392,14 @@ export default function DocsPage() {
             <Table headers={["Input","Weight","Logic"]} rows={[
               ["ETF Net Flow (7d)","40%","Positive = bullish institutional pressure"],
               ["Macro Events (48h)","30%","High-impact events in next 48h = caution"],
-              ["BTC 30d Momentum","30%","Price vs 30-day MA — above = risk-on"],
+              ["BTC 30d Momentum","30%","Price vs 30-day MA � above = risk-on"],
             ]} />
             <SubTitle id="agents-execution">Execution Agent</SubTitle>
             <InfoBox>All orders are <strong>limit + IOC</strong>. Market orders are forbidden on SoDEX testnet (MissingOraclePrice error). Slippage: +0.5% BUY, -0.5% SELL.</InfoBox>
             <CodeBlock lang="typescript" code={"// Order construction\nconst price = Math.round(midPrice * (1 + 0.005)); // +0.5% slippage BUY\nconst qty   = (usdcAmount / price).toFixed(5);     // quantityPrecision=5\n\nconst order = {\n  symbol: 'vBTC_vUSDC',   // testnet symbol\n  side:   'BUY',\n  type:   'LIMIT',\n  timeInForce: 'IOC',\n  quantity: qty,           // string, quantityPrecision=5\n  price:    price.toString(), // string, pricePrecision=0 for BTC\n};"} />
             <SubTitle id="agents-circuit">Circuit Breaker</SubTitle>
             <Table headers={["Trigger","Scope","Cooldown"]} rows={[
-              ["3 consecutive losses","Global — all assets halted","1 hour (auto-reset)"],
+              ["3 consecutive losses","Global � all assets halted","1 hour (auto-reset)"],
               ["2 consecutive losses on asset","Single asset blocked","24 hours"],
               [">15% price drawdown on asset","Single asset blocked","24 hours"],
               ["Daily drawdown < -5%","Global halt","Manual reset required"],
@@ -433,9 +433,9 @@ export default function DocsPage() {
             <p className="text-sm leading-relaxed mb-6" style={{ color: "var(--text-secondary)" }}>Tracks 13 crypto sectors using composite scoring. Scores computed on demand, cached in Redis 5min.</p>
             <SubTitle id="ssi-scoring">Composite Scoring Formula</SubTitle>
             <Table headers={["Signal","Weight","Source"]} rows={[
-              ["S1 — Fundraising Velocity","30%","7-day project raise activity via getFundraisingProjects"],
-              ["S2 — Institutional Momentum","35%","SSI index 7-day ROI via getIndexMarketSnapshot"],
-              ["S3 — Sector Trend","35%","SSI 30-day kline price trend via getIndexKlines(30)"],
+              ["S1 � Fundraising Velocity","30%","7-day project raise activity via getFundraisingProjects"],
+              ["S2 � Institutional Momentum","35%","SSI index 7-day ROI via getIndexMarketSnapshot"],
+              ["S3 � Sector Trend","35%","SSI 30-day kline price trend via getIndexKlines(30)"],
             ]} />
             <CodeBlock lang="typescript" code={"const score = (S1 * 0.30) + (S2 * 0.35) + (S3 * 0.35);\nconst verdict =\n  score >= 75 ? 'STRONG_BUY' :\n  score >= 55 ? 'BUY'        :\n  score >= 35 ? 'NEUTRAL'    : 'SELL';"} />
             <SubTitle id="ssi-sectors">13 Tracked Sectors</SubTitle>
@@ -451,7 +451,7 @@ export default function DocsPage() {
           <section data-section id="execution">
             <SectionTitle id="execution" status="TESTNET">DEX Execution</SectionTitle>
             <p className="text-sm leading-relaxed mb-6" style={{ color: "var(--text-secondary)" }}>
-              All trades are signed using EIP-712 typed data and submitted to SoDEX testnet (chainId 138565) via REST. Wallets are non-custodial — private keys never leave the backend.
+              All trades are signed using EIP-712 typed data and submitted to SoDEX testnet (chainId 138565) via REST. Wallets are non-custodial � private keys never leave the backend.
             </p>
             <SubTitle id="exec-eip712">EIP-712 Signing</SubTitle>
             <CodeBlock lang="typescript" code={"// Full signing implementation (packages/backend/src/clients/sodex.ts)\nconst envelope  = JSON.stringify({ type: actionName, params: body });\nconst payloadHash = ethers.keccak256(ethers.toUtf8Bytes(envelope));\n\nconst domain = {\n  name: 'SoDEX', version: '1',\n  chainId: 138565,\n  verifyingContract: '0x...'\n};\nconst types = {\n  ActionPayload: [{ name: 'payloadHash', type: 'bytes32' }]\n};\n\nconst rawSig  = await wallet.signTypedData(domain, types, { payloadHash });\nconst sigBytes = ethers.Signature.from(rawSig);\nconst v = sigBytes.v - 27;\nconst signature = sigBytes.r + sigBytes.s.slice(2) + v.toString(16).padStart(2, '0');\n\nheaders['X-API-Signature'] = signature;\nheaders['X-API-Chain']     = '138565';"} />
@@ -470,9 +470,9 @@ export default function DocsPage() {
             <SubTitle id="exec-symbols">Testnet Symbols</SubTitle>
             <Table headers={["Symbol","Type","Quote"]} rows={[
               ["vBTC_vUSDC","Spot","vUSDC"],
-              ["vBTCvUSDC","Perps","vUSDC — perpetual, no expiry"],
+              ["vBTCvUSDC","Perps","vUSDC � perpetual, no expiry"],
               ["vETH_vUSDC","Spot","vUSDC"],
-              ["vETHvUSDC","Perps","vUSDC — perpetual"],
+              ["vETHvUSDC","Perps","vUSDC � perpetual"],
             ]} />
           </section>
           <Divider />
@@ -573,12 +573,12 @@ export default function DocsPage() {
               ["portfolio","{ usdc, btc, eth, totalUsd }","On order fill"],
               ["heartbeat","{ ts, status }","Every 60 seconds"],
             ]} />
-            <CodeBlock lang="typescript" code={"// React hook — packages/dashboard/src/lib/ws.ts\nconst ws = new WebSocket('wss://your-backend.onrender.com:10001');\n\nws.onmessage = (e) => {\n  const { channel, data } = JSON.parse(e.data);\n  if (channel === 'signals')   onSignal(data);\n  if (channel === 'prices')    updatePrices(data);\n  if (channel === 'alerts')    showAlert(data);\n  if (channel === 'portfolio') updatePortfolio(data);\n};\n\nws.send(JSON.stringify({\n  action: 'subscribe',\n  channels: ['signals', 'prices', 'alerts', 'portfolio', 'heartbeat'],\n}));"} />
+            <CodeBlock lang="typescript" code={"// React hook � packages/dashboard/src/lib/ws.ts\nconst ws = new WebSocket('wss://your-backend.onrender.com:10001');\n\nws.onmessage = (e) => {\n  const { channel, data } = JSON.parse(e.data);\n  if (channel === 'signals')   onSignal(data);\n  if (channel === 'prices')    updatePrices(data);\n  if (channel === 'alerts')    showAlert(data);\n  if (channel === 'portfolio') updatePortfolio(data);\n};\n\nws.send(JSON.stringify({\n  action: 'subscribe',\n  channels: ['signals', 'prices', 'alerts', 'portfolio', 'heartbeat'],\n}));"} />
           </section>
           <Divider />
           <section data-section id="database">
             <SectionTitle id="database" status="LIVE">Database Schema</SectionTitle>
-            <p className="text-sm leading-relaxed mb-6" style={{ color: "var(--text-secondary)" }}>Supabase PostgreSQL project <code className="text-xs px-1 py-0.5 rounded font-mono" style={{ background: "rgba(249,115,22,0.1)", color: "#f97316" }}>ngwqsxhsfzzrdchclbzi</code> — 9 tables, Row Level Security enabled.</p>
+            <p className="text-sm leading-relaxed mb-6" style={{ color: "var(--text-secondary)" }}>Supabase PostgreSQL project <code className="text-xs px-1 py-0.5 rounded font-mono" style={{ background: "rgba(249,115,22,0.1)", color: "#f97316" }}>ngwqsxhsfzzrdchclbzi</code> � 9 tables, Row Level Security enabled.</p>
             <Table headers={["Table","Key Columns","Purpose"]} rows={[
               ["signals","id, asset, direction, confidence, entry, takeProfit, stopLoss, regime, outcome","All research signals + outcome tracking"],
               ["user_profiles","wallet_address, telegram_id, encrypted_key, created_at","User identity + embedded wallet storage"],
@@ -597,7 +597,7 @@ export default function DocsPage() {
             <p className="text-sm leading-relaxed mb-4" style={{ color: "var(--text-secondary)" }}>Backend base URL: <code className="text-xs px-1 py-0.5 rounded font-mono" style={{ background: "rgba(249,115,22,0.1)", color: "#f97316" }}>https://your-backend.onrender.com</code>. All routes require no auth by default (rate-limited by IP). User routes require a valid JWT from Supabase auth.</p>
             <InfoBox>The <strong>/api/agents/orchestrate</strong> endpoint starts the full 5-agent pipeline. This is also triggered by the Telegram /research command and the cron scheduler every 4 hours.</InfoBox>
             <Table headers={["Method","Path","Description"]} rows={[
-              ["GET","/api/health","Health check — returns status, uptime, version"],
+              ["GET","/api/health","Health check � returns status, uptime, version"],
               ["GET","/api/market","Live price snapshot for BTC, ETH, SOL"],
               ["GET","/api/signals","Last 20 signals, sorted by createdAt desc"],
               ["GET","/api/signals/track-record","Aggregate HIT/STOP/DRIFT/PENDING counts"],
@@ -625,7 +625,7 @@ export default function DocsPage() {
             <SectionTitle id="deployment" status="LIVE">Deployment</SectionTitle>
             <p className="text-sm leading-relaxed mb-4" style={{ color: "var(--text-secondary)" }}>SoSoMind uses a split deployment: backend on Render.com (always-on), frontend on Vercel (edge). Both are production-deployed.</p>
             <SubTitle id="deployment">Environment Variables</SubTitle>
-            <CodeBlock lang="bash" code={"# Required — backend\nWALLET_ENCRYPT_KEY=<64-char hex>           # AES-256-GCM key for wallet encryption\nSODEX_CHAIN_ID=138565\nSODEX_PRIVATE_KEY=0x<key>\nSODEX_ADDRESS=0x<addr>\nSODEX_ACCOUNT_ID=<id>\nSOSOVALUE_API_KEY=SOSO-<key>\nSUPABASE_URL=https://<project>.supabase.co\nSUPABASE_SERVICE_ROLE_KEY=<key>\nUPSTASH_REDIS_REST_URL=https://<...>.upstash.io\nUPSTASH_REDIS_REST_TOKEN=<token>\nTELEGRAM_BOT_TOKEN=<token>\nTELEGRAM_ALLOWED_CHAT_ID=<id>\n\n# AI providers (6-provider fallback chain)\nCEREBRAS_API_KEY=<key>   SAMBANOVA_API_KEY=<key>\nTOGETHER_API_KEY=<key>   OPENROUTER_API_KEY=<key>\nGROQ_API_KEY=<key>       GEMINI_API_KEY=<key>\n\n# Required — frontend (Next.js)\nNEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co\nNEXT_PUBLIC_SUPABASE_ANON_KEY=<key>\nNEXT_PUBLIC_BACKEND_URL=https://your-backend.onrender.com"} />
+            <CodeBlock lang="bash" code={"# Required � backend\nWALLET_ENCRYPT_KEY=<64-char hex>           # AES-256-GCM key for wallet encryption\nSODEX_CHAIN_ID=138565\nSODEX_PRIVATE_KEY=0x<key>\nSODEX_ADDRESS=0x<addr>\nSODEX_ACCOUNT_ID=<id>\nSOSOVALUE_API_KEY=SOSO-<key>\nSUPABASE_URL=https://<project>.supabase.co\nSUPABASE_SERVICE_ROLE_KEY=<key>\nUPSTASH_REDIS_REST_URL=https://<...>.upstash.io\nUPSTASH_REDIS_REST_TOKEN=<token>\nTELEGRAM_BOT_TOKEN=<token>\nTELEGRAM_ALLOWED_CHAT_ID=<id>\n\n# AI providers (6-provider fallback chain)\nCEREBRAS_API_KEY=<key>   SAMBANOVA_API_KEY=<key>\nTOGETHER_API_KEY=<key>   OPENROUTER_API_KEY=<key>\nGROQ_API_KEY=<key>       GEMINI_API_KEY=<key>\n\n# Required � frontend (Next.js)\nNEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co\nNEXT_PUBLIC_SUPABASE_ANON_KEY=<key>\nNEXT_PUBLIC_BACKEND_URL=https://your-backend.onrender.com"} />
             <Table headers={["Service","Platform","URL"]} rows={[
               ["Backend API","Render.com (always-on)","https://your-backend.onrender.com:10000"],
               ["WebSocket","Render.com (always-on)","wss://your-backend.onrender.com:10001"],
@@ -637,7 +637,7 @@ export default function DocsPage() {
           <section data-section id="roadmap">
             <SectionTitle id="roadmap" status="ROADMAP">Roadmap</SectionTitle>
             <p className="text-sm leading-relaxed mb-6" style={{ color: "var(--text-secondary)" }}>
-              Current focus: mainnet launch and signal marketplace. The system is architecturally ready — only testnet-to-mainnet migration and marketplace contracts remain.
+              Current focus: mainnet launch and signal marketplace. The system is architecturally ready � only testnet-to-mainnet migration and marketplace contracts remain.
             </p>
             <Table headers={["Feature","Status","Notes"]} rows={[
               ["SoDEX Mainnet (chainId 286623)", <StatusBadge key="r" status="ROADMAP" />, "Waiting for mainnet gateway access"],

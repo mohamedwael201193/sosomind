@@ -13,7 +13,7 @@
  * ✅ 4-step wizard: Strategy → Risk Preflight → Sign & Submit → Execution Proof
  */
 import { useEffect, useMemo, useRef, useState, useCallback, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fetcher, api } from '@/lib/api';
@@ -196,7 +196,7 @@ function CandlestickChart({ klines, symbol }: { klines: any[]; symbol: string })
 
 function TradeInner() {
   const { address, token } = useWallet();
-  const searchParams = useSearchParams();
+  const [searchParams] = useSearchParams();
   const initSide = (searchParams.get('side') ?? 'buy') as 'buy' | 'sell';
   const initType = (searchParams.get('type') === 'market' ? 'market' : 'limit') as 'limit' | 'market';
   const initQty = searchParams.get('qty') ?? '';

@@ -1,8 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { Link } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { X, Target, Zap, CandlestickChart, PieChart, ChevronRight } from "lucide-react";
 
 const STEPS = [
@@ -33,7 +33,7 @@ const STEPS = [
 ];
 
 export function DemoTour() {
-  const pathname = usePathname();
+  const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
 
@@ -95,7 +95,7 @@ export function DemoTour() {
             {step < STEPS.length - 1 ? (
               <>
                 <Link
-                  href={current.href}
+                  to={current.href}
                   onClick={() => setStep((s) => s + 1)}
                   className="flex-1 flex items-center justify-center gap-1 py-2.5 rounded-xl text-sm font-bold"
                   style={{ background: "var(--accent)", color: "#fff" }}

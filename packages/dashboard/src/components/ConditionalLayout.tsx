@@ -1,5 +1,5 @@
 'use client';
-import { usePathname } from 'next/navigation';
+import { useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { MobileNav } from './MobileNav';
 import { StatusBar } from './StatusBar';
@@ -11,7 +11,7 @@ import { JudgePathBanner } from './JudgePathBanner';
 const STANDALONE_ROUTES = ['/landing', '/docs', '/trade/sign'];
 
 export function ConditionalLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  const { pathname } = useLocation();
   const isStandalone = STANDALONE_ROUTES.some(r => pathname === r || pathname.startsWith(r + '/'));
 
   if (isStandalone) {

@@ -4,7 +4,7 @@ import {
   Brain, TrendingUp, Target, Activity, ShieldCheck, Zap,
   BarChart3, DollarSign, Globe2, CheckCircle2, ArrowRight,
 } from "lucide-react";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 // Colors: var(--accent), var(--green), var(--yellow), var(--red), var(--text-primary), etc.
@@ -580,11 +580,11 @@ export default function MethodologyPage() {
           Track Record → Signal audit → Risk preflight → MetaMask sign → Portfolio proof
         </p>
         <div className="flex flex-wrap gap-3 justify-center">
-          <Link href="/track-record" className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-bold" style={{ background: "#00ff7f", color: "#030a05" }}>
+          <Link to="/track-record" className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-bold" style={{ background: "#00ff7f", color: "#030a05" }}>
             View Track Record
             <ArrowRight className="w-4 h-4" />
           </Link>
-          <Link href="/trade" className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-bold" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--text-primary)" }}>
+          <Link to="/trade" className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-bold" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--text-primary)" }}>
             Trade on SoDEX
           </Link>
         </div>

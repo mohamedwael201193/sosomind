@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { API_URL, WS_URL as ENV_WS_URL } from './env';
+
 function resolveWsUrl(): string {
-  if (process.env.NEXT_PUBLIC_WS_URL) return process.env.NEXT_PUBLIC_WS_URL;
-  const api = process.env.NEXT_PUBLIC_API_URL || "";
-  if (api.includes("onrender.com")) {
-    return api.replace(/^http/, "ws").replace(/\/$/, "") + ":10001";
+  if (ENV_WS_URL) return ENV_WS_URL;
+  if (API_URL.includes('onrender.com')) {
+    return API_URL.replace(/^http/, 'ws').replace(/\/$/, '') + ':10001';
   }
-  return "ws://localhost:10001";
+  return 'ws://localhost:10001';
 }
 
 const WS_URL = resolveWsUrl();

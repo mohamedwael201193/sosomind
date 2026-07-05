@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { CryptoIcon } from "@/components/CryptoIcon";
 import { cn } from "@/lib/utils";
+import { API_URL } from '@/lib/env';
 
 type Category = "all" | "etf_inflow" | "etf_outflow" | "treasury_buy" | "vc_funding" | "large_move";
 
@@ -51,7 +52,6 @@ function formatUSD(n: number): string {
 
 export default function WhalesPage() {
   const qc = useQueryClient();
-  const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:10000";
   const [category, setCategory] = useState<Category>("all");
   const [hasAutoScanned, setHasAutoScanned] = useState(false);
 
@@ -66,7 +66,7 @@ export default function WhalesPage() {
 
   const scan = useMutation({
     mutationFn: () =>
-      fetch(`${API}/api/whales/scan`, { method: "POST" }).then((r) => r.json()),
+      fetch(`${API_URL}/api/whales/scan`, { method: "POST" }).then((r) => r.json()),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["whale-alerts"] }),
   });
 
