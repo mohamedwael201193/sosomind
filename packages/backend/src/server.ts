@@ -1,3 +1,4 @@
+import http from 'http';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -173,7 +174,9 @@ export async function startServer() {
     res.status(err.status || 500).json({ error: err.message || 'internal_error' });
   });
 
-  app.listen(PORT, () => {
+  const httpServer = http.createServer(app);
+  startWebSocketServer(httpServer);
+  httpServer.listen(PORT, () => {
     console.log(`🧠 SosoMind backend listening on http://localhost:${PORT}`);
   });
 
@@ -228,6 +231,4 @@ export async function startServer() {
     runOutcomeEvaluation().catch((e) => console.error('outcomeEval tick error', e));
   }, 60 * 60 * 1000);
 
-  // Start WebSocket server
-  startWebSocketServer();
 }

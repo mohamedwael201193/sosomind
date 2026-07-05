@@ -543,7 +543,10 @@ function TradeInner() {
         const allFreshSymbols: SodexSymbol[] = freshResult.data ?? symbols.data ?? [];
         const freshTradeable = allFreshSymbols.filter((s) => !isNonTrading(s.status ?? ''));
 
-        const sectors: any[] = (await fetcher('/api/sectors/intel')) ?? [];
+        const sectors: any[] = (await Promise.race([
+          fetcher('/api/sectors/intel'),
+          new Promise<any[]>((_, reject) => setTimeout(() => reject(new Error('SSI timeout')), 12_000)),
+        ])) ?? [];
         const list = Array.isArray(sectors) ? sectors : [];
         const top = list.find((s: any) => s.verdict === 'STRONG_BUY')
                  ?? list.find((s: any) => s.verdict === 'BUY')

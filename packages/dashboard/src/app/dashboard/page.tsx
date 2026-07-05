@@ -17,6 +17,7 @@ import {
   Bell, Search, Layers, ExternalLink, CandlestickChart,
 } from "lucide-react";
 import { SetupProgress } from "@/components/SetupProgress";
+import { ProductJourney } from "@/components/ProductJourney";
 import { useSetupProgress } from "@/hooks/useSetupProgress";
 import { useWallet } from "@/context/WalletContext";
 import { useEnvironment } from "@/context/EnvironmentContext";
@@ -437,6 +438,8 @@ export default function DashboardPage() {
           </GlassCard>
         )}
       </motion.div>
+
+      <ProductJourney />
 
       <LiveTicker />
 

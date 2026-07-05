@@ -8,6 +8,7 @@ import LightweightCandlestickChart, { CandlePoint } from "@/components/Lightweig
 import { TrendingUp, TrendingDown, Search, Zap, BarChart2, BookOpen, Activity, MessageSquare, Target, Wallet, Clock } from "lucide-react";
 import { fetchWithMeta } from "@/lib/api";
 import { AgentCycle } from "@/components/AgentCycle";
+import { AiAnalysisPanel, type AnalysisResult } from "@/components/AiAnalysisPanel";
 import { cn } from "@/lib/utils";
 
 const ASSETS = ["BTC", "ETH", "SOL", "BNB", "AVAX", "ARB", "OP", "SUI"];
@@ -40,7 +41,8 @@ export default function ResearchPage() {
   const [walletAddress, setWalletAddress] = useState("");
   const [showAgentCycle, setShowAgentCycle] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
-  const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  const [analysisStep, setAnalysisStep] = useState(0);
+  const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const klines = useQuery({
@@ -89,18 +91,26 @@ export default function ResearchPage() {
     setAnalyzing(true);
     setError(null);
     setResult(null);
+    setAnalysisStep(0);
+    const stepTimer = window.setInterval(() => {
+      setAnalysisStep((s) => Math.min(s + 1, 3));
+    }, 2_500);
     try {
-      const r = await api.post(`/api/agents/research/${asset.toUpperCase()}`);
-      setResult((r.data?.signal ?? r.data?.data ?? r.data) as Record<string, unknown>);
+      const r = await api.post(`/api/agents/research/${asset.toUpperCase()}`, {}, { timeout: 120_000 });
+      const signal = (r.data?.signal ?? r.data?.data ?? r.data) as AnalysisResult;
+      setResult(signal);
+      setAnalysisStep(4);
     } catch (e: unknown) {
       try {
-        const r2 = await api.post(`/api/research/${asset.toUpperCase()}`);
-        setResult((r2.data?.signal ?? r2.data) as Record<string, unknown>);
+        const r2 = await api.post(`/api/research/${asset.toUpperCase()}`, {}, { timeout: 120_000 });
+        setResult((r2.data?.signal ?? r2.data) as AnalysisResult);
+        setAnalysisStep(4);
       } catch {
-        const msg = e instanceof Error ? e.message : "Analysis failed";
+        const msg = e instanceof Error ? e.message : "Analysis failed. Backend may be waking up - try again in a few seconds.";
         setError(msg);
       }
     } finally {
+      window.clearInterval(stepTimer);
       setAnalyzing(false);
     }
   }
@@ -232,90 +242,14 @@ export default function ResearchPage() {
               )}
             </GlassCard>
 
-            {/* AI Analysis result */}
-            <AnimatePresence>
-              {(result || error) && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                >
-                  {error ? (
-                    <GlassCard glow="red" padding="md">
-                      <p className="text-sm text-[var(--red)]">{error}</p>
-                    </GlassCard>
-                  ) : result && (
-                    <GlassCard
-                      glow={(result.direction as string) === "long" ? "green" : (result.direction as string) === "short" ? "red" : "blue"}
-                      padding="md"
-                    >
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-bold text-[var(--text-primary)]">AI Analysis: {asset}</h3>
-                        <span
-                          className={cn(
-                            "px-3 py-1 rounded-full text-xs font-bold",
-                            (result.direction as string) === "long" ? "bg-[var(--green-soft)] text-[var(--green)]" :
-                            (result.direction as string) === "short" ? "bg-[var(--red-soft)] text-[var(--red)]" :
-                            "bg-[var(--blue-soft)] text-[var(--blue)]"
-                          )}
-                        >
-                          {String(result.direction ?? "neutral").toUpperCase()}
-                        </span>
-                      </div>
-
-                      {result.confidence != null && (
-                        <div className="mb-4">
-                          <div className="flex justify-between text-xs text-[var(--text-muted)] mb-1">
-                            <span>Confidence</span>
-                            <span>{String(result.confidence)}%</span>
-                          </div>
-                          <div className="h-2 rounded-full bg-[var(--border-subtle)] overflow-hidden">
-                            <motion.div
-                              className={cn(
-                                "h-full rounded-full",
-                                (result.direction as string) === "long" ? "bg-[var(--green)]" :
-                                (result.direction as string) === "short" ? "bg-[var(--red)]" : "bg-[var(--blue)]"
-                              )}
-                              initial={{ width: 0 }}
-                              animate={{ width: `${Number(result.confidence ?? 0)}%` }}
-                              transition={{ duration: 0.8 }}
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Price targets */}
-                      {(result.entry != null || result.tp != null || result.sl != null) && (
-                        <div className="grid grid-cols-3 gap-3 mb-4">
-                          {result.entry != null && (
-                            <div className="text-center p-2 rounded-[var(--radius-sm)] bg-[var(--bg-glass)]">
-                              <div className="text-xs text-[var(--text-muted)] mb-1">Entry</div>
-                              <div className="text-sm font-bold text-[var(--text-primary)]">${String(result.entry ?? "")}</div>
-                            </div>
-                          )}
-                          {result.tp != null && (
-                            <div className="text-center p-2 rounded-[var(--radius-sm)] bg-[var(--green-soft)]">
-                              <div className="text-xs text-[var(--green)] mb-1">Take Profit</div>
-                              <div className="text-sm font-bold text-[var(--green)]">${String(result.tp ?? "")}</div>
-                            </div>
-                          )}
-                          {result.sl != null && (
-                            <div className="text-center p-2 rounded-[var(--radius-sm)] bg-[var(--red-soft)]">
-                              <div className="text-xs text-[var(--red)] mb-1">Stop Loss</div>
-                              <div className="text-sm font-bold text-[var(--red)]">${String(result.sl ?? "")}</div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {result.reason != null && (
-                        <p className="text-sm text-[var(--text-secondary)]">{String(result.reason)}</p>
-                      )}
-                    </GlassCard>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <AiAnalysisPanel
+              asset={asset}
+              analyzing={analyzing}
+              analysisStep={analysisStep}
+              result={result}
+              error={error}
+              onClose={() => { setResult(null); setError(null); }}
+            />
           </motion.div>
         )}
 

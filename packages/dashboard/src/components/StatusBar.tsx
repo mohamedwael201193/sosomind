@@ -2,41 +2,30 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Wifi, WifiOff } from 'lucide-react';
-import { API_URL } from '@/lib/api';
-type ServiceStatus = 'up' | 'down' | 'warn' | 'loading';
+import { fetchLiveHealth, type HealthSnapshot, type ServiceStatus } from '@/lib/health';
 
 export function StatusBar() {
-  const [wsStatus, setWsStatus] = useState<ServiceStatus>('loading');
-  const [apiStatus, setApiStatus] = useState<ServiceStatus>('loading');
-  const [sosoStatus, setSosoStatus] = useState<ServiceStatus>('loading');
-  const [sodexStatus, setSodexStatus] = useState<ServiceStatus>('loading');
-  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
-  const [wsConnections, setWsConnections] = useState<number>(0);
+  const [health, setHealth] = useState<HealthSnapshot>({
+    api: 'loading',
+    ws: 'loading',
+    soso: 'loading',
+    sodex: 'loading',
+    wsConnections: 0,
+    updatedAt: null,
+  });
 
   useEffect(() => {
+    let cancelled = false;
     const check = async () => {
-      try {
-        const r = await fetch(`${API_URL}/api/health`, { signal: AbortSignal.timeout(4000) });
-        const json = await r.json();
-        setApiStatus('up');
-        const ws = json?.services?.websocket;
-        setWsStatus(ws?.status === 'ok' || ws?.status === 'running' ? 'up' : 'down');
-        setWsConnections(ws?.connections ?? 0);
-        const sv = json?.services?.sosovalue?.status;
-        setSosoStatus(sv === 'down' ? 'down' : sv === 'degraded' ? 'warn' : 'up');
-        const sd = json?.services?.sodex?.status;
-        setSodexStatus(sd === 'ok' ? 'up' : sd === 'down' ? 'down' : 'up');
-        setLastUpdate(new Date());
-      } catch {
-        setApiStatus('down');
-        setWsStatus('down');
-        setSosoStatus('down');
-        setSodexStatus('down');
-      }
+      const snap = await fetchLiveHealth();
+      if (!cancelled) setHealth(snap);
     };
     check();
-    const id = setInterval(check, 30_000);
-    return () => clearInterval(id);
+    const id = setInterval(check, 20_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
   }, []);
 
   const dot = (s: ServiceStatus) =>
@@ -69,25 +58,25 @@ export function StatusBar() {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text-secondary)' }}>
-        {dot(apiStatus)}
+        {dot(health.api)}
         <span>API</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text-secondary)' }}>
-        {dot(wsStatus)}
-        <span>WS{wsStatus === 'up' ? ` · ${wsConnections}` : ''}</span>
+        {dot(health.ws)}
+        <span>WS{health.ws === 'up' ? ` · ${health.wsConnections}` : ''}</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text-secondary)' }}>
-        {dot(sosoStatus)}
+        {dot(health.soso)}
         <span>SoSoValue</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text-secondary)' }}>
-        {dot(sodexStatus)}
+        {dot(health.sodex)}
         <span>SoDEX</span>
       </div>
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
         <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
-          {apiStatus === 'up' ? <Wifi className="w-3 h-3" style={{ color: 'var(--green)' }} /> : <WifiOff className="w-3 h-3" style={{ color: 'var(--red)' }} />}
-          {lastUpdate ? lastUpdate.toLocaleTimeString() : '…'}
+          {health.api === 'up' ? <Wifi className="w-3 h-3" style={{ color: 'var(--green)' }} /> : <WifiOff className="w-3 h-3" style={{ color: 'var(--red)' }} />}
+          {health.updatedAt ? health.updatedAt.toLocaleTimeString() : '…'}
         </span>
       </div>
     </motion.div>

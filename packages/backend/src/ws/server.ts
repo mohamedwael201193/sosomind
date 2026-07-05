@@ -1,3 +1,4 @@
+import type { Server as HttpServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { sosovalue } from '../clients/sosovalue';
 import { sodex } from '../clients/sodex';
@@ -6,6 +7,7 @@ import { supabase, subscribeToSignals } from '../db/supabase';
 export type WsChannel = 'prices' | 'orderbook' | 'trades' | 'signals' | 'alerts';
 
 const WS_PORT = parseInt(process.env.WS_PORT || '10001', 10);
+export const WS_PATH = process.env.WS_PATH || '/ws';
 
 const channelClients = new Map<WsChannel, Set<WebSocket>>();
 const ALL_CHANNELS: WsChannel[] = ['prices', 'orderbook', 'trades', 'signals', 'alerts'];
@@ -24,7 +26,7 @@ export function broadcast(channel: WsChannel, data: unknown): number {
   return sent;
 }
 
-export function getWsStats(): { running: boolean; port: number; connections: number; channels: Record<string, number> } {
+export function getWsStats(): { running: boolean; port: number; path: string; connections: number; channels: Record<string, number> } {
   const channels: Record<string, number> = {};
   let total = 0;
   for (const ch of ALL_CHANNELS) {
@@ -32,7 +34,7 @@ export function getWsStats(): { running: boolean; port: number; connections: num
     channels[ch] = n;
     total += n;
   }
-  return { running: !!wssRef, port: WS_PORT, connections: total, channels };
+  return { running: !!wssRef, port: WS_PORT, path: WS_PATH, connections: total, channels };
 }
 
 function subscribe(ws: WebSocket, channel: WsChannel) {
@@ -40,9 +42,7 @@ function subscribe(ws: WebSocket, channel: WsChannel) {
   channelClients.get(channel)?.add(ws);
 }
 
-export function startWebSocketServer(): WebSocketServer {
-  const wss = new WebSocketServer({ port: WS_PORT });
-  wssRef = wss;
+function attachWsHandlers(wss: WebSocketServer) {
 
   // Supabase realtime: push new signals instantly
   try {
@@ -70,8 +70,6 @@ export function startWebSocketServer(): WebSocketServer {
       for (const clients of channelClients.values()) clients.delete(ws);
     });
   });
-
-  console.log(`🔌 WebSocket server on ws://localhost:${WS_PORT}`);
 
   // Push prices every 15s for BTC/ETH/SOL
   setInterval(async () => {
@@ -111,5 +109,19 @@ export function startWebSocketServer(): WebSocketServer {
     } catch {}
   }, 60_000);
 
+}
+
+/** Attach to HTTP server on Render (single exposed port) or standalone port in dev. */
+export function startWebSocketServer(httpServer?: HttpServer): WebSocketServer {
+  const wss = httpServer
+    ? new WebSocketServer({ server: httpServer, path: WS_PATH })
+    : new WebSocketServer({ port: WS_PORT });
+  wssRef = wss;
+  attachWsHandlers(wss);
+  if (httpServer) {
+    console.log(`🔌 WebSocket attached at path ${WS_PATH} (shared HTTP port)`);
+  } else {
+    console.log(`🔌 WebSocket server on ws://localhost:${WS_PORT}`);
+  }
   return wss;
 }
