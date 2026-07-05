@@ -30,7 +30,10 @@ async function fetchWithRetry(url: string, attempts = 3, timeoutMs = 12_000): Pr
 
 export async function fetchLiveHealth(): Promise<HealthSnapshot> {
   try {
-    const r = await fetchWithRetry(`${API_URL}/api/health/live`);
+    let r = await fetchWithRetry(`${API_URL}/api/health/live`);
+    if (r.status === 404) {
+      r = await fetchWithRetry(`${API_URL}/api/health`, 2, 20_000);
+    }
     const json = await r.json();
     const ws = json?.services?.websocket;
     const sv = json?.services?.sosovalue?.status;
