@@ -17,6 +17,16 @@ function parseUsdcAvailable(balances: Array<{ coin?: string; total?: string; loc
   return Math.max(0, free);
 }
 
+function lowestMinNotionalFromSymbols(raw: unknown): number {
+  const items: any[] = Array.isArray(raw) ? raw : (raw as any)?.data ?? (raw as any)?.symbols ?? [];
+  let min = Infinity;
+  for (const item of items) {
+    const n = parseFloat(String(item?.minNotional ?? '0'));
+    if (n > 0) min = Math.min(min, n);
+  }
+  return Number.isFinite(min) ? min : 0;
+}
+
 router.get('/status',
   validate(addressSchema, 'query'),
   asyncHandler(async (req, res) => {
@@ -27,26 +37,29 @@ router.get('/status',
     const cacheKey = `acct:status:${env.id}:${addr}`;
 
     const payload = await cached(cacheKey, 8, async () => {
-      const [state, spotBalances, perpsBalances, accountID] = await Promise.all([
+      const [state, spotBalances, perpsBalances, accountID, symbolsRaw] = await Promise.all([
         client.getAccountStateForAddress(addr).catch(() => null),
         client.getSpotBalancesForAddress(addr).catch(() => null),
         client.getPerpsBalancesForAddress(addr).catch(() => null),
         client.getAccountIDForAddress(addr),
+        client.getSpotSymbols().catch(() => []),
       ]);
 
       const spotRows = spotBalances?.balances ?? spotBalances?.data?.balances ?? [];
       const perpsRows = perpsBalances?.balances ?? perpsBalances?.data?.balances ?? [];
       const spotUsdc = parseUsdcAvailable(spotRows);
       const perpsUsdc = parseUsdcAvailable(perpsRows);
+      const minDepositUsd = lowestMinNotionalFromSymbols(symbolsRaw) || env.minDepositUsd;
 
       return {
         address: addr,
         environment: publicProfileSummary(env),
         accountID,
         tradingEnabled: accountID > 0,
+        minDepositUsd,
         spot: {
           usdcAvailable: spotUsdc,
-          funded: spotUsdc >= env.minDepositUsd,
+          funded: spotUsdc >= minDepositUsd,
           balances: spotRows,
         },
         perps: {
@@ -71,15 +84,14 @@ router.get('/funding',
     const addr = address.toLowerCase();
 
     const status = await cached(`acct:funding:${env.id}:${addr}`, 8, async () => {
-      const [accountID, spotBalances] = await Promise.all([
+      const [accountID, spotBalances, symbolsRaw] = await Promise.all([
         client.getAccountIDForAddress(addr),
         client.getSpotBalancesForAddress(addr).catch(() => null),
+        client.getSpotSymbols().catch(() => []),
       ]);
       const spotRows = spotBalances?.balances ?? spotBalances?.data?.balances ?? [];
       const spotUsdc = parseUsdcAvailable(spotRows);
-      const evmFunding = (spotRows as any[]).filter((b) =>
-        !['VUSDC', 'vUSDC'].includes(String(b.coin ?? '')),
-      );
+      const minDepositUsd = lowestMinNotionalFromSymbols(symbolsRaw) || env.minDepositUsd;
 
       return {
         address: addr,
@@ -87,8 +99,8 @@ router.get('/funding',
         accountID,
         tradingEnabled: accountID > 0,
         spotUsdc,
-        minDepositUsd: env.minDepositUsd,
-        spotFunded: spotUsdc >= env.minDepositUsd,
+        minDepositUsd,
+        spotFunded: spotUsdc >= minDepositUsd,
         faucetAvailable: env.faucetAvailable,
         depositCopy: env.depositCopy,
         sodexAppUrl: env.sodexAppUrl,
@@ -96,10 +108,12 @@ router.get('/funding',
           ? `${env.sodexAppUrl}/faucet`
           : `${env.sodexAppUrl}/portfolio`,
         portfolioUrl: `${env.sodexAppUrl}/portfolio`,
-        evmFundingAssets: evmFunding,
+        evmFundingAssets: (spotRows as any[]).filter((b) =>
+          !['VUSDC', 'vUSDC'].includes(String(b.coin ?? '')),
+        ),
         nextSteps: accountID <= 0
           ? ['Connect wallet on SoDEX', 'Accept terms and enable trading']
-          : spotUsdc < env.minDepositUsd
+          : spotUsdc < minDepositUsd
             ? env.faucetAvailable
               ? ['Claim testnet assets', 'Transfer EVM-Funding to Spot', 'Enable gas-free trading if prompted']
               : ['Deposit supported assets', 'Wait for Spot balance to update', 'Transfer Spot to Futures if trading perps']

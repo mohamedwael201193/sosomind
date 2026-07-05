@@ -18,8 +18,16 @@ import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fetcher, api } from '@/lib/api';
 import { placeSpotOrder, getRelayInfo } from '@/lib/sodex-client';
-import { useWallet } from '@/context/WalletContext';
+import {
+  getMinNotional,
+  getMinQuantity,
+  validateSpotOrder,
+  feeRateForOrder,
+  feePercentLabel,
+  type SodexSymbolMeta,
+} from '@/lib/sodex-market';
 import { useEnvironment } from '@/context/EnvironmentContext';
+import { useWallet } from '@/context/WalletContext';
 import { GlassCard } from '@/components/GlassCard';
 import {
   ArrowUpRight, ArrowDownRight, Loader2, ShieldCheck,
@@ -28,8 +36,6 @@ import {
   Zap, BarChart2, SlidersHorizontal,
 } from 'lucide-react';
 import { CryptoIcon } from '@/components/CryptoIcon';
-
-const MIN_NOTIONAL_USDC = 5;
 
 /** Strip testnet `v` prefix for display. */
 function dc(coin: string): string {
@@ -49,17 +55,8 @@ function fmt(n: string | number, decimals = 2): string {
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
-interface SodexSymbol {
-  id: number;
-  name: string;
-  displayName: string;
-  baseCoin: string;
-  quoteCoin: string;
-  minQuantity: string;
-  pricePrecision: number;
-  quantityPrecision: number;
-  status: string;
-  minNotional?: string;
+interface SodexSymbol extends SodexSymbolMeta {
+  marketMinQuantity?: string;
 }
 
 interface Ticker {
@@ -368,6 +365,12 @@ function TradeInner() {
     ? (side === 'buy' ? (bestAsk || bestBid || lastPx) : (bestBid || bestAsk || lastPx))
     : Number(price);
   const estCost = qtyNum && priceNum ? qtyNum * priceNum : 0;
+  const minNotional = getMinNotional(activeSymbol);
+  const minQty = getMinQuantity(activeSymbol, orderType);
+  const feeRate = feeRateForOrder(activeSymbol, orderType);
+  const estFee = estCost > 0 ? estCost * feeRate : 0;
+  const sodexAppUrl = info.data?.isTestnet ? 'https://testnet.sodex.com' : 'https://sodex.com';
+  const chainLabel = info.data?.isTestnet ? 'ValueChain Testnet' : 'ValueChain Mainnet';
   const changePct = activeTicker?.changePct ?? 0;
   const isPositive = changePct >= 0;
 
@@ -412,8 +415,8 @@ function TradeInner() {
       const confPct = Math.min(0.25, Math.max(0.05, ((copySignalData.confidence as number) || 50) / 400));
       const entryPx = Number(copySignalData.entry) > 0 ? Number(copySignalData.entry) : bestAsk || lastPx;
       const confQty = (usdcBalance * confPct) / entryPx;
-      const minQty = entryPx > 0 ? (MIN_NOTIONAL_USDC / entryPx) * 1.02 : 0;
-      const autoQty = Math.max(confQty, minQty);
+      const minQtyForNotional = entryPx > 0 && minNotional > 0 ? (minNotional / entryPx) * 1.02 : 0;
+      const autoQty = Math.max(confQty, minQtyForNotional);
       if (autoQty > 0) {
         setQuantity(autoQty.toFixed(activeSymbol.quantityPrecision ?? 4));
         autoFilledStrategyRef.current = strategy;
@@ -548,12 +551,14 @@ function TradeInner() {
       return;
     }
     const effectivePx = orderType === 'limit' ? Number(price) : marketPrice;
-    const notional = qtyNum * effectivePx;
-    if (notional < MIN_NOTIONAL_USDC) {
-      setResult({
-        ok: false,
-        message: `Minimum order is $${MIN_NOTIONAL_USDC} USDC (yours ≈ $${notional.toFixed(2)}). Increase quantity or use 25%+ sizing.`,
-      });
+    const validation = validateSpotOrder({
+      symbol: activeSymbol,
+      orderType,
+      quantity: qtyNum,
+      price: effectivePx,
+    });
+    if (!validation.ok) {
+      setResult({ ok: false, message: validation.message });
       return;
     }
     // Pre-flight: block cancel-only assets before MetaMask signature prompt
@@ -570,14 +575,12 @@ function TradeInner() {
     try {
       const r = await placeSpotOrder({
         accountID,
-        symbolID: activeSymbol.id,
+        symbol: activeSymbol,
         market: activeSymbol.name,
         side,
         orderType,
         quantity: qtyNum,
-        price: orderType === 'limit' ? Number(price) : marketPrice,
-        pricePrecision: activeSymbol.pricePrecision,
-        quantityPrecision: activeSymbol.quantityPrecision,
+        referencePrice: effectivePx,
       });
       if (r.ok) {
         setResult({ ok: true, message: `Submitted — order ID: ${r.orderId ?? 'pending'}` });
@@ -1040,20 +1043,30 @@ function TradeInner() {
                         detail: info.data?.isTestnet ? 'Testnet (safe to trade)' : info.data ? 'Mainnet' : 'Checking…',
                       },
                       {
-                        label: 'Min notional ($5 USDC)',
-                        pass: estCost >= MIN_NOTIONAL_USDC,
-                        warn: estCost > 0 && estCost < MIN_NOTIONAL_USDC,
-                        detail: estCost >= MIN_NOTIONAL_USDC
-                          ? `$${fmt(estCost, 2)} — meets SoDEX minimum`
-                          : estCost > 0
-                            ? `$${fmt(estCost, 2)} — increase qty to at least $${MIN_NOTIONAL_USDC}`
-                            : 'Set quantity to continue',
+                        label: minNotional > 0 ? `Min notional ($${minNotional} USDC)` : 'Min notional',
+                        pass: !activeSymbol || estCost <= 0 || estCost >= minNotional,
+                        warn: estCost > 0 && minNotional > 0 && estCost < minNotional,
+                        detail: !activeSymbol
+                          ? 'Select a market'
+                          : estCost <= 0
+                            ? 'Set quantity to continue'
+                            : estCost >= minNotional
+                              ? `$${fmt(estCost, 2)} — meets ${activeSymbol.displayName} minimum`
+                              : `$${fmt(estCost, 2)} — increase qty to at least $${minNotional}`,
+                      },
+                      {
+                        label: minQty > 0 ? `Min quantity (${minQty})` : 'Min quantity',
+                        pass: !activeSymbol || qtyNum <= 0 || qtyNum >= minQty,
+                        warn: qtyNum > 0 && minQty > 0 && qtyNum < minQty,
+                        detail: activeSymbol
+                          ? `Market min qty ${getMinQuantity(activeSymbol, 'market')} · limit min ${getMinQuantity(activeSymbol, 'limit')}`
+                          : 'No market selected',
                       },
                       {
                         label: 'SoDEX account',
                         pass: accountID > 0,
                         warn: false,
-                        detail: accountID > 0 ? `accountID ${accountID}` : 'Enable Trading on testnet.sodex.com',
+                        detail: accountID > 0 ? `accountID ${accountID}` : `Enable trading on ${sodexAppUrl}`,
                       },
                       {
                         label: 'Circuit breaker',
@@ -1285,7 +1298,7 @@ function TradeInner() {
                       <div className="mt-1 flex items-center bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-lg overflow-hidden focus-within:border-blue-500/60 transition-colors">
                         <input type="number" step="any" min="0" value={quantity}
                           onChange={(e) => setQuantity(e.target.value)}
-                          placeholder={activeSymbol?.minQuantity ?? '0.00'}
+                          placeholder={activeSymbol ? String(getMinQuantity(activeSymbol, orderType) || activeSymbol.minQuantity || '0') : '0.00'}
                           className="flex-1 bg-transparent px-3 py-2 text-sm focus:outline-none min-w-0" />
                       </div>
                       {address && (
@@ -1306,8 +1319,14 @@ function TradeInner() {
                       </div>
                       {estCost > 0 && (
                         <div className="flex justify-between text-xs text-[var(--text-muted)]">
-                          <span>Fee ({orderType === 'limit' ? '0.035%' : '0.065%'})</span>
-                          <span className="font-mono">{fmt(estCost * (orderType === 'limit' ? 0.00035 : 0.00065), 4)} USDC</span>
+                          <span>Fee ({feePercentLabel(feeRate)})</span>
+                          <span className="font-mono">{fmt(estFee, 4)} USDC</span>
+                        </div>
+                      )}
+                      {activeSymbol && minNotional > 0 && (
+                        <div className="flex justify-between text-[10px] text-[var(--text-muted)]">
+                          <span>Min order</span>
+                          <span>${minNotional} USDC · min qty {minQty || '—'}</span>
                         </div>
                       )}
                     </div>
@@ -1342,7 +1361,7 @@ function TradeInner() {
                     </div>
                     {submitting && (
                       <p className="text-[10px] text-center mt-2 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                        Approve the EIP-712 signature on your phone or wallet extension — switch to ValueChain Testnet if prompted.
+                        Approve the EIP-712 signature on your phone or wallet extension — switch to {chainLabel} (chain {info.data?.chainId ?? '…'}) if prompted.
                       </p>
                     )}
                     <AnimatePresence>
@@ -1355,7 +1374,7 @@ function TradeInner() {
                       {address && accountID === 0 && !accountIDQuery.isLoading && (
                         <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
                           className="text-xs rounded-lg px-3 py-2 bg-amber-500/10 text-amber-400">
-                          SoDEX account not found for this wallet. Deposit on testnet.sodex.com first to register.
+                          SoDEX account not found for this wallet. Enable trading on <a href={`${sodexAppUrl}/portfolio`} target="_blank" rel="noopener noreferrer" className="underline">{sodexAppUrl}</a>.
                         </motion.div>
                       )}
                     </AnimatePresence>

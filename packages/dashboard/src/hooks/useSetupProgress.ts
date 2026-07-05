@@ -24,6 +24,7 @@ export interface SetupStep {
 interface AccountStatus {
   accountID: number;
   tradingEnabled: boolean;
+  minDepositUsd?: number;
   spot: { usdcAvailable: number; funded: boolean };
   environment: { label: string; chainId: number; isTestnet: boolean; sodexAppUrl: string; faucetAvailable: boolean; minDepositUsd: number };
 }
@@ -55,7 +56,7 @@ export function useSetupProgress() {
 
   const env = statusQuery.data?.environment;
   const usdcSpot = statusQuery.data?.spot?.usdcAvailable ?? 0;
-  const minDeposit = env?.minDepositUsd ?? 5;
+  const minDeposit = statusQuery.data?.minDepositUsd ?? env?.minDepositUsd ?? 1;
   const sodexUrl = env?.sodexAppUrl ?? (selector === 'testnet' ? 'https://testnet.sodex.com' : 'https://sodex.com');
   const hasTrade = Array.isArray(ordersQuery.data) && ordersQuery.data.length > 0;
   const accountID = statusQuery.data?.accountID ?? 0;

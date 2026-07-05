@@ -79,7 +79,7 @@ export interface SpotOrderRequest {
   clOrdID: string;
   side: 1 | 2;            // 1=buy, 2=sell
   type: 1 | 2;            // 1=limit, 2=market
-  timeInForce: 1 | 2 | 3; // 1=IOC, 2=FOK, 3=GTC
+  timeInForce: 1 | 2 | 3; // 1=GTC, 2=FOK, 3=IOC
   price?: string;
   quantity: string;
 }

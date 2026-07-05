@@ -72,7 +72,7 @@ function buildProfile(
     sodexAppUrl: overrides.sodexAppUrl ?? (isTestnet
       ? 'https://testnet.sodex.com'
       : 'https://sodex.com'),
-    minDepositUsd: overrides.minDepositUsd ?? 5,
+    minDepositUsd: overrides.minDepositUsd ?? 1,
     maxNotionalUsd: overrides.maxNotionalUsd ?? parseFloat(process.env.TRADING_MAX_NOTIONAL_USD || '100'),
     faucetAvailable: overrides.faucetAvailable ?? isTestnet,
     depositCopy: overrides.depositCopy ?? (isTestnet
