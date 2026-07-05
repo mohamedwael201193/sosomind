@@ -12,101 +12,8 @@ import {
   ReferenceLine, CartesianGrid, Area, AreaChart,
 } from 'recharts';
 import { GlassCard } from '@/components/GlassCard';
+import { RegimeDial } from '@/components/RegimeDial';
 import { cn } from '@/lib/utils';
-
-// ─── Premium Gauge ────────────────────────────────────────────────────────────
-function RegimeGauge({ score }: { score: number }) {
-  const clamp = Math.max(0, Math.min(100, score));
-  // Map score 0-100 → angle -135° to +135° (270° sweep)
-  const angle = -135 + (clamp / 100) * 270;
-  const rad = (angle * Math.PI) / 180;
-  const cx = 130, cy = 130, r = 95;
-  const nx = cx + r * Math.cos(rad);
-  const ny = cy + r * Math.sin(rad);
-
-  const regime =
-    clamp >= 60 ? { label: 'Risk-On', color: '#10b981', sub: 'Favorable for longs', glow: '#10b98140' }
-    : clamp <= 40 ? { label: 'Risk-Off', color: '#ef4444', sub: 'Defensive positioning', glow: '#ef444440' }
-    : { label: 'Neutral', color: '#f59e0b', sub: 'Mixed signals', glow: '#f59e0b40' };
-
-  const arc = (startDeg: number, endDeg: number, color: string, width = 14) => {
-    const s = (startDeg * Math.PI) / 180;
-    const e = (endDeg * Math.PI) / 180;
-    const x1 = cx + r * Math.cos(s), y1 = cy + r * Math.sin(s);
-    const x2 = cx + r * Math.cos(e), y2 = cy + r * Math.sin(e);
-    const large = endDeg - startDeg > 180 ? 1 : 0;
-    return (
-      <path
-        d={`M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`}
-        fill="none" stroke={color} strokeWidth={width} strokeLinecap="round"
-      />
-    );
-  };
-
-  return (
-    <div className="flex flex-col items-center">
-      <svg viewBox="0 0 260 220" width={260} height={220} style={{ overflow: 'visible' }}>
-        <defs>
-          <filter id="glow">
-            <feGaussianBlur stdDeviation="4" result="blur" />
-            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-        </defs>
-        {/* Track */}
-        {arc(-135, 135, 'rgba(255,255,255,0.06)', 14)}
-        {/* Segment colors */}
-        {arc(-135, -45, '#ef444428', 14)}
-        {arc(-45, 45, '#f59e0b28', 14)}
-        {arc(45, 135, '#10b98128', 14)}
-        {/* Filled progress arc */}
-        {clamp > 0 && arc(-135, -135 + (clamp / 100) * 270, regime.color + '80', 14)}
-        {/* Tick marks */}
-        {[0, 25, 50, 75, 100].map((v) => {
-          const a = ((-135 + (v / 100) * 270) * Math.PI) / 180;
-          const ri = r - 10, ro = r + 6;
-          return (
-            <line key={v}
-              x1={cx + ri * Math.cos(a)} y1={cy + ri * Math.sin(a)}
-              x2={cx + ro * Math.cos(a)} y2={cy + ro * Math.sin(a)}
-              stroke="rgba(255,255,255,0.2)" strokeWidth="1.5"
-            />
-          );
-        })}
-        {/* Needle */}
-        <motion.g
-          animate={{ rotate: angle + 90 }}
-          style={{ originX: cx, originY: cy, transformOrigin: `${cx}px ${cy}px` }}
-          transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
-        >
-          <line
-            x1={cx} y1={cy}
-            x2={cx} y2={cy - r + 8}
-            stroke={regime.color} strokeWidth={3} strokeLinecap="round"
-            style={{ filter: `drop-shadow(0 0 6px ${regime.color})` }}
-          />
-        </motion.g>
-        {/* Centre pivot */}
-        <circle cx={cx} cy={cy} r={9} fill={regime.color} style={{ filter: `drop-shadow(0 0 10px ${regime.color})` }} />
-        <circle cx={cx} cy={cy} r={4} fill="var(--bg-base, #040406)" />
-        {/* Score */}
-        <text x={cx} y={cy + 36} textAnchor="middle" fill={regime.color}
-          fontSize="34" fontWeight="900" fontFamily="'JetBrains Mono', monospace"
-          style={{ filter: `drop-shadow(0 0 8px ${regime.color})` }}>
-          {clamp}
-        </text>
-        <text x={cx} y={cy + 56} textAnchor="middle" fill={regime.color} fontSize="13" fontWeight="700">
-          {regime.label}
-        </text>
-        <text x={cx} y={cy + 72} textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize="10">
-          {regime.sub}
-        </text>
-        {/* Labels */}
-        <text x={22} y={200} fill="#ef4444" fontSize="9" fontWeight="600">RISK-OFF</text>
-        <text x={180} y={200} fill="#10b981" fontSize="9" fontWeight="600">RISK-ON</text>
-      </svg>
-    </div>
-  );
-}
 
 // ─── Score breakdown bar ───────────────────────────────────────────────────────
 const COMPONENT_META: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
@@ -204,7 +111,7 @@ export default function MacroPage() {
                 <RefreshCw className="w-5 h-5 animate-spin mr-2" /> Loading macro data...
               </div>
             ) : (
-              <RegimeGauge score={score} />
+              <RegimeDial score={score} size="lg" />
             )}
             {/* Key drivers */}
             {drivers.length > 0 && (

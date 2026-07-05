@@ -1,6 +1,5 @@
 "use client";
 
-import { useId } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Link } from "react-router-dom";
 import {
@@ -13,6 +12,7 @@ import {
   TrendingUp,
   Zap,
 } from "lucide-react";
+import { RegimeDial } from "./RegimeDial";
 
 export interface MacroOutlookData {
   regime?: "risk-on" | "risk-off" | "neutral";
@@ -77,153 +77,6 @@ function formatEventDate(raw: string) {
   const d = new Date(raw);
   if (Number.isNaN(d.getTime())) return raw;
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
-function RegimeGauge({ score, color, glow }: { score: number; color: string; glow: string }) {
-  const reduceMotion = useReducedMotion();
-  const uid = useId();
-  const clamp = Math.max(0, Math.min(100, score));
-  const angle = -135 + (clamp / 100) * 270;
-  const cx = 120;
-  const cy = 118;
-  const r = 78;
-
-  const arc = (startDeg: number, endDeg: number, stroke: string, width = 10, opacity = 1) => {
-    const s = (startDeg * Math.PI) / 180;
-    const e = (endDeg * Math.PI) / 180;
-    const x1 = cx + r * Math.cos(s);
-    const y1 = cy + r * Math.sin(s);
-    const x2 = cx + r * Math.cos(e);
-    const y2 = cy + r * Math.sin(e);
-    const large = endDeg - startDeg > 180 ? 1 : 0;
-    return (
-      <path
-        d={`M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`}
-        fill="none"
-        stroke={stroke}
-        strokeWidth={width}
-        strokeLinecap="round"
-        opacity={opacity}
-      />
-    );
-  };
-
-  return (
-    <svg viewBox="0 0 240 168" className="w-full max-w-[260px] mx-auto" aria-hidden>
-      <defs>
-        <linearGradient id={`${uid}-fill`} x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor={color} stopOpacity="0.35" />
-          <stop offset="100%" stopColor={color} stopOpacity="0.95" />
-        </linearGradient>
-        <filter id={`${uid}-glow`}>
-          <feGaussianBlur stdDeviation="3" result="blur" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
-
-      {arc(-135, 135, "rgba(255,255,255,0.06)", 10)}
-      {arc(-135, -45, "rgba(239,68,68,0.18)", 10)}
-      {arc(-45, 45, "rgba(249,115,22,0.18)", 10)}
-      {arc(45, 135, "rgba(34,197,94,0.18)", 10)}
-
-      {clamp > 0 && (
-        <motion.path
-          d={(() => {
-            const end = -135 + (clamp / 100) * 270;
-            const s = (-135 * Math.PI) / 180;
-            const e = (end * Math.PI) / 180;
-            const x1 = cx + r * Math.cos(s);
-            const y1 = cy + r * Math.sin(s);
-            const x2 = cx + r * Math.cos(e);
-            const y2 = cy + r * Math.sin(e);
-            const large = end + 135 > 180 ? 1 : 0;
-            return `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`;
-          })()}
-          fill="none"
-          stroke={`url(#${uid}-fill)`}
-          strokeWidth="10"
-          strokeLinecap="round"
-          filter={`url(#${uid}-glow)`}
-          initial={{ pathLength: 0, opacity: 0.4 }}
-          animate={{ pathLength: 1, opacity: 1 }}
-          transition={{ duration: reduceMotion ? 0 : 1.1, ease: [0.16, 1, 0.3, 1] }}
-        />
-      )}
-
-      {[0, 25, 50, 75, 100].map((v) => {
-        const a = ((-135 + (v / 100) * 270) * Math.PI) / 180;
-        const ri = r - 8;
-        const ro = r + 5;
-        return (
-          <line
-            key={v}
-            x1={cx + ri * Math.cos(a)}
-            y1={cy + ri * Math.sin(a)}
-            x2={cx + ro * Math.cos(a)}
-            y2={cy + ro * Math.sin(a)}
-            stroke="rgba(255,255,255,0.18)"
-            strokeWidth="1.5"
-          />
-        );
-      })}
-
-      <motion.g
-        animate={{ rotate: angle + 90 }}
-        style={{ transformOrigin: `${cx}px ${cy}px` }}
-        transition={
-          reduceMotion
-            ? { duration: 0 }
-            : { type: "spring", stiffness: 120, damping: 18 }
-        }
-      >
-        <line
-          x1={cx}
-          y1={cy}
-          x2={cx}
-          y2={cy - r + 10}
-          stroke={color}
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          style={{ filter: `drop-shadow(0 0 6px ${glow})` }}
-        />
-      </motion.g>
-
-      <circle cx={cx} cy={cy} r="7" fill={color} style={{ filter: `drop-shadow(0 0 10px ${glow})` }} />
-      <circle cx={cx} cy={cy} r="3" fill="var(--bg-base, #0a0806)" />
-
-      <text
-        x={cx}
-        y={cy + 30}
-        textAnchor="middle"
-        fill="var(--text-primary, #fafafa)"
-        fontSize="28"
-        fontWeight="800"
-        style={{ fontFamily: "var(--font-display)", fontVariantNumeric: "tabular-nums" }}
-      >
-        {clamp}
-      </text>
-      <text
-        x={cx}
-        y={cy + 46}
-        textAnchor="middle"
-        fill="var(--text-muted, rgba(255,255,255,0.45))"
-        fontSize="10"
-        style={{ fontFamily: "var(--font-mono)" }}
-      >
-        / 100
-      </text>
-
-      <text x="18" y="162" fill="#ef4444" fontSize="8" fontWeight="700" style={{ fontFamily: "var(--font-mono)" }}>
-        OFF
-      </text>
-      <text x="196" y="162" fill="#22c55e" fontSize="8" fontWeight="700" style={{ fontFamily: "var(--font-mono)" }}>
-        ON
-      </text>
-    </svg>
-  );
 }
 
 function BreakdownBars({ breakdown }: { breakdown: Record<string, number> }) {
@@ -337,33 +190,13 @@ export function MacroRegimePanel({ data, isLoading, isFetching }: MacroRegimePan
   return (
     <div className="space-y-4">
       <div className="relative">
-        <div className="absolute top-0 left-0 right-0 flex items-center justify-center gap-1.5">
-          {isFetching && (
-            <RefreshCw className="w-3 h-3 text-[var(--text-muted)] animate-spin" aria-hidden />
-          )}
-          <span
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider"
-            style={{
-              background: `${meta.color}14`,
-              color: meta.color,
-              border: `1px solid ${meta.color}35`,
-            }}
-          >
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: meta.color, boxShadow: `0 0 6px ${meta.color}` }} />
-            {meta.label}
-          </span>
-        </div>
-
-        <div className="pt-8">
-          <RegimeGauge score={displayScore} color={meta.color} glow={meta.glow} />
-        </div>
-
-        <p
-          className="text-center text-[11px] -mt-1"
-          style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}
-        >
-          {meta.sub}
-        </p>
+        {isFetching && (
+          <RefreshCw
+            className="absolute top-0 right-0 w-3.5 h-3.5 text-[var(--text-muted)] animate-spin"
+            aria-hidden
+          />
+        )}
+        <RegimeDial score={displayScore} size="sm" />
       </div>
 
       {Object.keys(breakdown).length > 0 && (
