@@ -24,6 +24,7 @@ export interface EnvironmentProfileSummary {
   isTestnet: boolean;
   writesAllowed: boolean;
   sodexAppUrl: string;
+  explorer: string;
   minDepositUsd: number;
   maxNotionalUsd: number;
   faucetAvailable: boolean;

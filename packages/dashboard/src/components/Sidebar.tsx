@@ -57,6 +57,7 @@ const navSections: NavSection[] = [
     label: "MONITOR",
     items: [
       { href: "/portfolio", label: "Portfolio", icon: PieChart },
+      { href: "/perps", label: "Perps (Read-only)", icon: Activity },
       { href: "/agents", label: "Market Regime", icon: BarChart3 },
     ],
   },

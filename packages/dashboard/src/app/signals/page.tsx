@@ -270,6 +270,44 @@ export default function SignalsPage() {
                           <p className="text-sm text-[var(--text-secondary)] mb-3 line-clamp-3">{String(rationale)}</p>
                         )}
 
+                        {(() => {
+                          const sources = Array.isArray((signal as any).sources) ? (signal as any).sources as Array<{ module?: string; insight?: string }> : [];
+                          const provider = (signal as any).provider ?? (signal as any).source ?? sources[0]?.module ?? null;
+                          const confExplain = (signal as any).confidence_explanation ?? null;
+                          const invalidation = (signal as any).invalidation_thesis ?? (signal as any).invalidation ?? null;
+                          if (!provider && !confExplain && sources.length === 0 && !invalidation) return null;
+                          return (
+                            <div className="mb-3 p-2.5 rounded-lg text-[11px] space-y-1.5" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}>
+                              <div className="font-bold uppercase tracking-wide text-[10px] text-[var(--text-muted)]">Evidence</div>
+                              {provider && (
+                                <div><span className="text-[var(--text-muted)]">Provider · </span>{String(provider)}</div>
+                              )}
+                              {ts && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[var(--text-muted)]">Timestamp · </span>
+                                  {new Date(typeof ts === 'string' ? ts : Number(ts) * (String(ts).length === 10 ? 1000 : 1)).toLocaleString()}
+                                  <FreshnessBadge timestamp={ts} />
+                                </div>
+                              )}
+                              {confExplain && (
+                                <div><span className="text-[var(--text-muted)]">Confidence · </span>{String(confExplain)}</div>
+                              )}
+                              {sources.length > 0 && (
+                                <ul className="list-disc pl-4 space-y-0.5">
+                                  {sources.map((s, si) => (
+                                    <li key={si}>
+                                      <span className="font-semibold">{s.module ?? 'source'}:</span> {s.insight ?? '—'}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                              {invalidation && (
+                                <div><span className="text-[var(--text-muted)]">Invalidation · </span>{String(invalidation)}</div>
+                              )}
+                            </div>
+                          );
+                        })()}
+
                         {conf > 0 && (
                           <div>
                             <div className="flex justify-between text-xs text-[var(--text-muted)] mb-1">

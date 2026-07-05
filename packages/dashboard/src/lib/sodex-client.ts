@@ -77,7 +77,11 @@ export interface SignAndSubmitArgs {
 
 export interface RelayResult {
   ok: boolean;
+  /** Internal relay audit UUID (Supabase signed_orders.id) */
   orderId?: string;
+  /** SoDEX exchange order ID from gateway response */
+  sodexOrderId?: string | null;
+  exchangeStatus?: string | null;
   status: string;
   sodex: unknown;
   error?: string;

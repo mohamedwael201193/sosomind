@@ -27,6 +27,8 @@ import {
   type SodexSymbolMeta,
 } from '@/lib/sodex-market';
 import { useEnvironment } from '@/context/EnvironmentContext';
+import { buildOrderProofLinks, extractSodexOrderMeta } from '@/lib/sodex-links';
+import type { OrderProofLinks } from '@/lib/sodex-links';
 import { useWallet } from '@/context/WalletContext';
 import { GlassCard } from '@/components/GlassCard';
 import {
@@ -194,7 +196,7 @@ function CandlestickChart({ klines, symbol }: { klines: any[]; symbol: string })
 
 function TradeInner() {
   const { address, token } = useWallet();
-  const { selector } = useEnvironment();
+  const { selector, config } = useEnvironment();
   const [searchParams] = useSearchParams();
   const initSide = (searchParams.get('side') ?? 'buy') as 'buy' | 'sell';
   const initType = (searchParams.get('type') === 'market' ? 'market' : 'limit') as 'limit' | 'market';
@@ -217,13 +219,15 @@ function TradeInner() {
   const [wizardStep, setWizardStep] = useState<WizardStep>(1);
   const [strategy, setStrategy] = useState<Strategy>('copy');
   const [executionProof, setExecutionProof] = useState<{
-    orderId: string | number;
+    auditId: string;
+    sodexOrderId: string | null;
     status: string;
     market: string;
     side: string;
     qty: string;
     price: string;
     ts: number;
+    proof: OrderProofLinks;
   } | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -369,10 +373,60 @@ function TradeInner() {
   const minQty = getMinQuantity(activeSymbol, orderType);
   const feeRate = feeRateForOrder(activeSymbol, orderType);
   const estFee = estCost > 0 ? estCost * feeRate : 0;
-  const sodexAppUrl = info.data?.isTestnet ? 'https://testnet.sodex.com' : 'https://sodex.com';
+  const sodexAppUrl = config?.active?.sodexAppUrl ?? (selector === 'testnet' ? 'https://testnet.sodex.com' : 'https://sodex.com');
+  const valueChainExplorer = config?.active?.explorer ?? 'https://main-scan.valuechain.xyz';
   const chainLabel = info.data?.isTestnet ? 'ValueChain Testnet' : 'ValueChain Mainnet';
   const changePct = activeTicker?.changePct ?? 0;
   const isPositive = changePct >= 0;
+
+  // Poll relay timeline until SoDEX order ID is available
+  useEffect(() => {
+    if (wizardStep !== 4 || !executionProof?.auditId) return;
+    if (executionProof.sodexOrderId && !executionProof.proof.pending) return;
+
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const tl = await fetcher<{
+          meta?: ReturnType<typeof extractSodexOrderMeta>;
+          order?: { sodex_response?: unknown; status?: string };
+          proof?: { sodexOrderId?: string | null; pending?: boolean };
+        }>(`/api/trading/orders/${executionProof.auditId}/timeline`);
+
+        if (cancelled) return;
+
+        const meta = tl?.meta ?? extractSodexOrderMeta(tl?.order?.sodex_response);
+        const sodexOrderId = meta.sodexOrderId ?? tl?.proof?.sodexOrderId ?? executionProof.sodexOrderId;
+        const exchangeStatus = meta.exchangeStatus ?? executionProof.status;
+        const proof = buildOrderProofLinks({
+          auditId: executionProof.auditId,
+          sodexOrderId,
+          sodexAppUrl,
+          valueChainExplorer,
+          exchangeStatus,
+        });
+
+        setExecutionProof((prev) => {
+          if (!prev) return prev;
+          if (prev.sodexOrderId === sodexOrderId && prev.status === exchangeStatus && !prev.proof.pending && !proof.pending) {
+            return prev;
+          }
+          return {
+            ...prev,
+            sodexOrderId,
+            status: exchangeStatus || prev.status,
+            proof,
+          };
+        });
+      } catch {
+        /* keep polling */
+      }
+    };
+
+    refresh();
+    const id = window.setInterval(refresh, 2500);
+    return () => { cancelled = true; window.clearInterval(id); };
+  }, [wizardStep, executionProof?.auditId, executionProof?.sodexOrderId, executionProof?.proof.pending, sodexAppUrl, valueChainExplorer]);
 
   useEffect(() => {
     if (symbolId == null && symbols.data?.length) {
@@ -583,15 +637,28 @@ function TradeInner() {
         referencePrice: effectivePx,
       });
       if (r.ok) {
-        setResult({ ok: true, message: `Submitted — order ID: ${r.orderId ?? 'pending'}` });
+        const relayMeta = extractSodexOrderMeta(r.sodex);
+        const sodexOrderId = r.sodexOrderId ?? relayMeta.sodexOrderId;
+        const exchangeStatus = r.exchangeStatus ?? relayMeta.exchangeStatus ?? 'SUBMITTED';
+        const auditId = String(r.orderId ?? '');
+        const proof = buildOrderProofLinks({
+          auditId,
+          sodexOrderId,
+          sodexAppUrl,
+          valueChainExplorer,
+          exchangeStatus,
+        });
+        setResult({ ok: true, message: sodexOrderId ? `Submitted — SoDEX order ${sodexOrderId}` : 'Submitted — awaiting SoDEX confirmation' });
         setExecutionProof({
-          orderId: r.orderId ?? 'pending',
-          status: 'SUBMITTED',
+          auditId,
+          sodexOrderId,
+          status: exchangeStatus,
           market: activeSymbol.displayName,
           side: side.toUpperCase(),
           qty: quantity,
           price: orderType === 'market' ? 'MARKET' : price,
           ts: Date.now(),
+          proof,
         });
         setQuantity('');
         setPrice('');
@@ -1397,12 +1464,13 @@ function TradeInner() {
 
                   <div className="space-y-2 mb-4">
                     {[
-                      { label: 'Order ID', value: String(executionProof.orderId) },
+                      { label: 'Relay Audit ID', value: executionProof.auditId },
+                      ...(executionProof.sodexOrderId ? [{ label: 'SoDEX Order ID', value: executionProof.sodexOrderId }] : []),
                       { label: 'Market', value: executionProof.market },
                       { label: 'Side', value: executionProof.side, color: executionProof.side === 'BUY' ? 'text-emerald-400' : 'text-red-400' },
                       { label: 'Quantity', value: executionProof.qty },
                       { label: 'Price', value: executionProof.price },
-                      { label: 'Status', value: executionProof.status, color: 'text-emerald-400' },
+                      { label: 'Status', value: executionProof.status, color: executionProof.proof.pending ? 'text-amber-400' : 'text-emerald-400' },
                       { label: 'Time', value: new Date(executionProof.ts).toLocaleTimeString() },
                     ].map(({ label, value, color }) => (
                       <div key={label} className="flex items-center justify-between px-2.5 py-1.5 rounded-lg"
@@ -1415,32 +1483,62 @@ function TradeInner() {
                     ))}
                   </div>
 
-                  <div className="flex items-center gap-2 p-2.5 rounded-lg mb-4"
-                    style={{ background: 'rgba(0,255,127,0.06)', border: '1px solid rgba(0,255,127,0.2)' }}>
-                    <ExternalLink className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[10px] font-semibold text-emerald-400 mb-0.5">On-Chain Explorer</div>
-                      <a
-                        href={`https://testnet.valuechain.com/tx/${executionProof.orderId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[10px] font-mono truncate block hover:text-emerald-300"
-                        style={{ color: 'var(--text-muted)' }}
-                      >
-                        valuechain.com/tx/{executionProof.orderId}
-                      </a>
+                  <div className="space-y-2 mb-4">
+                    <div className="flex items-center gap-2 p-2.5 rounded-lg"
+                      style={{ background: executionProof.proof.pending ? 'rgba(245,158,11,0.06)' : 'rgba(0,255,127,0.06)', border: executionProof.proof.pending ? '1px solid rgba(245,158,11,0.2)' : '1px solid rgba(0,255,127,0.2)' }}>
+                      <ExternalLink className={`w-3.5 h-3.5 shrink-0 ${executionProof.proof.pending ? 'text-amber-400' : 'text-emerald-400'}`} />
+                      <div className="flex-1 min-w-0">
+                        <div className={`text-[10px] font-semibold mb-0.5 ${executionProof.proof.pending ? 'text-amber-400' : 'text-emerald-400'}`}>
+                          {executionProof.proof.pending ? 'Confirmation Pending' : 'SoDEX Portfolio'}
+                        </div>
+                        <p className="text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                          {executionProof.proof.explorerNote}
+                        </p>
+                        {!executionProof.proof.pending && (
+                          <a
+                            href={executionProof.proof.sodexPortfolioUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] font-mono truncate block hover:text-emerald-300 mt-1"
+                            style={{ color: 'var(--text-muted)' }}
+                          >
+                            {executionProof.proof.sodexPortfolioUrl.replace(/^https?:\/\//, '')} → Order History
+                          </a>
+                        )}
+                      </div>
+                      {!executionProof.proof.pending && executionProof.sodexOrderId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(executionProof.sodexOrderId!);
+                            setCopied(true);
+                            setTimeout(() => setCopied(false), 1500);
+                          }}
+                          className="shrink-0 text-[var(--text-muted)] hover:text-white transition-colors"
+                        >
+                          {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(String(executionProof.orderId));
-                        setCopied(true);
-                        setTimeout(() => setCopied(false), 1500);
-                      }}
-                      className="shrink-0 text-[var(--text-muted)] hover:text-white transition-colors"
-                    >
-                      {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
+
+                    {executionProof.proof.evmExplorer && (
+                      <div className="flex items-center gap-2 p-2.5 rounded-lg"
+                        style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)' }}>
+                        <ExternalLink className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[10px] font-semibold text-blue-400 mb-0.5">ValueChain Explorer</div>
+                          <a
+                            href={executionProof.proof.evmExplorer.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] font-mono truncate block hover:text-blue-300"
+                            style={{ color: 'var(--text-muted)' }}
+                          >
+                            {executionProof.proof.evmExplorer.url.replace(/^https?:\/\//, '')}
+                          </a>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <button

@@ -347,11 +347,23 @@ export class SoDEXClient {
   async getPerpsBalancesForAddress(address: string) {
     return this.read(this.perps, `/accounts/${address}/balances`);
   }
+  async getPerpsPositionsForAddress(address: string) {
+    return this.read(this.perps, `/accounts/${address}/positions`);
+  }
+  async getPerpsOrdersForAddress(address: string, symbol?: string) {
+    return this.read(this.perps, `/accounts/${address}/orders`, { params: symbol ? { symbol } : undefined });
+  }
+  async getPerpsTradesForAddress(address: string, symbol?: string, limit = 50) {
+    return this.read(this.perps, `/accounts/${address}/trades`, { params: { ...(symbol ? { symbol } : {}), limit } });
+  }
   async getSpotOrdersForAddress(address: string, symbol?: string) {
     return this.read(this.spot, `/accounts/${address}/orders`, { params: symbol ? { symbol } : undefined });
   }
   async getSpotOrderHistoryForAddress(address: string, symbol?: string, limit = 50) {
     return this.read(this.spot, `/accounts/${address}/orders/history`, { params: { ...(symbol ? { symbol } : {}), limit } });
+  }
+  async getSpotTradesForAddress(address: string, symbol?: string, limit = 50) {
+    return this.read(this.spot, `/accounts/${address}/trades`, { params: { ...(symbol ? { symbol } : {}), limit } });
   }
   async getSpotOrders(symbol?: string) {
     return this.read(this.spot, `/accounts/${this.address}/orders`, { params: symbol ? { symbol } : undefined });

@@ -17,6 +17,7 @@ import {
   isWalletAllowlisted,
   publicProfileSummary,
 } from '../config/environment.js';
+import { extractSodexOrderMeta, mapExchangeStatusToRelayStatus } from '../utils/sodexOrderParse.js';
 
 const router = Router();
 
@@ -192,16 +193,18 @@ router.post('/', requireWallet, tradeLimiter, asyncHandler(async (req: AuthedReq
 
   const sodexCode = upstream?.code;
   const ok = httpStatus >= 200 && httpStatus < 300 && (sodexCode === 0 || sodexCode === undefined);
-  const finalStatus = ok ? 'submitted' : 'rejected';
+  const orderMeta = extractSodexOrderMeta(upstream);
+  const finalStatus = mapExchangeStatusToRelayStatus(orderMeta.exchangeStatus, ok);
   if (orderRowId) {
     await supabase
       .from('signed_orders')
       .update({
         sodex_response: upstream,
         status: finalStatus,
-        error_message: ok ? null : (upstream?.error || upstream?.message || `HTTP ${httpStatus}`),
+        error_message: ok ? null : (upstream?.error || upstream?.message || orderMeta.exchangeStatus || `HTTP ${httpStatus}`),
         submitted_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        finalized_at: ['filled', 'rejected'].includes(finalStatus) ? new Date().toISOString() : null,
       })
       .eq('id', orderRowId);
   }
@@ -214,6 +217,8 @@ router.post('/', requireWallet, tradeLimiter, asyncHandler(async (req: AuthedReq
   return res.status(httpStatus).json({
     ok,
     orderId: orderRowId,
+    sodexOrderId: orderMeta.sodexOrderId,
+    exchangeStatus: orderMeta.exchangeStatus,
     status: finalStatus,
     environment: publicProfileSummary(profile),
     sodex: upstream,

@@ -64,6 +64,59 @@ router.get('/perps/funding-rate', validate(z.object({ market: z.string().min(1) 
   res.json({ data });
 }));
 
+router.get('/perps/mark-prices', asyncHandler(async (req, res) => {
+  const c = client(req);
+  const data = await cached(envKey(req, 'sodex:perps:mark-prices'), 15, () => c.getPerpsMarkPrices());
+  res.json({ data });
+}));
+
+router.get('/user/:address/perps/balances', asyncHandler(async (req, res) => {
+  const { address } = req.params;
+  if (!/^0x[0-9a-fA-F]{40}$/.test(address))
+    return res.status(400).json({ error: 'invalid_address' });
+  const addr = address.toLowerCase();
+  const c = client(req);
+  const data = await cached(envKey(req, `sodex:p:bal:${addr}`), 12, () => c.getPerpsBalancesForAddress(addr));
+  res.json({ data });
+}));
+
+router.get('/user/:address/perps/positions', asyncHandler(async (req, res) => {
+  const { address } = req.params;
+  if (!/^0x[0-9a-fA-F]{40}$/.test(address))
+    return res.status(400).json({ error: 'invalid_address' });
+  const addr = address.toLowerCase();
+  const c = client(req);
+  const data = await cached(envKey(req, `sodex:p:pos:${addr}`), 10, () => c.getPerpsPositionsForAddress(addr));
+  res.json({ data });
+}));
+
+router.get('/user/:address/perps/orders', asyncHandler(async (req, res) => {
+  const { address } = req.params;
+  if (!/^0x[0-9a-fA-F]{40}$/.test(address))
+    return res.status(400).json({ error: 'invalid_address' });
+  const symbol = typeof req.query.symbol === 'string' ? req.query.symbol : undefined;
+  const addr = address.toLowerCase();
+  const c = client(req);
+  const data = await cached(envKey(req, `sodex:p:ord:${addr}:${symbol ?? ''}`), 10, () =>
+    c.getPerpsOrdersForAddress(addr, symbol)
+  );
+  res.json({ data });
+}));
+
+router.get('/user/:address/perps/trades', asyncHandler(async (req, res) => {
+  const { address } = req.params;
+  if (!/^0x[0-9a-fA-F]{40}$/.test(address))
+    return res.status(400).json({ error: 'invalid_address' });
+  const symbol = typeof req.query.symbol === 'string' ? req.query.symbol : undefined;
+  const limit = req.query.limit ? Number(req.query.limit) : 50;
+  const addr = address.toLowerCase();
+  const c = client(req);
+  const data = await cached(envKey(req, `sodex:p:trades:${addr}:${symbol ?? ''}:${limit}`), 15, () =>
+    c.getPerpsTradesForAddress(addr, symbol, limit)
+  );
+  res.json({ data });
+}));
+
 router.get('/spot/tickers', asyncHandler(async (req, res) => {
   const c = client(req);
   const data = await cached(envKey(req, 'sodex:spot:tickers'), 10, () => c.getSpotTickers());
@@ -99,6 +152,20 @@ router.get('/user/:address/orders/history', asyncHandler(async (req, res) => {
   const c = client(req);
   const data = await cached(envKey(req, `sodex:oh:${addr}:${symbol ?? ''}:${limit}`), 15, () =>
     c.getSpotOrderHistoryForAddress(addr, symbol, limit)
+  );
+  res.json({ data });
+}));
+
+router.get('/user/:address/trades', asyncHandler(async (req, res) => {
+  const { address } = req.params;
+  if (!/^0x[0-9a-fA-F]{40}$/.test(address))
+    return res.status(400).json({ error: 'invalid_address' });
+  const symbol = typeof req.query.symbol === 'string' ? req.query.symbol : undefined;
+  const limit = req.query.limit ? Number(req.query.limit) : 50;
+  const addr = address.toLowerCase();
+  const c = client(req);
+  const data = await cached(envKey(req, `sodex:trades:${addr}:${symbol ?? ''}:${limit}`), 15, () =>
+    c.getSpotTradesForAddress(addr, symbol, limit)
   );
   res.json({ data });
 }));
