@@ -113,12 +113,12 @@ export function getSoSoValueHealth(): {
   const hasBackupKeys = configuredKeyCount > 1;
 
   let status: 'ok' | 'degraded' | 'down';
-  if (isCircuitOpen()) {
-    status = hasBackupKeys ? 'degraded' : 'down';
-  } else if (recentSuccess && (activeKeyLabel === 'primary' || activeKeyLabel == null)) {
+  if (recentSuccess) {
+    // Any configured key (primary or fallback) served a request successfully —
+    // the integration is live and functioning from the user's perspective.
     status = 'ok';
-  } else if (recentSuccess) {
-    status = 'degraded'; // serving via backup key
+  } else if (isCircuitOpen()) {
+    status = hasBackupKeys ? 'degraded' : 'down';
   } else if (cbFailures === 0) {
     // No failures recorded — key is healthy even if no traffic has hit it recently
     status = 'ok';
