@@ -141,6 +141,11 @@ export function resolveProfileFromSelector(
   if (hint && hint in ENVIRONMENT_PROFILES && !hint.startsWith('testnet')) {
     return ENVIRONMENT_PROFILES[hint as EnvironmentId];
   }
+  if (selector === 'mainnet') {
+    const def = getDefaultProfileId();
+    if (def !== 'testnet' && def !== 'local') return ENVIRONMENT_PROFILES[def];
+    return ENVIRONMENT_PROFILES['mainnet-limited'];
+  }
   return ENVIRONMENT_PROFILES[getDefaultProfileId()];
 }
 
