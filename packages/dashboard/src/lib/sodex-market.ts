@@ -92,14 +92,42 @@ export function feePercentLabel(rate: number): string {
   return `${(rate * 100).toFixed(3).replace(/\.?0+$/, '')}%`;
 }
 
+export function getMaxSellQuantity(
+  available: number,
+  symbol: SodexSymbolMeta,
+  orderType: 'limit' | 'market',
+): number {
+  if (!Number.isFinite(available) || available <= 0) return 0;
+  const feeRate = feeRateForOrder(symbol, orderType);
+  const afterFee = available / (1 + Math.max(0, feeRate));
+  return parseFloat(formatQuantity(afterFee, symbol));
+}
+
 export function validateSpotOrder(input: {
   symbol: SodexSymbolMeta;
   orderType: 'limit' | 'market';
   quantity: number;
   price: number;
+  side?: 'buy' | 'sell';
+  /** Available base coin balance (required for sell validation) */
+  availableBase?: number;
 }): { ok: true } | { ok: false; message: string } {
-  const { symbol, orderType, quantity, price } = input;
+  const { symbol, orderType, quantity, price, side, availableBase } = input;
   if (!quantity || quantity <= 0) return { ok: false, message: 'Enter a quantity > 0' };
+
+  if (side === 'sell' && availableBase != null) {
+    const maxSell = getMaxSellQuantity(availableBase, symbol, orderType);
+    if (maxSell <= 0) {
+      return { ok: false, message: `No ${symbol.displayName.split('/')[0] ?? symbol.baseCoin} available to sell` };
+    }
+    if (quantity > maxSell + 1e-12) {
+      const coin = symbol.displayName.split('/')[0] ?? symbol.baseCoin.replace(/^v/, '');
+      return {
+        ok: false,
+        message: `Insufficient ${coin} balance. Max sell: ${maxSell} (available ${formatQuantity(availableBase, symbol)}, fee reserved)`,
+      };
+    }
+  }
 
   const minQty = getMinQuantity(symbol, orderType);
   if (minQty > 0 && quantity < minQty) {
@@ -133,9 +161,9 @@ export interface BuiltSpotOrderItem {
 
 /**
  * Build a spot batch order item matching official SoDEX mainnet/testnet rules.
- * - Mainnet MARKET: type=2, TIF=IOC, no price (stablecoin pairs require true market IOC).
- * - Testnet MARKET: limit+slippage+IOC (MissingOraclePrice workaround).
- * - LIMIT: type=1, GTC on mainnet, IOC on testnet (testnet TIF restrictions).
+ * Market orders always use limit + IOC with a slippage buffer (proven on bot + execution agent).
+ * Pure MARKET type can leave sells stuck at SUBMITTED without filling.
+ * LIMIT: GTC on mainnet, IOC on testnet.
  */
 export function buildSpotOrderItem(input: {
   symbol: SodexSymbolMeta;
@@ -150,18 +178,7 @@ export function buildSpotOrderItem(input: {
   const sideCode: 1 | 2 = input.side === 'buy' ? 1 : 2;
   const qtyStr = formatQuantity(input.quantity, input.symbol);
 
-  if (input.orderType === 'market' && !input.isTestnet) {
-    return {
-      symbolID: input.symbol.id,
-      clOrdID: input.clOrdID,
-      side: sideCode,
-      type: ORDER_TYPE.MARKET,
-      timeInForce: TIF.IOC,
-      quantity: qtyStr,
-    };
-  }
-
-  if (input.orderType === 'market' && input.isTestnet) {
+  if (input.orderType === 'market') {
     const slip = input.side === 'buy' ? 1.005 : 0.995;
     const px = formatPrice(input.referencePrice * slip, input.symbol);
     return {

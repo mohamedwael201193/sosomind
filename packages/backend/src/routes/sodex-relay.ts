@@ -17,7 +17,7 @@ import {
   isWalletAllowlisted,
   publicProfileSummary,
 } from '../config/environment.js';
-import { extractSodexOrderMeta, mapExchangeStatusToRelayStatus } from '../utils/sodexOrderParse.js';
+import { extractSodexOrderMeta, mapExchangeStatusToRelayStatus, extractSodexOrderError, isFailedOrderStatus } from '../utils/sodexOrderParse.js';
 
 const router = Router();
 
@@ -192,8 +192,12 @@ router.post('/', requireWallet, tradeLimiter, asyncHandler(async (req: AuthedReq
   }
 
   const sodexCode = upstream?.code;
-  const ok = httpStatus >= 200 && httpStatus < 300 && (sodexCode === 0 || sodexCode === undefined);
+  let ok = httpStatus >= 200 && httpStatus < 300 && (sodexCode === 0 || sodexCode === undefined);
   const orderMeta = extractSodexOrderMeta(upstream);
+  const orderErr = extractSodexOrderError(upstream);
+  if (isFailedOrderStatus(orderMeta.exchangeStatus, orderMeta.executedQty)) {
+    ok = false;
+  }
   const finalStatus = mapExchangeStatusToRelayStatus(orderMeta.exchangeStatus, ok);
   if (orderRowId) {
     await supabase
@@ -201,7 +205,7 @@ router.post('/', requireWallet, tradeLimiter, asyncHandler(async (req: AuthedReq
       .update({
         sodex_response: upstream,
         status: finalStatus,
-        error_message: ok ? null : (upstream?.error || upstream?.message || orderMeta.exchangeStatus || `HTTP ${httpStatus}`),
+        error_message: ok ? null : (orderErr || upstream?.error || upstream?.message || orderMeta.exchangeStatus || `HTTP ${httpStatus}`),
         submitted_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         finalized_at: ['filled', 'rejected'].includes(finalStatus) ? new Date().toISOString() : null,
@@ -220,6 +224,7 @@ router.post('/', requireWallet, tradeLimiter, asyncHandler(async (req: AuthedReq
     sodexOrderId: orderMeta.sodexOrderId,
     exchangeStatus: orderMeta.exchangeStatus,
     status: finalStatus,
+    error: ok ? undefined : (orderErr || upstream?.error || upstream?.message || orderMeta.exchangeStatus),
     environment: publicProfileSummary(profile),
     sodex: upstream,
   });

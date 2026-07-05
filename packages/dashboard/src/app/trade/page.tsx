@@ -17,17 +17,18 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fetcher, api } from '@/lib/api';
-import { placeSpotOrder, getRelayInfo } from '@/lib/sodex-client';
+import { placeSpotOrder, getRelayInfo, listMyOrders } from '@/lib/sodex-client';
 import {
   getMinNotional,
   getMinQuantity,
+  getMaxSellQuantity,
   validateSpotOrder,
   feeRateForOrder,
   feePercentLabel,
   type SodexSymbolMeta,
 } from '@/lib/sodex-market';
 import { useEnvironment } from '@/context/EnvironmentContext';
-import { buildOrderProofLinks, extractSodexOrderMeta } from '@/lib/sodex-links';
+import { buildOrderProofLinks, extractSodexOrderMeta, isFailedOrderStatus } from '@/lib/sodex-links';
 import type { OrderProofLinks } from '@/lib/sodex-links';
 import { useWallet } from '@/context/WalletContext';
 import { GlassCard } from '@/components/GlassCard';
@@ -319,6 +320,39 @@ function TradeInner() {
     queryFn: () => fetcher(`/api/sodex/user/${address}/orders/history?limit=30`),
   });
 
+  const relayOrders = useQuery<any[]>({
+    queryKey: ['relay-orders', selector, address],
+    enabled: Boolean(address && token),
+    refetchInterval: 10_000,
+    queryFn: () => listMyOrders(30),
+  });
+
+  const mergedOrderHistory = useMemo(() => {
+    const sodex = orderHistory.data ?? [];
+    const seen = new Set(sodex.map((o) => String(o.orderID)));
+    const relay = (relayOrders.data ?? [])
+      .map((r: any) => {
+        const meta = extractSodexOrderMeta(r.sodex_response);
+        const sodexId = meta.sodexOrderId;
+        if (sodexId && seen.has(String(sodexId))) return null;
+        return {
+          orderID: sodexId ?? r.id,
+          symbol: r.market ?? '',
+          side: String(r.side ?? '').toUpperCase() as 'BUY' | 'SELL',
+          type: String(r.order_type ?? 'market').toUpperCase(),
+          price: String(r.price ?? '—'),
+          origQty: String(r.quantity ?? ''),
+          executedQty: String(meta.executedQty ?? '0'),
+          status: meta.exchangeStatus ?? String(r.status ?? 'SUBMITTED').toUpperCase(),
+          createdAt: r.created_at ?? r.submitted_at ?? new Date().toISOString(),
+        } satisfies OrderRow;
+      })
+      .filter(Boolean) as OrderRow[];
+    return [...relay, ...sodex].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+  }, [orderHistory.data, relayOrders.data]);
+
   const orderbook = useQuery<{ bids: any[]; asks: any[] }>({
     queryKey: ['sodex', selector, 'spot', 'orderbook', activeSymbol?.name],
     enabled: Boolean(activeSymbol?.name),
@@ -450,9 +484,10 @@ function TradeInner() {
       if (side === 'buy' && effectivePrice > 0) {
         const qty = (usdcBalance * pct) / effectivePrice;
         setQuantity(qty.toFixed(activeSymbol.quantityPrecision));
-      } else if (side === 'sell') {
-        const qty = baseCoinBalance * pct;
-        setQuantity(qty.toFixed(activeSymbol.quantityPrecision));
+      } else if (side === 'sell' && activeSymbol) {
+        const maxQty = getMaxSellQuantity(baseCoinBalance, activeSymbol, orderType);
+        const qty = maxQty * pct;
+        setQuantity(qty > 0 ? qty.toFixed(activeSymbol.quantityPrecision ?? 4) : '');
       }
     },
     [activeSymbol, priceNum, usdcBalance, baseCoinBalance, bestAsk, bestBid, side],
@@ -613,6 +648,8 @@ function TradeInner() {
       orderType,
       quantity: qtyNum,
       price: effectivePx,
+      side,
+      availableBase: side === 'sell' ? baseCoinBalance : undefined,
     });
     if (!validation.ok) {
       setResult({ ok: false, message: validation.message });
@@ -643,6 +680,12 @@ function TradeInner() {
         const relayMeta = extractSodexOrderMeta(r.sodex);
         const sodexOrderId = r.sodexOrderId ?? relayMeta.sodexOrderId;
         const exchangeStatus = r.exchangeStatus ?? relayMeta.exchangeStatus ?? 'SUBMITTED';
+        if (isFailedOrderStatus(exchangeStatus, relayMeta.executedQty)) {
+          const failMsg = r.error || (r.sodex as any)?.error || exchangeStatus || 'Order did not fill on SoDEX';
+          setResult({ ok: false, message: failMsg });
+          setSubmitting(false);
+          return;
+        }
         const auditId = String(r.orderId ?? '');
         const proof = buildOrderProofLinks({
           auditId,
@@ -666,6 +709,7 @@ function TradeInner() {
         setQuantity('');
         setPrice('');
         orderHistory.refetch();
+        relayOrders.refetch();
         balanceQuery.refetch();
         setWizardStep(4);
       } else {
@@ -881,7 +925,7 @@ function TradeInner() {
                 <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…
                 </div>
-              ) : (orderHistory.data ?? []).length === 0 ? (
+              ) : mergedOrderHistory.length === 0 ? (
                 <p className="text-sm text-[var(--text-muted)]">No orders yet — your trades will appear here.</p>
               ) : (
                 <div className="overflow-x-auto">
@@ -899,7 +943,7 @@ function TradeInner() {
                       </tr>
                     </thead>
                     <tbody>
-                      {(orderHistory.data ?? []).map((o) => {
+                      {mergedOrderHistory.map((o) => {
                         const sym = (symbols.data ?? []).find((s) => s.name === o.symbol);
                         const dispName = sym?.displayName
                           ?? o.symbol.replace(/_vUSDC$/, '/USDC').replace(/^v/, '');
@@ -1371,6 +1415,15 @@ function TradeInner() {
                           placeholder={activeSymbol ? String(getMinQuantity(activeSymbol, orderType) || activeSymbol.minQuantity || '0') : '0.00'}
                           className="flex-1 bg-transparent px-3 py-2 text-sm focus:outline-none min-w-0" />
                       </div>
+                      {address && side === 'sell' && activeSymbol && baseCoinBalance > 0 && (
+                        <p className="text-[10px] mt-1 text-[var(--text-muted)]">
+                          Max sell (fee reserved):{' '}
+                          <span className="font-mono text-amber-400/90">
+                            {getMaxSellQuantity(baseCoinBalance, activeSymbol, orderType)}{' '}
+                            {dc(activeSymbol.baseCoin)}
+                          </span>
+                        </p>
+                      )}
                       {address && (
                         <div className="flex gap-1 mt-1.5">
                           {[0.25, 0.5, 0.75, 1].map((pct) => (

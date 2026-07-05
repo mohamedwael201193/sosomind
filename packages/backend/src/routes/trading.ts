@@ -12,7 +12,8 @@ import {
   resolveProfileFromRequest,
 } from '../config/environment.js';
 import { getCircuitStatus } from '../agents/circuitBreaker.js';
-import { extractSodexOrderMeta } from '../utils/sodexOrderParse.js';
+import { extractSodexOrderMeta, isFilledOrderStatus, isFailedOrderStatus } from '../utils/sodexOrderParse.js';
+import { getSodexClientFromRequest } from '../clients/sodex.js';
 
 const router = Router();
 
@@ -41,8 +42,41 @@ router.get('/orders/:id/timeline',
     if (error) return res.status(500).json({ error: error.message });
     if (!data) return res.status(404).json({ error: 'order_not_found' });
 
-    const meta = extractSodexOrderMeta(data.sodex_response);
+    let meta = extractSodexOrderMeta(data.sodex_response);
     const env = resolveProfileFromRequest(req);
+
+    // Refresh status from SoDEX when still in-flight
+    if (
+      data.wallet_address &&
+      meta.sodexOrderId &&
+      !isFilledOrderStatus(meta.exchangeStatus) &&
+      !isFailedOrderStatus(meta.exchangeStatus, meta.executedQty)
+    ) {
+      try {
+        const sodex = getSodexClientFromRequest(req);
+        const history = await sodex.getSpotOrderHistoryForAddress(String(data.wallet_address).toLowerCase(), undefined, 30);
+        const rows = Array.isArray(history) ? history : (history as any)?.orders ?? [];
+        const match = rows.find((o: any) => String(o.orderID ?? o.orderId ?? o.id) === meta.sodexOrderId);
+        if (match?.status) {
+          meta = {
+            ...meta,
+            exchangeStatus: String(match.status),
+            avgPrice: match.avgPrice != null ? Number(match.avgPrice) : meta.avgPrice,
+            executedQty: match.executedQty != null ? Number(match.executedQty) : meta.executedQty,
+          };
+          const liveStatus = mapLiveRelayStatus(meta.exchangeStatus, meta.executedQty);
+          if (liveStatus !== data.status) {
+            await supabase.from('signed_orders').update({
+              status: liveStatus,
+              updated_at: new Date().toISOString(),
+              finalized_at: ['filled', 'rejected'].includes(liveStatus) ? new Date().toISOString() : null,
+            }).eq('id', id);
+          }
+        }
+      } catch {
+        /* keep cached meta */
+      }
+    }
 
     const events = [
       { at: data.created_at, stage: 'submitted', detail: 'Signed order received by relay' },
@@ -67,7 +101,7 @@ router.get('/orders/:id/timeline',
         sodexAppUrl: env.sodexAppUrl,
         explorer: env.explorer,
         explorerNote: 'Spot orders are not EVM transactions. Use SoDEX Portfolio → Order History.',
-        pending: !meta.sodexOrderId && data.status === 'pending',
+        pending: !isFilledOrderStatus(meta.exchangeStatus) && !isFailedOrderStatus(meta.exchangeStatus, meta.executedQty),
       },
       timeline: events,
     }, { ttlMs: 0, source: 'live' }));
@@ -75,3 +109,10 @@ router.get('/orders/:id/timeline',
 );
 
 export default router;
+
+function mapLiveRelayStatus(exchangeStatus: string | null, executedQty: number | null): string {
+  const s = (exchangeStatus ?? '').toUpperCase();
+  if (s === 'FILLED' || s === 'PARTIAL_FILL') return 'filled';
+  if (isFailedOrderStatus(exchangeStatus, executedQty)) return 'rejected';
+  return 'submitted';
+}

@@ -13,6 +13,8 @@ import { PageHeader } from '@/components/LoadingSkeleton';
 import { useWallet } from '@/context/WalletContext';
 import { useEnvironment } from '@/context/EnvironmentContext';
 import { CryptoIcon } from '@/components/CryptoIcon';
+import { listMyOrders } from '@/lib/sodex-client';
+import { extractSodexOrderMeta } from '@/lib/sodex-links';
 
 const CHART_COLORS = ['#10b981','#3b82f6','#8b5cf6','#f59e0b','#ef4444','#06b6d4','#84cc16'];
 
@@ -49,7 +51,7 @@ function coinPrecision(coin: string, symbols: any[]): number {
 }
 
 export default function PortfolioPage() {
-  const { address, connect, isConnecting } = useWallet();
+  const { address, connect, isConnecting, token } = useWallet();
   const { selector, config } = useEnvironment();
   const sodexAppUrl = config?.active?.sodexAppUrl ?? (selector === 'testnet' ? 'https://testnet.sodex.com' : 'https://sodex.com');
   const envLabel = config?.active?.label ?? (selector === 'testnet' ? 'Testnet' : 'Mainnet');
@@ -87,6 +89,13 @@ export default function PortfolioPage() {
     enabled: Boolean(address),
     refetchInterval: 15_000,
     queryFn: () => fetcher(`/api/sodex/user/${address}/trades?limit=50`),
+  });
+
+  const relayOrders = useQuery<any[]>({
+    queryKey: ['relay-orders', selector, address],
+    enabled: Boolean(address && token),
+    refetchInterval: 15_000,
+    queryFn: () => listMyOrders(50),
   });
 
   const symbols = useQuery<any[]>({
@@ -145,7 +154,33 @@ export default function PortfolioPage() {
     })).filter((a) => a.value > 0),
   [balances, totalUsd]);
 
-  const orders = normalizeList(orderHistory.data);
+  const orders = useMemo(() => {
+    const sodex = normalizeList(orderHistory.data);
+    const seen = new Set(sodex.map((o) => String(o.orderID ?? o.orderId ?? '')));
+    const relay = (relayOrders.data ?? [])
+      .map((r: any) => {
+        const meta = extractSodexOrderMeta(r.sodex_response);
+        const sodexId = meta.sodexOrderId;
+        if (sodexId && seen.has(sodexId)) return null;
+        return {
+          orderID: sodexId ?? r.id,
+          symbol: r.market,
+          side: String(r.side ?? '').toUpperCase(),
+          type: String(r.order_type ?? 'market').toUpperCase(),
+          price: r.price ?? '—',
+          origQty: r.quantity,
+          executedQty: meta.executedQty ?? '0',
+          status: meta.exchangeStatus ?? String(r.status ?? 'SUBMITTED').toUpperCase(),
+          createdAt: r.created_at ?? r.submitted_at,
+          fee: '—',
+          _relay: true,
+        };
+      })
+      .filter(Boolean) as any[];
+    return [...relay, ...sodex].sort(
+      (a, b) => new Date(b.createdAt ?? b.time ?? 0).getTime() - new Date(a.createdAt ?? a.time ?? 0).getTime(),
+    );
+  }, [orderHistory.data, relayOrders.data]);
   const openOrderRows = normalizeList(openOrders.data);
   const fillRows = normalizeList(fills.data);
   const filledOrders = orders.filter((o) => o.status === 'FILLED' || o.status === 'PARTIAL_FILL');

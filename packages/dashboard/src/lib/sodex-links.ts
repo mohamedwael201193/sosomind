@@ -32,6 +32,24 @@ export function extractSodexOrderMeta(upstream: unknown): SodexOrderMeta {
   return { sodexOrderId, clOrdId, exchangeStatus, avgPrice, executedQty };
 }
 
+export function isFilledOrderStatus(status: string | null | undefined): boolean {
+  const s = (status ?? '').toUpperCase();
+  return s === 'FILLED' || s === 'PARTIAL_FILL';
+}
+
+export function isFailedOrderStatus(status: string | null | undefined, executedQty?: number | null): boolean {
+  const s = (status ?? '').toUpperCase();
+  if (['REJECTED', 'FAILED', 'ERROR'].includes(s)) return true;
+  if (['CANCELED', 'CANCELLED', 'EXPIRED'].includes(s) && !(executedQty != null && executedQty > 0)) return true;
+  return false;
+}
+
+export function isPendingOrderStatus(status: string | null | undefined): boolean {
+  const s = (status ?? '').toUpperCase();
+  if (!s) return true;
+  return !isFilledOrderStatus(s) && !isFailedOrderStatus(s);
+}
+
 function parseOptionalNumber(v: unknown): number | null {
   if (v == null || v === '') return null;
   const n = typeof v === 'number' ? v : parseFloat(String(v));
@@ -78,7 +96,7 @@ export function buildOrderProofLinks(input: {
 
   const sodexOrderId = input.sodexOrderId?.trim() || null;
   const status = (input.exchangeStatus ?? '').toUpperCase();
-  const pending = !sodexOrderId && !['FILLED', 'PARTIAL_FILL', 'REJECTED', 'CANCELED', 'CANCELLED'].includes(status);
+  const pending = isPendingOrderStatus(status) && !isFilledOrderStatus(status);
 
   const explorerNote = evmExplorer
     ? 'EVM deposit/withdrawal — viewable on ValueChain explorer.'
