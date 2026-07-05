@@ -8,7 +8,7 @@ import {
   Zap, BarChart3, Shield, TrendingUp, Brain, Globe2, ArrowRight, Wallet,
   Mic, RefreshCcw, Search, Eye, BookOpen, Scale, FileText, Swords, User, DollarSign,
   ChevronDown, Sun, Moon, Send, Database, Activity, Layers, Target,
-  Network, Cpu, MessageSquare, Star, Check, Bolt,
+  Network, Cpu, MessageSquare, Star, Check, Bolt, Radio,
   X, Code2,
 } from "lucide-react";
 import { API_URL } from '@/lib/env';
@@ -16,122 +16,76 @@ import { ProductionState } from '@/components/ProductionState';
 import { useEffect, useRef, useState } from "react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import MCP from "@lobehub/icons/es/MCP";
-import Claude from "@lobehub/icons/es/Claude";
-import OpenAI from "@lobehub/icons/es/OpenAI";
-import Gemini from "@lobehub/icons/es/Gemini";
-import DeepSeek from "@lobehub/icons/es/DeepSeek";
-import Mistral from "@lobehub/icons/es/Mistral";
 
-// ── Constants ──────────────────────────────────────────────────────────────────
+// ── Constants (from landing-content.ts — aligned with SOSOMIND_DOCUMENTATION.md) ──
 
-const HERO_TAGLINE = "The Trustworthy Agentic Trading Loop";
-const HERO_SUB = "Live SoSoValue intelligence → explainable signals → risk gate → MetaMask-signed SoDEX orders → public HIT/STOP/DRIFT ledger.";
-const NAV_LINKS: { label: string; href: string; external?: boolean }[] = [
-  { label: "Features", href: "#features" },
-  { label: "Agents",   href: "#agents" },
-  { label: "Data",     href: "#data" },
-  { label: "Bot",      href: "#bot" },
-  { label: "Docs",     href: "/docs",    external: true },
-  { label: "Roadmap",  href: "/roadmap", external: true },
-  { label: "FAQ",      href: "#faq" },
-];
+import {
+  HERO_TAGLINE,
+  HERO_SUB,
+  NAV_LINKS,
+  STATS,
+  PARTNERS,
+  FEATURES as FEATURES_RAW,
+  AGENTS as AGENTS_RAW,
+  DATA_SOURCES as DATA_SOURCES_RAW,
+  FAQ_ITEMS,
+  FOOTER_LINKS,
+  EXECUTION_STEPS,
+} from "@/content/landing-content";
 
-const STATS = [
-  { to: 35, suffix: "", fmt: "35", label: "SoSoValue API Methods" },
-  { to: 13, suffix: "", fmt: "13", label: "SSI Sectors Scored" },
-  { to: 3, suffix: "", fmt: "3", label: "Hero Surfaces" },
-  { to: 19, suffix: "", fmt: "19", label: "SoDEX MCP Tools" },
-];
+const FEATURE_ICON_MAP: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
+  Brain: Brain,
+  Zap: Zap,
+  Shield: Shield,
+  Wallet: Wallet,
+  BarChart3: BarChart3,
+  Globe2: Globe2,
+  Layers: Layers,
+  Radio: Radio,
+  Send: Send,
+  Activity: Activity,
+  BookOpen: BookOpen,
+  Cpu: Cpu,
+  Network: Network,
+  Bolt: Bolt,
+};
 
-const PARTNERS = [
-  "SoSoValue", "SoDEX", "Binance", "Macro Events", "Fundraising DB", "On-chain Analytics",
-  "ETF Flows", "Sector Indices", "BTC Treasuries", "Social Sentiment", "Crypto Stocks", "News Feed", "NFT Data",
-];
+const AGENTS = AGENTS_RAW.map((a) => ({
+  ...a,
+  icon: FEATURE_ICON_MAP[a.icon as string] ?? Network,
+}));
 
-const FEATURES = [
-  { icon: MessageSquare, title: "NLP Intent Trading",      desc: "Type in plain English, execute with precision. Our NLP agent parses your intent and routes it to the right strategy.",  size: "large"  },
-  { icon: Zap,           title: "Signal Marketplace",      desc: "Subscribe to curated signal streams from top-performing strategies, each verified with live backtest performance.",      size: "large"  },
-  { icon: Search,        title: "Arbitrage Scanner",       desc: "Real-time cross-exchange spread detection with slippage-adjusted execution paths.",                                     size: "medium" },
-  { icon: Eye,           title: "Whale Tracker",           desc: "Follow on-chain wallet movements of known large traders with entry/exit alerts.",                                        size: "medium" },
-  { icon: Mic,           title: "Voice Trading",           desc: "Hands-free trading via voice commands. Powered by Whisper AI and integrated directly into SoDEX execution.",            size: "medium" },
-  { icon: RefreshCcw,    title: "Portfolio Rebalancer",    desc: "Set target allocations and auto-rebalance on schedule or on drift thresholds.",                                          size: "small"  },
-  { icon: Activity,      title: "Paper Trading",           desc: "Test strategies in live market conditions with zero risk on our full paper trading simulator.",                           size: "small"  },
-  { icon: Layers,        title: "Confluence Engine",       desc: "Combine signals from 5+ independent systems for high-confidence trade ideas.",                                          size: "small"  },
-  { icon: Scale,         title: "Kelly Criterion",         desc: "Mathematically optimal position sizing based on your edge and risk tolerance.",                                          size: "small"  },
-  { icon: Star,          title: "Social Sentiment",        desc: "Aggregate Twitter/X, Telegram, and Reddit sentiment into actionable momentum signals.",                                  size: "small"  },
-  { icon: FileText,      title: "Tax Reporting",           desc: "Auto-generate capital gains reports, FIFO accounting, and export for TurboTax or CoinTracker.",                         size: "small"  },
-  { icon: Swords,        title: "MEV Protection",          desc: "Route orders through MEV-resistant RPC endpoints and private mempool submissions.",                                      size: "small"  },
-  { icon: User,          title: "Trader Persona",          desc: "AI-built risk profile calibrated to your trading history, drawdown tolerance, and return goals.",                       size: "small"  },
-  { icon: DollarSign,    title: "Funding Signals",         desc: "Monitor perpetual funding rates across exchanges for long/short bias arbitrage opportunities.",                          size: "small"  },
-  { icon: BookOpen,      title: "Macro Playbook",          desc: "Regime-aware strategy selection based on ETF flows, macro events, and institutional positioning.",                      size: "small"  },
-];
+const FEATURES = FEATURES_RAW.map((f) => ({
+  ...f,
+  icon: FEATURE_ICON_MAP[f.icon] ?? Zap,
+}));
 
-const AGENTS = [
-  { name: "Orchestrator",  icon: Network,  desc: "Central coordination hub that routes user intent to the right specialist agent, enforces circuit breakers, and aggregates final recommendations.", confidence: 94 },
-  { name: "Research",      icon: Brain,    desc: "Deep-dives into asset fundamentals, tokenomics, fundraising history, and community metrics to build comprehensive investment theses.", confidence: 88 },
-  { name: "Risk",          icon: Shield,   desc: "Continuously monitors portfolio exposure, correlation matrices, and macro stress indicators to trigger defensive actions.", confidence: 91 },
-  { name: "Macro Overlay", icon: Globe2,   desc: "Tracks ETF flows, macro events, Fed policy cycles, and cross-asset signals to contextualize every trade in the macro landscape.", confidence: 85 },
-  { name: "Execution",     icon: Bolt,     desc: "Handles order routing, slippage optimization, MEV protection, and multi-leg spread execution directly on SoDEX.", confidence: 97 },
-];
+const DATA_SOURCE_ICON_MAP: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
+  Database: Database,
+  Zap: Zap,
+  Activity: Activity,
+  TrendingUp: TrendingUp,
+  Globe2: Globe2,
+  DollarSign: DollarSign,
+  MessageSquare: MessageSquare,
+  Layers: Layers,
+  BarChart3: BarChart3,
+  BookOpen: BookOpen,
+  Star: Star,
+  FileText: FileText,
+  Target: Target,
+};
 
-const SIGNALS = [
-  { pair: "BTC/USDT", direction: "LONG",    confidence: 82, data: [62000,63100,63800,62900,64200,65100,64800,66200] },
-  { pair: "ETH/USDT", direction: "NEUTRAL", confidence: 54, data: [2400,2350,2380,2410,2390,2430,2420,2450] },
-  { pair: "SOL/USDT", direction: "LONG",    confidence: 76, data: [148,151,149,155,158,157,162,165] },
-  { pair: "BNB/USDT", direction: "SHORT",   confidence: 71, data: [580,572,568,574,566,560,555,548] },
-];
-
-const ETF_DATA = [
-  { date: "Jan 1",  inflow: 420, outflow: 210 },
-  { date: "Jan 2",  inflow: 380, outflow: 190 },
-  { date: "Jan 3",  inflow: 510, outflow: 240 },
-  { date: "Jan 4",  inflow: 460, outflow: 280 },
-  { date: "Jan 5",  inflow: 620, outflow: 200 },
-  { date: "Jan 6",  inflow: 580, outflow: 310 },
-  { date: "Jan 7",  inflow: 700, outflow: 260 },
-];
-
-const MACRO_EVENTS = [
-  { date: "Jan 8",  category: "FED",    title: "FOMC Meeting",                  impact: "HIGH"   },
-  { date: "Jan 9",  category: "ETF",    title: "BlackRock BTC ETF: $420M flow", impact: "HIGH"   },
-  { date: "Jan 11", category: "CPI",    title: "US CPI Print: 3.1%",            impact: "MEDIUM" },
-  { date: "Jan 12", category: "CRYPTO", title: "Ethereum Dencun Upgrade",       impact: "HIGH"   },
-  { date: "Jan 14", category: "MACRO",  title: "Non-Farm Payrolls",             impact: "MEDIUM" },
-  { date: "Jan 15", category: "CRYPTO", title: "Coinbase Q4 Earnings",          impact: "LOW"    },
-  { date: "Jan 16", category: "FED",    title: "Fed Chair Speech",              impact: "MEDIUM" },
-  { date: "Jan 18", category: "ETF",    title: "Options expiry: $2.4B",         impact: "HIGH"   },
-];
-
-const DATA_SOURCES = [
-  { name: "SoSoValue",          tools: 35, type: "MCP",  icon: Database    },
-  { name: "SoDEX",              tools: 25, type: "MCP",  icon: Zap         },
-  { name: "Binance Spot",       tools: 12, type: "REST", icon: Activity    },
-  { name: "Binance Perps",      tools: 10, type: "REST", icon: TrendingUp  },
-  { name: "Macro Events",       tools: 8,  type: "Feed", icon: Globe2      },
-  { name: "Fundraising DB",     tools: 6,  type: "Feed", icon: DollarSign  },
-  { name: "Social Sentiment",   tools: 5,  type: "AI",   icon: MessageSquare },
-  { name: "On-chain Analytics", tools: 9,  type: "RPC",  icon: Layers      },
-  { name: "ETF Flows",          tools: 7,  type: "Feed", icon: BarChart3   },
-  { name: "Sector Indices",     tools: 8,  type: "Feed", icon: Target      },
-  { name: "BTC Treasuries",     tools: 4,  type: "Feed", icon: BookOpen    },
-  { name: "Crypto Stocks",      tools: 6,  type: "REST", icon: Star        },
-  { name: "News Feed",          tools: 11, type: "AI",   icon: FileText    },
-];
-
-const FAQ_ITEMS = [
-  { q: "What is SoSoMind?",                a: "SoSoMind is a multi-agent AI-powered trading platform that combines real-time market intelligence, automated signals, and direct DEX execution into a single unified interface." },
-  { q: "How do signals work?",             a: "Our Signal Engine aggregates data from 13 live sources, runs them through 5 specialist AI agents, and surfaces high-confidence directional signals with confluence scoring." },
-  { q: "What is the Agent Orchestrator?",  a: "The Orchestrator is the central brain. It receives your intent, decides which specialist agents to activate, enforces risk limits, and assembles the final recommendation." },
-  { q: "How does DEX execution work?",     a: "Type a natural language trade command or click execute on any signal. The NLP agent parses your intent, the Execution agent routes it to SoDEX, and you confirm with an EIP-712 signature." },
-  { q: "Is paper trading available?",      a: "Yes. Use paper trading to test strategies in live market conditions with simulated capital and no real funds at risk." },
-  { q: "What data sources are used?",      a: "SoSoMind connects to live data sources including SoSoValue, SoDEX, Binance, on-chain analytics, macro event calendars, and social sentiment feeds." },
-  { q: "How does risk monitoring work?",   a: "The Risk Agent continuously tracks portfolio exposure, correlation, and drawdown. Circuit breakers automatically reduce exposure when thresholds are breached." },
-  { q: "How do I get started?",            a: "Connect your wallet from the dashboard, complete the trader persona setup, and your personalized terminal is ready." },
-];
+const DATA_SOURCES = DATA_SOURCES_RAW.map((ds, i) => ({
+  name: ds.name,
+  tools: ds.tools,
+  type: ds.type.split(" + ")[0] === "REST" ? "REST" : ds.type.includes("MCP") ? "MCP" : ds.type.includes("Realtime") ? "Feed" : "Feed",
+  icon: [Database, Zap, Activity, Globe2, DollarSign, Target, BookOpen, Star, FileText, TrendingUp, Layers, Activity][i] ?? Database,
+}));
 
 // ── Micro-components ──────────────────────────────────────────────────────────
 
-function SplitHeadline({ text, className }: { text: string; className?: string }) {
+function SplitHeadline({ text, className, style }: { text: string; className?: string; style?: React.CSSProperties }) {
   const container = {
     hidden: {},
     visible: { transition: { staggerChildren: 0.05, delayChildren: 0.1 } },
@@ -142,7 +96,7 @@ function SplitHeadline({ text, className }: { text: string; className?: string }
   };
   const words = text.split(" ");
   return (
-    <motion.h1 className={className} variants={container} initial="hidden" animate="visible">
+    <motion.h1 className={className} style={style} variants={container} initial="hidden" animate="visible">
       {words.map((word, wi) => (
         <span key={wi} style={{ display: "inline-block", whiteSpace: "nowrap" }}>
           {word.split("").map((c, ci) => (
@@ -292,6 +246,33 @@ interface PublicSignalsResponse {
   meta: PublicSignalsMeta;
 }
 
+interface MacroOutlook {
+  regime: 'risk-on' | 'risk-off' | 'neutral';
+  score: number;
+  drivers: string[];
+  upcomingEvents: Array<{ name: string; date: string; importance: string }>;
+  breakdown: Record<string, number>;
+}
+
+interface SectorIntel {
+  sectorName: string;
+  score: number;
+  verdict: string;
+}
+
+function verdictColor(verdict: string): string {
+  if (verdict.includes('STRONG_BUY') || verdict === 'BUY') return '#22c55e';
+  if (verdict === 'SELL' || verdict.includes('STRONG_SELL')) return '#ef4444';
+  if (verdict === 'NEUTRAL') return '#60a5fa';
+  return '#f97316';
+}
+
+function formatMacroDate(raw: string): string {
+  if (!raw) return '—';
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? raw.slice(0, 10) : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 export default function LandingPage() {
   const { address, isConnecting, connect } = useWallet();
   const { theme, toggle: toggleTheme } = useTheme();
@@ -303,6 +284,10 @@ export default function LandingPage() {
   const [mounted, setMounted] = useState(false);
   const [liveTrackRecord, setLiveTrackRecord] = useState<PublicSignalsResponse | null>(null);
   const [trackRecordLoading, setTrackRecordLoading] = useState(true);
+  const [macroOutlook, setMacroOutlook] = useState<MacroOutlook | null>(null);
+  const [macroLoading, setMacroLoading] = useState(true);
+  const [sectorIntel, setSectorIntel] = useState<SectorIntel[] | null>(null);
+  const [sectorLoading, setSectorLoading] = useState(true);
   const [paperLeaderboard, setPaperLeaderboard] = useState<any[] | null>(null);
   const [marketLeaderboard, setMarketLeaderboard] = useState<any[] | null>(null);
   const execRef = useRef<HTMLDivElement | null>(null);
@@ -314,6 +299,31 @@ export default function LandingPage() {
       .then((json) => { if (json?.data && json?.meta) setLiveTrackRecord(json); })
       .catch(() => setLiveTrackRecord(null))
       .finally(() => setTrackRecordLoading(false));
+  }, []);
+
+  useEffect(() => {
+    setMacroLoading(true);
+    fetch(`${API_URL}/api/agents/macro`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => { if (json?.data) setMacroOutlook(json.data); })
+      .catch(() => setMacroOutlook(null))
+      .finally(() => setMacroLoading(false));
+  }, []);
+
+  useEffect(() => {
+    setSectorLoading(true);
+    fetch(`${API_URL}/api/sectors/intel`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        const rows = Array.isArray(json?.data) ? json.data : [];
+        setSectorIntel(rows.map((s: any) => ({
+          sectorName: s.sectorName ?? s.sector ?? s.name ?? 'Sector',
+          score: Number(s.score ?? 0),
+          verdict: String(s.verdict ?? 'NEUTRAL'),
+        })));
+      })
+      .catch(() => setSectorIntel(null))
+      .finally(() => setSectorLoading(false));
   }, []);
 
   useEffect(() => {
@@ -353,9 +363,9 @@ export default function LandingPage() {
     const el = execRef.current;
     if (!el) return;
     const obs = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
+        if (entry.isIntersecting) {
         let step = 0;
-        const animate = () => { setExecStep(step); step++; if (step < 4) setTimeout(animate, 500); };
+        const animate = () => { setExecStep(step); step++; if (step < EXECUTION_STEPS.length) setTimeout(animate, 500); };
         setTimeout(animate, 300);
         obs.disconnect();
       }
@@ -376,11 +386,23 @@ export default function LandingPage() {
       ? '…'
       : '—';
 
-  const liveStats = STATS.map(s =>
-    s.label === 'Signal Win Rate' && liveTrackRecord?.meta?.hit_rate != null
+  const liveStats = STATS.map((s) =>
+    s.label === 'Public Hit Rate' && liveTrackRecord?.meta?.hit_rate != null
       ? { ...s, to: liveTrackRecord.meta.hit_rate, fmt: `${liveTrackRecord.meta.hit_rate}%` }
       : s
   );
+
+  const heroSignals = (liveTrackRecord?.data ?? []).slice(0, 4);
+
+  const macroBreakdown = macroOutlook
+    ? Object.entries(macroOutlook.breakdown).map(([key, value]) => ({
+        key,
+        label: key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+        value,
+      }))
+    : [];
+
+  const macroChartData = macroBreakdown.map((b) => ({ name: b.label.slice(0, 8), score: b.value }));
 
   return (
     <div data-theme={theme} className="min-h-screen overflow-x-hidden" style={{ background: "var(--bg-base)", color: "var(--text-primary)" }}>
@@ -405,7 +427,7 @@ export default function LandingPage() {
         }}
       >
         <div className="flex items-center gap-8">
-          <Link to="/landing" className="flex items-center gap-2.5">
+          <Link to="/" className="flex items-center gap-2.5">
             <LogoMark size={32} />
             <span
               className="font-black text-xl tracking-tight hidden sm:block"
@@ -419,7 +441,7 @@ export default function LandingPage() {
             </span>
           </Link>
           <div className="hidden md:flex items-center gap-6">
-            {NAV_LINKS.map((link) => link.external ? (
+            {NAV_LINKS.map((link) => link.href.startsWith('#') ? (
               <a key={link.label} href={link.href} className="text-sm font-medium transition-colors" style={{ color: "var(--text-secondary)" }}
                 onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "var(--text-primary)"; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "var(--text-secondary)"; }}>
@@ -531,7 +553,7 @@ export default function LandingPage() {
               style={{ borderColor: "rgba(249,115,22,0.35)", background: "rgba(249,115,22,0.08)", color: "#f97316" }}
             >
               <span className="w-1.5 h-1.5 rounded-full animate-pulse inline-block" style={{ background: "#22c55e" }} />
-              Live · AI-Powered Finance
+              Live · SoDEX Mainnet
             </motion.div>
 
             {/* Big left-aligned headline */}
@@ -543,27 +565,17 @@ export default function LandingPage() {
                 className="text-xs font-bold uppercase tracking-[0.18em] mb-3"
                 style={{ color: "var(--text-muted)" }}
               >
-                Agentic Finance Intelligence
+                Non-custodial agentic trading
               </motion.p>
-              <motion.h1
-                initial={{ opacity: 0, y: 24, filter: "blur(8px)" }}
-                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                transition={{ delay: 0.2, duration: 0.7, ease: [0.16, 1, 0.3, 1] as [number,number,number,number] }}
+              <SplitHeadline
+                text={HERO_TAGLINE}
                 className="font-bold leading-[1.08] tracking-[-0.025em]"
                 style={{
                   fontSize: "clamp(2rem, 4.2vw, 3.8rem)",
                   fontFamily: "var(--font-display)",
                   color: "var(--text-primary)",
-                }}
-              >
-                The AI-powered OS<br />
-                for <span style={{
-                  background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}>serious crypto traders</span>
-              </motion.h1>
+                } as React.CSSProperties}
+              />
             </div>
 
             <motion.p
@@ -573,7 +585,7 @@ export default function LandingPage() {
               className="text-[clamp(1rem,2vw,1.2rem)] mb-10 leading-relaxed max-w-lg"
               style={{ color: "var(--text-secondary)" }}
             >
-              Live SoSoValue intelligence → explainable signals → risk gate → MetaMask-signed SoDEX orders → public outcome ledger.
+              {HERO_SUB}
             </motion.p>
 
             {/* CTA buttons */}
@@ -669,7 +681,7 @@ export default function LandingPage() {
 
               {/* Tabs */}
               <div className="flex border-b" style={{ borderColor: "var(--glass-border)" }}>
-                {["Signals","Agents","ETF Flow"].map((tab, i) => (
+                {["Signals","Agents","Macro"].map((tab, i) => (
                   <button
                     key={tab} onClick={() => setHeroTab(i)}
                     className="relative flex-1 py-2.5 text-xs font-semibold transition-colors"
@@ -699,42 +711,27 @@ export default function LandingPage() {
                       transition={{ duration: 0.25 }}
                       className="flex flex-col gap-2"
                     >
-                      {SIGNALS.map((sig, i) => {
+                      {trackRecordLoading ? (
+                        <ProductionState state="loading" compact />
+                      ) : heroSignals.length === 0 ? (
+                        <ProductionState state="unavailable" compact title="No public signals yet" message="Signals appear here once the research pipeline publishes outcomes." />
+                      ) : heroSignals.map((sig, i) => {
                         const color = sig.direction === "LONG" ? "#22c55e" : sig.direction === "SHORT" ? "#ef4444" : "#f97316";
-                        const chartData = sig.data.map((v, j) => ({ v, j }));
                         return (
-                          <motion.div key={sig.pair}
+                          <motion.div key={sig.id ?? i}
                             initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: i * 0.07, duration: 0.35 }}
                             className="flex items-center gap-3 px-3 py-2.5 rounded-[10px]"
                             style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}
                           >
                             <div className="flex flex-col min-w-[72px]">
-                              <span className="font-bold text-xs" style={{ color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>{sig.pair}</span>
+                              <span className="font-bold text-xs" style={{ color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>{sig.asset}</span>
                               <span className="text-[10px] font-bold uppercase" style={{ color }}>{sig.direction}</span>
                             </div>
-                            {/* Sparkline */}
-                            <div style={{ width: 80, height: 30, flexShrink: 0 }}>
-                              {mounted && (
-                              <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={chartData}>
-                                  <defs>
-                                    <linearGradient id={`sg${i}`} x1="0" y1="0" x2="0" y2="1">
-                                      <stop offset="0%" stopColor={color} stopOpacity={0.3} />
-                                      <stop offset="100%" stopColor={color} stopOpacity={0} />
-                                    </linearGradient>
-                                  </defs>
-                                  <Area dataKey="v" stroke={color} fill={`url(#sg${i})`} strokeWidth={1.5} dot={false} isAnimationActive />
-                                </AreaChart>
-                              </ResponsiveContainer>
-                              )}
-                            </div>
-                            {/* Confidence */}
                             <div className="flex flex-col items-end ml-auto">
                               <span className="text-xs font-black" style={{ color, fontFamily: "var(--font-mono)" }}>{sig.confidence}%</span>
                               <span className="text-[9px]" style={{ color: "var(--text-muted)" }}>confidence</span>
                             </div>
-                            {/* Confidence bar */}
                             <div className="hidden sm:block w-16">
                               <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
                                 <motion.div
@@ -745,13 +742,18 @@ export default function LandingPage() {
                                 />
                               </div>
                             </div>
+                            {sig.outcome ? (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{
+                                background: sig.outcome === 'HIT' ? 'rgba(34,197,94,0.12)' : sig.outcome === 'STOP' ? 'rgba(239,68,68,0.12)' : 'rgba(96,165,250,0.12)',
+                                color: sig.outcome === 'HIT' ? '#22c55e' : sig.outcome === 'STOP' ? '#ef4444' : '#60a5fa',
+                              }}>{sig.outcome}</span>
+                            ) : null}
                           </motion.div>
                         );
                       })}
-                      {/* Mini summary */}
                       <div className="mt-2 flex items-center gap-2 px-2">
                         <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#22c55e" }} />
-                        <span className="text-[10px]" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>Updated 12s ago · Confluence Engine v2</span>
+                        <span className="text-[10px]" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>Live from /api/public/signals</span>
                       </div>
                     </motion.div>
                   )}
@@ -778,18 +780,9 @@ export default function LandingPage() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>{ag.name}</div>
-                              <div className="text-[10px] truncate" style={{ color: "var(--text-muted)" }}>{ag.desc.substring(0, 55)}…</div>
+                              <div className="text-[10px] truncate" style={{ color: "var(--text-muted)" }}>{ag.desc.substring(0, 72)}…</div>
                             </div>
-                            <div className="flex flex-col items-end">
-                              <span className="text-xs font-black" style={{ color: "#22c55e", fontFamily: "var(--font-mono)" }}>{ag.confidence}%</span>
-                              <div className="w-12 h-1 rounded-full overflow-hidden mt-1" style={{ background: "rgba(255,255,255,0.07)" }}>
-                                <motion.div
-                                  initial={{ width: 0 }} animate={{ width: `${ag.confidence}%` }}
-                                  transition={{ delay: 0.3 + i * 0.06, duration: 0.65 }}
-                                  className="h-full rounded-full" style={{ background: "#22c55e" }}
-                                />
-                              </div>
-                            </div>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: "rgba(34,197,94,0.12)", color: "#22c55e" }}>LIVE</span>
                           </motion.div>
                         );
                       })}
@@ -798,48 +791,49 @@ export default function LandingPage() {
 
                   {/* Tab 2: ETF Flow */}
                   {heroTab === 2 && (
-                    <motion.div key="etf"
+                    <motion.div key="macro"
                       initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
                       transition={{ duration: 0.25 }}
                     >
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>BTC ETF Net Flows (7d)</span>
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(34,197,94,0.12)", color: "#22c55e" }}>+$2.4B</span>
-                      </div>
-                      <div style={{ height: 180 }}>
-                        {mounted && (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={ETF_DATA}>
-                            <defs>
-                              <linearGradient id="etfIn" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="#f97316" stopOpacity={0.4} />
-                                <stop offset="100%" stopColor="#f97316" stopOpacity={0} />
-                              </linearGradient>
-                              <linearGradient id="etfOut" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="#ef4444" stopOpacity={0.3} />
-                                <stop offset="100%" stopColor="#ef4444" stopOpacity={0} />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                            <XAxis dataKey="date" tick={{ fontSize: 9, fill: "var(--text-muted)" }} axisLine={false} tickLine={false} />
-                            <Tooltip
-                              contentStyle={{ background: "var(--bg-card)", border: "1px solid var(--glass-border)", borderRadius: 8, fontSize: 11 }}
-                              labelStyle={{ color: "var(--text-muted)" }}
-                            />
-                            <Area type="monotone" dataKey="inflow" stroke="#f97316" fill="url(#etfIn)" strokeWidth={2} dot={false} isAnimationActive name="Inflow $M" />
-                            <Area type="monotone" dataKey="outflow" stroke="#ef4444" fill="url(#etfOut)" strokeWidth={1.5} dot={false} isAnimationActive name="Outflow $M" />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                        )}
-                      </div>
-                      <div className="flex gap-4 mt-2 px-1">
-                        {[["#f97316","Inflow"],["#ef4444","Outflow"]].map(([c,l]) => (
-                          <div key={l} className="flex items-center gap-1.5">
-                            <div className="w-2.5 h-0.5 rounded-full" style={{ background: c as string }} />
-                            <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>{l}</span>
+                      {macroLoading ? (
+                        <ProductionState state="loading" compact />
+                      ) : !macroOutlook ? (
+                        <ProductionState state="unavailable" compact title="Macro data unavailable" message="Macro regime loads from /api/agents/macro." />
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>Macro Regime Score</span>
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase" style={{
+                              background: macroOutlook.regime === 'risk-on' ? "rgba(34,197,94,0.12)" : macroOutlook.regime === 'risk-off' ? "rgba(239,68,68,0.12)" : "rgba(249,115,22,0.12)",
+                              color: macroOutlook.regime === 'risk-on' ? "#22c55e" : macroOutlook.regime === 'risk-off' ? "#ef4444" : "#f97316",
+                            }}>{macroOutlook.regime}</span>
                           </div>
-                        ))}
-                      </div>
+                          <div className="text-3xl font-black mb-4" style={{ color: "#f97316", fontFamily: "var(--font-mono)" }}>{macroOutlook.score}/100</div>
+                          <div style={{ height: 160 }}>
+                            {mounted && macroChartData.length > 0 && (
+                              <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={macroChartData}>
+                                  <defs>
+                                    <linearGradient id="macroBreakdown" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="0%" stopColor="#f97316" stopOpacity={0.4} />
+                                      <stop offset="100%" stopColor="#f97316" stopOpacity={0} />
+                                    </linearGradient>
+                                  </defs>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                                  <XAxis dataKey="name" tick={{ fontSize: 9, fill: "var(--text-muted)" }} axisLine={false} tickLine={false} />
+                                  <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: "var(--text-muted)" }} axisLine={false} tickLine={false} />
+                                  <Area type="monotone" dataKey="score" stroke="#f97316" fill="url(#macroBreakdown)" strokeWidth={2} dot={false} isAnimationActive />
+                                </AreaChart>
+                              </ResponsiveContainer>
+                            )}
+                          </div>
+                          <div className="mt-3 flex flex-col gap-1">
+                            {(macroOutlook.drivers.slice(0, 3)).map((d) => (
+                              <span key={d} className="text-[10px]" style={{ color: "var(--text-muted)" }}>• {d}</span>
+                            ))}
+                          </div>
+                        </>
+                      )}
                     </motion.div>
                   )}
 
@@ -912,7 +906,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── 4. ARCHITECTURE DIAGRAM ───────────────────────────────────────── */}
-      <section id="agents" className="py-24 px-6">
+      <section id="architecture" className="py-24 px-6">
         <div className="max-w-4xl mx-auto">
           <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.6 }}>
             <p className="text-xs font-bold uppercase tracking-widest mb-4 text-center" style={{ color: "#f97316" }}>Architecture</p>
@@ -1042,10 +1036,10 @@ export default function LandingPage() {
               Features
             </span>
             <h2 className="text-[clamp(2rem,5vw,3.5rem)] font-black text-center mb-4 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
-              15 tools.{" "}
-              <span style={{ background: "linear-gradient(135deg, #f97316, #ea580c)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>One command.</span>
+              {FEATURES.length} production modules.{" "}
+              <span style={{ background: "linear-gradient(135deg, #f97316, #ea580c)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>One platform.</span>
             </h2>
-            <p className="text-center max-w-xl mx-auto" style={{ color: "var(--text-secondary)" }}>Everything from NLP trade execution to tax reporting — unified in a single agentic interface.</p>
+            <p className="text-center max-w-xl mx-auto" style={{ color: "var(--text-secondary)" }}>Live SoSoValue intelligence, SSI scoring, risk preflight, and non-custodial SoDEX mainnet execution — no mock data.</p>
           </motion.div>
 
           {/* Bento grid */}
@@ -1416,7 +1410,7 @@ export default function LandingPage() {
                       <span className="font-bold text-sm" style={{ color: "var(--text-primary)" }}>{agent.name}</span>
                       {isActive && <span className="w-2 h-2 rounded-full animate-pulse inline-block" style={{ background: "#22c55e" }} />}
                     </div>
-                    <span className="text-xs" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>{agent.confidence}%</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded" style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e", fontFamily: "var(--font-mono)" }}>AGENT</span>
                   </motion.div>
                 );
               })}
@@ -1437,21 +1431,6 @@ export default function LandingPage() {
                   <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(249,115,22,0.1)", color: "#f97316", fontFamily: "var(--font-mono)" }}>ACTIVE</span>
                 </div>
                 <p className="text-sm leading-relaxed mb-6" style={{ color: "var(--text-secondary)" }}>{AGENTS[activeAgent].desc}</p>
-                <div>
-                  <div className="flex justify-between text-xs mb-2" style={{ color: "var(--text-muted)" }}>
-                    <span>Confidence Score</span>
-                    <span style={{ fontFamily: "var(--font-mono)" }}>{AGENTS[activeAgent].confidence}%</span>
-                  </div>
-                  <div className="h-2 rounded-full" style={{ background: "var(--surface-2)" }}>
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${AGENTS[activeAgent].confidence}%` }}
-                      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] as [number,number,number,number] }}
-                      className="h-2 rounded-full"
-                      style={{ background: "linear-gradient(135deg,#f97316 0%,#ea580c 50%,#c2410c 100%)" }}
-                    />
-                  </div>
-                </div>
                 <div className="mt-6 pt-4 border-t" style={{ borderColor: "var(--glass-border)" }}>
                   <div className="text-xs font-bold mb-3 uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Circuit Breaker Levels</div>
                   {[
@@ -1489,20 +1468,23 @@ export default function LandingPage() {
               }}>trading signals</span>
             </h2>
             <p className="text-center max-w-xl mx-auto mb-12" style={{ color: "var(--text-secondary)" }}>
-              High-confidence directional signals powered by multi-source confluence scoring — updated every 30 seconds.
+              Evidence-first directional signals from the live research pipeline — tracked on the public outcome ledger.
             </p>
             <div className="flex items-center justify-center gap-2 mb-8">
               <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "#22c55e" }} />
-              <span className="text-xs font-semibold" style={{ color: "#22c55e", fontFamily: "var(--font-mono)" }}>LIVE SIGNALS</span>
-              <span className="text-xs" style={{ color: "var(--text-muted)" }}>· Updated every 30s</span>
+              <span className="text-xs font-semibold" style={{ color: "#22c55e", fontFamily: "var(--font-mono)" }}>LIVE FROM API</span>
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>· /api/public/signals</span>
             </div>
           </motion.div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {SIGNALS.map((sig, i) => {
-              const sparkData = sig.data.map((v, j) => ({ v, j }));
+            {trackRecordLoading ? (
+              <ProductionState state="loading" className="md:col-span-4" />
+            ) : heroSignals.length === 0 ? (
+              <ProductionState state="unavailable" className="md:col-span-4" title="No public signals yet" message="Published signals with confidence and outcomes appear here." />
+            ) : heroSignals.map((sig, i) => {
               const color = sig.direction === "LONG" ? "#22c55e" : sig.direction === "SHORT" ? "#ef4444" : "#60a5fa";
               return (
-                <motion.div key={sig.pair}
+                <motion.div key={sig.id ?? i}
                   initial={{ opacity: 0, x: 30 }}
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true, margin: "-60px" }}
@@ -1513,23 +1495,8 @@ export default function LandingPage() {
                     background: sig.direction === "LONG" ? "rgba(34,197,94,0.03)" : sig.direction === "SHORT" ? "rgba(239,68,68,0.03)" : undefined,
                   }}>
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-sm" style={{ color: "var(--text-primary)" }}>{sig.pair}</span>
+                      <span className="font-bold text-sm" style={{ color: "var(--text-primary)" }}>{sig.asset}</span>
                       <SignalBadge dir={sig.direction} />
-                    </div>
-                    <div className="h-16">
-                      {mounted && (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={sparkData}>
-                          <defs>
-                            <linearGradient id={`sg${i}`} x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor={color} stopOpacity={0.3} />
-                              <stop offset="100%" stopColor={color} stopOpacity={0} />
-                            </linearGradient>
-                          </defs>
-                          <Area type="monotone" dataKey="v" stroke={color} fill={`url(#sg${i})`} strokeWidth={1.5} dot={false} isAnimationActive />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                      )}
                     </div>
                     <div>
                       <div className="flex justify-between text-xs mb-1" style={{ color: "var(--text-muted)" }}>
@@ -1547,7 +1514,10 @@ export default function LandingPage() {
                         />
                       </div>
                     </div>
-                    <span className="text-[10px]" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>Updated 30s ago</span>
+                    <span className="text-[10px] font-bold" style={{
+                      color: sig.outcome === 'HIT' ? '#22c55e' : sig.outcome === 'STOP' ? '#ef4444' : 'var(--text-muted)',
+                      fontFamily: "var(--font-mono)",
+                    }}>{sig.outcome ?? 'ACTIVE'}</span>
                   </SpotlightCard>
                 </motion.div>
               );
@@ -1572,42 +1542,34 @@ export default function LandingPage() {
             </p>
           </motion.div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-10">
-            {[
-              { sector: "DeFi",      score: 78, verdict: "STRONG_BUY", color: "#22c55e" },
-              { sector: "AI",        score: 82, verdict: "STRONG_BUY", color: "#22c55e" },
-              { sector: "Layer 1",   score: 61, verdict: "BUY",        color: "#f97316" },
-              { sector: "Layer 2",   score: 55, verdict: "BUY",        color: "#f97316" },
-              { sector: "RWA",       score: 71, verdict: "BUY",        color: "#f97316" },
-              { sector: "NFT",       score: 38, verdict: "NEUTRAL",    color: "#60a5fa" },
-              { sector: "GameFi",    score: 44, verdict: "NEUTRAL",    color: "#60a5fa" },
-              { sector: "MAG7",      score: 74, verdict: "BUY",        color: "#f97316" },
-              { sector: "Meme",      score: 29, verdict: "SELL",       color: "#ef4444" },
-              { sector: "PayFi",     score: 66, verdict: "BUY",        color: "#f97316" },
-              { sector: "CeFi",      score: 52, verdict: "BUY",        color: "#f97316" },
-              { sector: "SocialFi",  score: 41, verdict: "NEUTRAL",    color: "#60a5fa" },
-              { sector: "DePIN",     score: 69, verdict: "BUY",        color: "#f97316" },
-            ].map((s, i) => (
-              <motion.div key={s.sector}
+            {sectorLoading ? (
+              <ProductionState state="loading" className="col-span-full" />
+            ) : !sectorIntel?.length ? (
+              <ProductionState state="unavailable" className="col-span-full" title="SSI scores loading" message="Sector intelligence loads from /api/sectors/intel." />
+            ) : sectorIntel.map((s, i) => {
+              const color = verdictColor(s.verdict);
+              return (
+              <motion.div key={s.sectorName}
                 initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }} transition={{ delay: i * 0.04, duration: 0.4 }}>
                 <div className="rounded-[10px] p-3" style={{ border: "1px solid var(--glass-border)", background: "var(--bg-card)" }}>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>{s.sector}</span>
+                    <span className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>{s.sectorName}</span>
                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{
-                      background: s.color === "#22c55e" ? "rgba(34,197,94,0.12)" : s.color === "#ef4444" ? "rgba(239,68,68,0.12)" : s.color === "#60a5fa" ? "rgba(96,165,250,0.12)" : "rgba(249,115,22,0.12)",
-                      color: s.color,
+                      background: color === "#22c55e" ? "rgba(34,197,94,0.12)" : color === "#ef4444" ? "rgba(239,68,68,0.12)" : color === "#60a5fa" ? "rgba(96,165,250,0.12)" : "rgba(249,115,22,0.12)",
+                      color,
                     }}>{s.verdict.replace("_", " ")}</span>
                   </div>
-                  <div className="text-xl font-black font-mono mb-1.5" style={{ color: s.color }}>{s.score}</div>
+                  <div className="text-xl font-black font-mono mb-1.5" style={{ color }}>{s.score}</div>
                   <div className="h-1.5 rounded-full" style={{ background: "var(--surface-2)" }}>
                     <motion.div
                       initial={{ width: 0 }} whileInView={{ width: `${s.score}%` }}
                       viewport={{ once: true }} transition={{ delay: 0.2 + i * 0.04, duration: 0.6, ease: [0.16, 1, 0.3, 1] as [number,number,number,number] }}
-                      className="h-1.5 rounded-full" style={{ background: s.color }} />
+                      className="h-1.5 rounded-full" style={{ background: color }} />
                   </div>
                 </div>
               </motion.div>
-            ))}
+            );})}
           </div>
           <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-60px" }} transition={{ duration: 0.5 }}
             className="rounded-[12px] p-5 flex flex-col md:flex-row items-start md:items-center gap-4"
@@ -1628,7 +1590,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── 9. SIGNAL TRACK RECORD ────────────────────────────────────────── */}
-      <section className="py-24 px-6 border-t" style={{ borderColor: "var(--glass-border)" }}>
+      <section id="track-record" className="py-24 px-6 border-t" style={{ borderColor: "var(--glass-border)" }}>
         <div className="max-w-5xl mx-auto">
           <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.6 }}>
             <p className="text-xs font-bold uppercase tracking-widest mb-4 text-center" style={{ color: "#f97316" }}>Track Record</p>
@@ -1737,31 +1699,36 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
           <motion.div initial={{ opacity: 0, x: -40 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.6 }}>
             <p className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: "#f97316" }}>Macro Intelligence</p>
-            <h2 className="text-[clamp(1.8rem,4vw,2.8rem)] font-black mb-2 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>ETF Flow Intelligence</h2>
-            <p className="text-sm mb-6" style={{ color: "var(--text-secondary)" }}>Track institutional capital flows across Spot Bitcoin ETFs and correlate with price action.</p>
+            <h2 className="text-[clamp(1.8rem,4vw,2.8rem)] font-black mb-2 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>Regime Score Breakdown</h2>
+            <p className="text-sm mb-6" style={{ color: "var(--text-secondary)" }}>Live risk-on/risk-off score from ETF flows, BTC momentum, and macro calendar proximity via /api/agents/macro.</p>
             <div className="rounded-[8px] border p-4" style={{ borderColor: "var(--glass-border)", background: "var(--bg-card)" }}>
-              {mounted && (
+              {macroLoading ? (
+                <ProductionState state="loading" compact />
+              ) : !macroOutlook ? (
+                <ProductionState state="unavailable" compact title="Macro unavailable" />
+              ) : mounted && macroChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
-                <AreaChart data={ETF_DATA}>
+                <AreaChart data={macroChartData}>
                   <defs>
                     <linearGradient id="inflowGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#22c55e" stopOpacity={0.35} />
                       <stop offset="100%" stopColor="#22c55e" stopOpacity={0} />
                     </linearGradient>
-                    <linearGradient id="outflowGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#ef4444" stopOpacity={0.25} />
-                      <stop offset="100%" stopColor="#ef4444" stopOpacity={0} />
-                    </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--glass-border)" />
-                  <XAxis dataKey="date" tick={{ fill: "var(--text-muted)", fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: "var(--text-muted)", fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="name" tick={{ fill: "var(--text-muted)", fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis domain={[0, 100]} tick={{ fill: "var(--text-muted)", fontSize: 10 }} axisLine={false} tickLine={false} />
                   <Tooltip contentStyle={{ background: "var(--bg-elevated)", border: "1px solid var(--glass-border)", borderRadius: 8, fontSize: 12 }} />
-                  <Area type="monotone" dataKey="inflow" stroke="#22c55e" fill="url(#inflowGrad)" strokeWidth={2} dot={false} isAnimationActive />
-                  <Area type="monotone" dataKey="outflow" stroke="#ef4444" fill="url(#outflowGrad)" strokeWidth={2} dot={false} isAnimationActive />
+                  <Area type="monotone" dataKey="score" stroke="#f97316" fill="url(#inflowGrad)" strokeWidth={2} dot={false} isAnimationActive />
                 </AreaChart>
               </ResponsiveContainer>
-              )}
+              ) : null}
+              {macroOutlook ? (
+                <div className="mt-4 flex items-center justify-between text-sm">
+                  <span style={{ color: "var(--text-muted)" }}>Composite score</span>
+                  <span className="font-black font-mono" style={{ color: "#f97316" }}>{macroOutlook.score}/100 · {macroOutlook.regime}</span>
+                </div>
+              ) : null}
             </div>
           </motion.div>
 
@@ -1769,8 +1736,12 @@ export default function LandingPage() {
             <p className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: "#f97316" }}>Macro Calendar</p>
             <h2 className="text-[clamp(1.8rem,4vw,2.8rem)] font-black mb-6 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>Upcoming events</h2>
             <div className="flex flex-col gap-0">
-              {MACRO_EVENTS.map((ev, i) => (
-                <motion.div key={i}
+              {macroLoading ? (
+                <ProductionState state="loading" compact />
+              ) : !macroOutlook?.upcomingEvents?.length ? (
+                <ProductionState state="unavailable" compact title="No upcoming macro events" message="Calendar events load from SoSoValue macro API." />
+              ) : macroOutlook.upcomingEvents.map((ev, i) => (
+                <motion.div key={`${ev.name}-${i}`}
                   initial={{ opacity: 0, x: 20 }}
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
@@ -1778,11 +1749,11 @@ export default function LandingPage() {
                   className="flex items-center gap-4 py-3 border-b"
                   style={{ borderColor: "var(--glass-border)" }}
                 >
-                  <span className="text-xs w-14 flex-shrink-0" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>{ev.date}</span>
-                  <span className="text-xs px-2 py-0.5 rounded font-bold w-16 text-center flex-shrink-0"
-                    style={{ background: "rgba(249,115,22,0.1)", color: "#f97316" }}>{ev.category}</span>
-                  <span className="text-sm flex-1" style={{ color: "var(--text-primary)" }}>{ev.title}</span>
-                  <ImpactBadge impact={ev.impact} />
+                  <span className="text-xs w-14 flex-shrink-0" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>{formatMacroDate(ev.date)}</span>
+                  <span className="text-xs px-2 py-0.5 rounded font-bold w-16 text-center flex-shrink-0 uppercase"
+                    style={{ background: "rgba(249,115,22,0.1)", color: "#f97316" }}>{ev.importance}</span>
+                  <span className="text-sm flex-1" style={{ color: "var(--text-primary)" }}>{ev.name}</span>
+                  <ImpactBadge impact={ev.importance?.toUpperCase() === 'HIGH' ? 'HIGH' : ev.importance?.toUpperCase() === 'LOW' ? 'LOW' : 'MEDIUM'} />
                 </motion.div>
               ))}
             </div>
@@ -1804,26 +1775,22 @@ export default function LandingPage() {
                 backgroundClip: "text",
               }}>plain English</span>
             </h2>
-            <p className="text-center max-w-xl mx-auto mb-16" style={{ color: "var(--text-secondary)" }}>Type your intent. Our NLP agent parses it, structures the order, and sends it to SoDEX — you just confirm.</p>
+            <p className="text-center max-w-xl mx-auto mb-16" style={{ color: "var(--text-secondary)" }}>Research → signal → risk gate → MetaMask EIP-712 sign → SoDEX mainnet relay → public outcome tracking.</p>
           </motion.div>
 
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-12">
-            {[
-              { icon: MessageSquare, label: "Natural Language",  sub: "\"Buy 0.5 BTC with 2% stop\"" },
-              { icon: Brain,         label: "NLP Agent",         sub: "Parse intent → build order" },
-              { icon: Database,      label: "SoDEX Order",       sub: "EIP-712 signed transaction" },
-              { icon: Check,         label: "Confirmed",         sub: "On-chain confirmation" },
-            ].map((step, i) => {
-              const Icon = step.icon;
+            {EXECUTION_STEPS.map((step, i) => {
+              const icons = [Brain, Zap, Shield, Wallet, Bolt, Target];
+              const Icon = icons[i] ?? Check;
               const lit = execStep >= i;
               return (
-                <div key={i} className="flex items-center gap-3 w-full md:w-auto">
+                <div key={step.step} className="flex items-center gap-3 w-full md:w-auto">
                   <motion.div
                     animate={{ opacity: lit ? 1 : 0.3, scale: lit ? 1 : 0.95 }}
                     transition={{ duration: 0.4 }}
                     className="flex-1 md:flex-none p-4 rounded-[8px] border text-center"
                     style={{
-                      minWidth: 130,
+                      minWidth: 120,
                       borderColor: lit ? "rgba(249,115,22,0.45)" : "var(--glass-border)",
                       background: lit ? "rgba(249,115,22,0.07)" : "var(--bg-card)",
                     }}
@@ -1832,10 +1799,10 @@ export default function LandingPage() {
                       style={{ background: lit ? "rgba(249,115,22,0.15)" : "var(--surface-2)" }}>
                       <Icon className="w-4 h-4" style={{ color: lit ? "#f97316" : "var(--text-muted)" } as React.CSSProperties} />
                     </div>
-                    <div className="font-bold text-xs mb-1" style={{ color: "var(--text-primary)" }}>{step.label}</div>
-                    <div className="text-[10px]" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>{step.sub}</div>
+                    <div className="font-bold text-xs mb-1" style={{ color: "var(--text-primary)" }}>{step.title}</div>
+                    <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>{step.body.slice(0, 48)}…</div>
                   </motion.div>
-                  {i < 3 && (
+                  {i < EXECUTION_STEPS.length - 1 && (
                     <motion.div
                       animate={{ scaleX: execStep > i ? 1 : 0 }}
                       transition={{ duration: 0.3 }}
@@ -2066,7 +2033,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── 11. DATA SOURCES ──────────────────────────────────────────────── */}
-      <section id="data" className="py-24 px-6 border-t" style={{ borderColor: "var(--glass-border)" }}>
+      <section id="integrations" className="py-24 px-6 border-t" style={{ borderColor: "var(--glass-border)" }}>
         <div className="max-w-5xl mx-auto">
           <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.6 }}>
             <p className="text-xs font-bold uppercase tracking-widest mb-4 text-center" style={{ color: "#f97316" }}>Data Sources</p>
@@ -2123,22 +2090,24 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-60px" }} transition={{ delay: 0.2, duration: 0.5 }}
             className="mt-12 pt-10 border-t" style={{ borderColor: "var(--glass-border)" }}
           >
-            <p className="text-xs font-bold uppercase tracking-widest mb-6 text-center" style={{ color: "var(--text-muted)" }}>AI Models Inside</p>
-            <div className="flex flex-wrap items-center justify-center gap-6">
+            <p className="text-xs font-bold uppercase tracking-widest mb-6 text-center" style={{ color: "var(--text-muted)" }}>AI Provider Fallback Chain</p>
+            <div className="flex flex-wrap items-center justify-center gap-4">
               {[
-                { label: "Claude", Icon: Claude,   color: "#d97706" },
-                { label: "GPT-4",  Icon: OpenAI,   color: "#10b981" },
-                { label: "Gemini", Icon: Gemini,   color: "#3b82f6" },
-                { label: "DeepSeek", Icon: DeepSeek, color: "#6366f1" },
-                { label: "Mistral", Icon: Mistral,  color: "#f59e0b" },
-              ].map(({ label, Icon: AiIcon, color }) => (
-                <div key={label} className="flex items-center gap-2 px-4 py-2.5 rounded-[10px] border transition-all"
+                "Cerebras",
+                "SambaNova",
+                "Together AI",
+                "OpenRouter",
+                "Groq",
+                "Gemini",
+              ].map((label) => (
+                <div key={label} className="flex items-center gap-2 px-4 py-2.5 rounded-[10px] border"
                   style={{ borderColor: "var(--glass-border)", background: "var(--bg-card)" }}>
-                  <AiIcon size={20} style={{ color }} />
+                  <Cpu className="w-4 h-4" style={{ color: "#f97316" }} />
                   <span className="text-sm font-semibold" style={{ color: "var(--text-secondary)" }}>{label}</span>
                 </div>
               ))}
             </div>
+            <p className="text-center text-xs mt-4" style={{ color: "var(--text-muted)" }}>Research synthesis uses the first available provider when API keys are configured.</p>
           </motion.div>
         </div>
       </section>
@@ -2212,7 +2181,7 @@ export default function LandingPage() {
               }}>smarter today.</span>
             </motion.h2>
             <p className="text-lg mb-10" style={{ color: "var(--text-secondary)" }}>
-              Connect your wallet and deploy the full AI agent stack in under 60 seconds.
+              Connect MetaMask and trade on SoDEX Mainnet with live intelligence, risk preflight, and public outcome tracking.
             </p>
             {address ? (
               <Link to="/dashboard">
@@ -2240,7 +2209,7 @@ export default function LandingPage() {
               className="mt-8 flex items-center justify-center gap-2"
             >
               <span className="w-2 h-2 rounded-full" style={{ background: "#22c55e" }} />
-              <span className="text-sm" style={{ color: "var(--text-muted)" }}>No credit card · Free to start · Cancel anytime</span>
+              <span className="text-sm" style={{ color: "var(--text-muted)" }}>SoDEX Mainnet · chainId 286623 · Testnet available in Settings</span>
             </motion.div>
           </motion.div>
         </div>
@@ -2263,7 +2232,7 @@ export default function LandingPage() {
               </span>
             </div>
             <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-              The agentic finance operating system for serious crypto traders.
+              Production agentic trading on SoDEX Mainnet with live SoSoValue intelligence and non-custodial EIP-712 execution.
             </p>
             <div className="flex gap-3 mt-5">
               {[
@@ -2285,20 +2254,28 @@ export default function LandingPage() {
             </div>
           </div>
           {[
-            { title: "Product",   links: ["Features","Agents","Signal Engine","Macro Overlay","DEX Execution"] },
-            { title: "Resources", links: ["Documentation","API Reference","Changelog","Status","Blog"] },
-            { title: "Legal",     links: ["Privacy Policy","Terms of Service","Risk Disclosure","Cookies"] },
+            { title: "Product", links: FOOTER_LINKS.product },
+            { title: "Resources", links: FOOTER_LINKS.resources },
+            { title: "Legal", links: FOOTER_LINKS.legal },
           ].map((col) => (
             <div key={col.title}>
               <div className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: "var(--text-muted)" }}>{col.title}</div>
               <ul className="flex flex-col gap-2.5">
                 {col.links.map((link) => (
-                  <li key={link}>
-                    <a href="#" className="text-sm transition-colors" style={{ color: "var(--text-secondary)" }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "var(--text-primary)"; }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "var(--text-secondary)"; }}>
-                      {link}
-                    </a>
+                  <li key={link.label}>
+                    {link.href.startsWith('http') ? (
+                      <a href={link.href} target="_blank" rel="noopener noreferrer" className="text-sm transition-colors" style={{ color: "var(--text-secondary)" }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "var(--text-primary)"; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "var(--text-secondary)"; }}>
+                        {link.label}
+                      </a>
+                    ) : (
+                      <Link to={link.href} className="text-sm transition-colors" style={{ color: "var(--text-secondary)" }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "var(--text-primary)"; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "var(--text-secondary)"; }}>
+                        {link.label}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>

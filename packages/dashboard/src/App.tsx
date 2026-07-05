@@ -34,9 +34,9 @@ export default function App() {
   return (
     <ConditionalLayout>
       <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/" element={<LandingPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/landing" element={<LandingPage />} />
+        <Route path="/landing" element={<Navigate to="/" replace />} />
         <Route path="/docs" element={<DocsPage />} />
         <Route path="/agents" element={<AgentsPage />} />
         <Route path="/alerts" element={<AlertsPage />} />
@@ -64,7 +64,7 @@ export default function App() {
         <Route path="/trade/wizard" element={<Navigate to="/trade" replace />} />
         <Route path="/trade/sign" element={<TradeSignPage />} />
         <Route path="/whales" element={<WhalesPage />} />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </ConditionalLayout>
   );

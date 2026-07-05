@@ -1,118 +1,445 @@
 "use client";
-import { motion } from "framer-motion";
 
-interface MacroGaugeProps {
-  score: number; // 0-100
-  label?: string;
+import { useId } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import { Link } from "react-router-dom";
+import {
+  Activity,
+  AlertCircle,
+  ArrowRight,
+  Calendar,
+  RefreshCw,
+  TrendingDown,
+  TrendingUp,
+  Zap,
+} from "lucide-react";
+
+export interface MacroOutlookData {
+  regime?: "risk-on" | "risk-off" | "neutral";
+  score?: number;
+  drivers?: string[];
+  breakdown?: Record<string, number>;
+  upcomingEvents?: Array<{ name: string; date: string; importance: string }>;
 }
 
-export function MacroGauge({ score = 50, label = "Macro Regime" }: MacroGaugeProps) {
-  const MIN_ANGLE = -120;
-  const MAX_ANGLE = 120;
-  const angle = MIN_ANGLE + (score / 100) * (MAX_ANGLE - MIN_ANGLE);
+interface MacroRegimePanelProps {
+  data?: MacroOutlookData | null;
+  isLoading?: boolean;
+  isFetching?: boolean;
+}
 
-  const cx = 90;
-  const cy = 90;
-  const r = 70;
+const BREAKDOWN_META: Record<
+  string,
+  { label: string; color: string; icon: typeof TrendingUp }
+> = {
+  etf_flow: { label: "ETF flow", color: "#3b82f6", icon: TrendingUp },
+  btc_momentum: { label: "BTC momentum", color: "#8b5cf6", icon: Activity },
+  macro_risk: { label: "Macro safety", color: "#f97316", icon: AlertCircle },
+  sentiment: { label: "Composite", color: "#22c55e", icon: Zap },
+};
 
-  function polarToXY(angleDeg: number) {
-    const rad = ((angleDeg - 90) * Math.PI) / 180;
-    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+function regimeMeta(regime: MacroOutlookData["regime"], score: number) {
+  if (regime === "risk-on" || score >= 60) {
+    return {
+      label: "Risk-on",
+      sub: "Favorable for long exposure",
+      color: "#22c55e",
+      glow: "rgba(34,197,94,0.35)",
+    };
   }
+  if (regime === "risk-off" || score <= 40) {
+    return {
+      label: "Risk-off",
+      sub: "Defensive positioning",
+      color: "#ef4444",
+      glow: "rgba(239,68,68,0.35)",
+    };
+  }
+  return {
+    label: "Neutral",
+    sub: "Mixed macro signals",
+    color: "#f97316",
+    glow: "rgba(249,115,22,0.35)",
+  };
+}
 
-  const start = polarToXY(MIN_ANGLE + 90);
-  const end = polarToXY(MAX_ANGLE + 90);
-  const arcPath = `M ${start.x} ${start.y} A ${r} ${r} 0 1 1 ${end.x} ${end.y}`;
-  const circumference = 2 * Math.PI * r;
-  const dashFraction = (score / 100) * (240 / 360);
+function driverIcon(text: string) {
+  const lower = text.toLowerCase();
+  if (lower.includes("etf")) return TrendingUp;
+  if (lower.includes("btc")) return Activity;
+  if (lower.includes("upcoming")) return Calendar;
+  if (lower.includes("-")) return TrendingDown;
+  return Zap;
+}
 
-  const colorZones = [
-    { color: "#ef4444", label: "Risk-Off", range: [0, 33] },
-    { color: "#eab308", label: "Neutral", range: [33, 66] },
-    { color: "#10b981", label: "Risk-On", range: [66, 100] },
-  ];
+function formatEventDate(raw: string) {
+  if (!raw) return "";
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return raw;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
 
-  const getColor = (s: number) => {
-    if (s < 33) return "#ef4444";
-    if (s < 66) return "#eab308";
-    return "#10b981";
+function RegimeGauge({ score, color, glow }: { score: number; color: string; glow: string }) {
+  const reduceMotion = useReducedMotion();
+  const uid = useId();
+  const clamp = Math.max(0, Math.min(100, score));
+  const angle = -135 + (clamp / 100) * 270;
+  const cx = 120;
+  const cy = 118;
+  const r = 78;
+
+  const arc = (startDeg: number, endDeg: number, stroke: string, width = 10, opacity = 1) => {
+    const s = (startDeg * Math.PI) / 180;
+    const e = (endDeg * Math.PI) / 180;
+    const x1 = cx + r * Math.cos(s);
+    const y1 = cy + r * Math.sin(s);
+    const x2 = cx + r * Math.cos(e);
+    const y2 = cy + r * Math.sin(e);
+    const large = endDeg - startDeg > 180 ? 1 : 0;
+    return (
+      <path
+        d={`M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`}
+        fill="none"
+        stroke={stroke}
+        strokeWidth={width}
+        strokeLinecap="round"
+        opacity={opacity}
+      />
+    );
   };
 
-  const needleAngle = angle + 90;
-  const needleTip = polarToXY(angle + 90);
-
   return (
-    <div className="flex flex-col items-center gap-2">
-      <svg viewBox="0 0 180 130" className="w-full max-w-[220px]">
-        {/* Background arc */}
-        <path
-          d={arcPath}
-          fill="none"
-          stroke="rgba(255,255,255,0.06)"
-          strokeWidth="12"
-          strokeLinecap="round"
-        />
+    <svg viewBox="0 0 240 168" className="w-full max-w-[260px] mx-auto" aria-hidden>
+      <defs>
+        <linearGradient id={`${uid}-fill`} x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor={color} stopOpacity="0.35" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.95" />
+        </linearGradient>
+        <filter id={`${uid}-glow`}>
+          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
 
-        {/* Colored progress arc */}
+      {arc(-135, 135, "rgba(255,255,255,0.06)", 10)}
+      {arc(-135, -45, "rgba(239,68,68,0.18)", 10)}
+      {arc(-45, 45, "rgba(249,115,22,0.18)", 10)}
+      {arc(45, 135, "rgba(34,197,94,0.18)", 10)}
+
+      {clamp > 0 && (
         <motion.path
-          d={arcPath}
+          d={(() => {
+            const end = -135 + (clamp / 100) * 270;
+            const s = (-135 * Math.PI) / 180;
+            const e = (end * Math.PI) / 180;
+            const x1 = cx + r * Math.cos(s);
+            const y1 = cy + r * Math.sin(s);
+            const x2 = cx + r * Math.cos(e);
+            const y2 = cy + r * Math.sin(e);
+            const large = end + 135 > 180 ? 1 : 0;
+            return `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`;
+          })()}
           fill="none"
-          stroke={getColor(score)}
-          strokeWidth="12"
+          stroke={`url(#${uid}-fill)`}
+          strokeWidth="10"
           strokeLinecap="round"
-          strokeDasharray={circumference}
-          initial={{ strokeDashoffset: circumference }}
-          animate={{ strokeDashoffset: circumference * (1 - dashFraction) }}
-          transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-          style={{ filter: `drop-shadow(0 0 6px ${getColor(score)}80)` }}
+          filter={`url(#${uid}-glow)`}
+          initial={{ pathLength: 0, opacity: 0.4 }}
+          animate={{ pathLength: 1, opacity: 1 }}
+          transition={{ duration: reduceMotion ? 0 : 1.1, ease: [0.16, 1, 0.3, 1] }}
         />
+      )}
 
-        {/* Zone ticks */}
-        {colorZones.map((zone) => {
-          const midPct = (zone.range[0] + zone.range[1]) / 2;
-          const tickAngle = MIN_ANGLE + (midPct / 100) * (MAX_ANGLE - MIN_ANGLE) + 90;
-          const inner = { x: cx + (r - 14) * Math.cos((tickAngle * Math.PI) / 180), y: cy + (r - 14) * Math.sin((tickAngle * Math.PI) / 180) };
-          const outer = { x: cx + (r - 4) * Math.cos((tickAngle * Math.PI) / 180), y: cy + (r - 4) * Math.sin((tickAngle * Math.PI) / 180) };
-          return (
-            <line key={zone.label} x1={inner.x} y1={inner.y} x2={outer.x} y2={outer.y} stroke={zone.color} strokeWidth="2" opacity="0.5" />
-          );
-        })}
+      {[0, 25, 50, 75, 100].map((v) => {
+        const a = ((-135 + (v / 100) * 270) * Math.PI) / 180;
+        const ri = r - 8;
+        const ro = r + 5;
+        return (
+          <line
+            key={v}
+            x1={cx + ri * Math.cos(a)}
+            y1={cy + ri * Math.sin(a)}
+            x2={cx + ro * Math.cos(a)}
+            y2={cy + ro * Math.sin(a)}
+            stroke="rgba(255,255,255,0.18)"
+            strokeWidth="1.5"
+          />
+        );
+      })}
 
-        {/* Needle */}
-        <motion.line
+      <motion.g
+        animate={{ rotate: angle + 90 }}
+        style={{ transformOrigin: `${cx}px ${cy}px` }}
+        transition={
+          reduceMotion
+            ? { duration: 0 }
+            : { type: "spring", stiffness: 120, damping: 18 }
+        }
+      >
+        <line
           x1={cx}
           y1={cy}
-          x2={needleTip.x}
-          y2={needleTip.y}
-          stroke="rgba(255,255,255,0.9)"
-          strokeWidth="2"
+          x2={cx}
+          y2={cy - r + 10}
+          stroke={color}
+          strokeWidth="2.5"
           strokeLinecap="round"
-          initial={{ rotate: MIN_ANGLE + 90 }}
-          animate={{ rotate: needleAngle }}
-          style={{ transformOrigin: `${cx}px ${cy}px` }}
-          transition={{ type: "spring", stiffness: 100, damping: 20 }}
+          style={{ filter: `drop-shadow(0 0 6px ${glow})` }}
         />
-        <circle cx={cx} cy={cy} r={4} fill="white" opacity="0.8" />
+      </motion.g>
 
-        {/* Score text */}
-        <text x={cx} y={cy + 22} textAnchor="middle" fontSize="20" fontWeight="bold" fill="white">
-          {score}
-        </text>
-        <text x={cx} y={cy + 36} textAnchor="middle" fontSize="9" fill="rgba(255,255,255,0.4)">
-          / 100
-        </text>
-      </svg>
+      <circle cx={cx} cy={cy} r="7" fill={color} style={{ filter: `drop-shadow(0 0 10px ${glow})` }} />
+      <circle cx={cx} cy={cy} r="3" fill="var(--bg-base, #0a0806)" />
 
-      {/* Regime label */}
-      <div className="text-center">
-        <div
-          className="text-sm font-bold"
-          style={{ color: getColor(score) }}
-        >
-          {score < 33 ? "Risk-Off" : score < 66 ? "Neutral" : "Risk-On"}
-        </div>
-        <div className="text-xs text-[var(--text-muted)] mt-0.5">{label}</div>
-      </div>
+      <text
+        x={cx}
+        y={cy + 30}
+        textAnchor="middle"
+        fill="var(--text-primary, #fafafa)"
+        fontSize="28"
+        fontWeight="800"
+        style={{ fontFamily: "var(--font-display)", fontVariantNumeric: "tabular-nums" }}
+      >
+        {clamp}
+      </text>
+      <text
+        x={cx}
+        y={cy + 46}
+        textAnchor="middle"
+        fill="var(--text-muted, rgba(255,255,255,0.45))"
+        fontSize="10"
+        style={{ fontFamily: "var(--font-mono)" }}
+      >
+        / 100
+      </text>
+
+      <text x="18" y="162" fill="#ef4444" fontSize="8" fontWeight="700" style={{ fontFamily: "var(--font-mono)" }}>
+        OFF
+      </text>
+      <text x="196" y="162" fill="#22c55e" fontSize="8" fontWeight="700" style={{ fontFamily: "var(--font-mono)" }}>
+        ON
+      </text>
+    </svg>
+  );
+}
+
+function BreakdownBars({ breakdown }: { breakdown: Record<string, number> }) {
+  const reduceMotion = useReducedMotion();
+  const entries = Object.entries(breakdown);
+
+  return (
+    <div className="space-y-2.5">
+      {entries.map(([key, val], i) => {
+        const meta = BREAKDOWN_META[key] ?? {
+          label: key.replace(/_/g, " "),
+          color: "var(--accent)",
+          icon: Zap,
+        };
+        const Icon = meta.icon;
+        const n = Math.max(0, Math.min(100, Number(val) || 0));
+
+        return (
+          <div key={key}>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <span className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-secondary)]">
+                <span
+                  className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
+                  style={{ background: `${meta.color}18`, color: meta.color }}
+                >
+                  <Icon className="w-3 h-3" />
+                </span>
+                {meta.label}
+              </span>
+              <span
+                className="text-[11px] font-bold tabular-nums"
+                style={{ color: meta.color, fontFamily: "var(--font-mono)" }}
+              >
+                {n}
+              </span>
+            </div>
+            <div
+              className="h-1 rounded-full overflow-hidden"
+              style={{ background: "rgba(255,255,255,0.06)" }}
+            >
+              <motion.div
+                className="h-full rounded-full"
+                style={{ background: meta.color, boxShadow: `0 0 10px ${meta.color}55` }}
+                initial={{ width: reduceMotion ? `${n}%` : "0%" }}
+                animate={{ width: `${n}%` }}
+                transition={{
+                  delay: reduceMotion ? 0 : 0.15 + i * 0.08,
+                  duration: reduceMotion ? 0 : 0.75,
+                  ease: [0.16, 1, 0.3, 1],
+                }}
+              />
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
+}
+
+export function MacroRegimePanel({ data, isLoading, isFetching }: MacroRegimePanelProps) {
+  const score = typeof data?.score === "number" ? data.score : null;
+  const breakdown = data?.breakdown ?? {};
+  const drivers = Array.isArray(data?.drivers) ? data!.drivers! : [];
+  const hasData =
+    score !== null ||
+    drivers.length > 0 ||
+    Object.keys(breakdown).length > 0;
+  const displayScore = score ?? 50;
+  const meta = regimeMeta(data?.regime, displayScore);
+  const nextEvent = data?.upcomingEvents?.[0];
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4 animate-pulse">
+        <div className="h-[168px] rounded-xl" style={{ background: "rgba(255,255,255,0.04)" }} />
+        <div className="space-y-2">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-6 rounded-md" style={{ background: "rgba(255,255,255,0.04)" }} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!hasData) {
+    return (
+      <div className="py-8 text-center">
+        <AlertCircle className="w-5 h-5 mx-auto mb-2 text-[var(--text-muted)]" />
+        <p className="text-xs text-[var(--text-muted)]" style={{ fontFamily: "var(--font-mono)" }}>
+          Macro feed unavailable. Retrying on next refresh.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="relative">
+        <RegimeGauge score={displayScore} color={meta.color} glow={meta.glow} />
+
+        <div className="absolute top-0 right-0 flex flex-col items-end gap-1">
+          {isFetching && (
+            <RefreshCw className="w-3.5 h-3.5 text-[var(--text-muted)] animate-spin" aria-hidden />
+          )}
+          <span
+            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
+            style={{
+              background: `${meta.color}14`,
+              color: meta.color,
+              border: `1px solid ${meta.color}35`,
+            }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: meta.color }} />
+            {meta.label}
+          </span>
+        </div>
+
+        <p
+          className="text-center text-[11px] -mt-1"
+          style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}
+        >
+          {meta.sub}
+        </p>
+      </div>
+
+      {Object.keys(breakdown).length > 0 && (
+        <div
+          className="rounded-xl p-3"
+          style={{
+            background: "rgba(255,255,255,0.03)",
+            border: "1px solid var(--glass-border)",
+          }}
+        >
+          <div
+            className="text-[10px] font-semibold uppercase tracking-wider mb-3"
+            style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}
+          >
+            Score inputs
+          </div>
+          <BreakdownBars breakdown={breakdown} />
+        </div>
+      )}
+
+      {nextEvent && (
+        <div
+          className="flex items-start gap-2.5 rounded-xl px-3 py-2.5"
+          style={{
+            background: "rgba(249,115,22,0.08)",
+            border: "1px solid rgba(249,115,22,0.22)",
+          }}
+        >
+          <Calendar className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: "var(--accent)" }} />
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: "var(--accent)" }}>
+              Next macro event
+            </p>
+            <p className="text-xs font-medium text-[var(--text-primary)] truncate">{nextEvent.name}</p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-0.5" style={{ fontFamily: "var(--font-mono)" }}>
+              {formatEventDate(nextEvent.date)}
+              {nextEvent.importance ? ` · ${nextEvent.importance}` : ""}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {drivers.length > 0 && (
+        <div>
+          <div
+            className="text-[10px] font-semibold uppercase tracking-wider mb-2"
+            style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}
+          >
+            Live drivers
+          </div>
+          <ul className="space-y-1">
+            {drivers.slice(0, 4).map((d, i) => {
+              const Icon = driverIcon(d);
+              return (
+                <motion.li
+                  key={`${d}-${i}`}
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2 + i * 0.06, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                  className="flex items-start gap-2 rounded-lg px-2 py-1.5"
+                  style={{ background: "rgba(255,255,255,0.02)" }}
+                >
+                  <span
+                    className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5"
+                    style={{ background: `${meta.color}12`, color: meta.color }}
+                  >
+                    <Icon className="w-3 h-3" />
+                  </span>
+                  <span className="text-[11px] leading-relaxed text-[var(--text-secondary)]">{d}</span>
+                </motion.li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      <Link
+        to="/agents"
+        className="group flex items-center justify-center gap-1.5 w-full py-2 rounded-lg text-[11px] font-semibold transition-all duration-300"
+        style={{
+          color: "var(--accent)",
+          background: "rgba(249,115,22,0.08)",
+          border: "1px solid rgba(249,115,22,0.2)",
+        }}
+      >
+        Full macro analysis
+        <ArrowRight className="w-3 h-3 transition-transform duration-300 group-hover:translate-x-0.5" />
+      </Link>
+    </div>
+  );
+}
+
+/** @deprecated Use MacroRegimePanel for dashboard; kept for any legacy imports */
+export function MacroGauge({ score = 50 }: { score?: number; label?: string }) {
+  return <MacroRegimePanel data={{ score, regime: score >= 60 ? "risk-on" : score <= 40 ? "risk-off" : "neutral" }} />;
 }

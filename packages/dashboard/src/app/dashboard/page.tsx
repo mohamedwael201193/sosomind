@@ -7,7 +7,7 @@ import { fetchWithMeta, fetcher } from "@/lib/api";
 import { API_URL } from "@/lib/env";
 import { GlassCard } from "@/components/GlassCard";
 import { LiveTicker } from "@/components/LiveTicker";
-import { MacroGauge } from "@/components/MacroGauge";
+import { MacroRegimePanel, type MacroOutlookData } from "@/components/MacroGauge";
 import { SectorHeatmap } from "@/components/SectorHeatmap";
 import { SignalFeed } from "@/components/SignalFeed";
 import { Link } from "react-router-dom";
@@ -150,9 +150,9 @@ export default function DashboardPage() {
     }
   }
 
-  const { data: macro } = useQuery({
+  const { data: macro, isLoading: macroLoading, isFetching: macroFetching } = useQuery({
     queryKey: ["macro"],
-    queryFn: () => fetcher("/api/agents/macro"),
+    queryFn: () => fetcher<MacroOutlookData>("/api/agents/macro"),
     staleTime: 120_000,
     refetchInterval: 180_000,
   });
@@ -202,10 +202,24 @@ export default function DashboardPage() {
     return [];
   })();
 
-  const macroData = (macro as Record<string, unknown>) ?? {};
-  const macroScore = Number((macroData as { score?: unknown })?.score ?? 0);
-  const macroRegime = macroScore >= 66 ? "Risk-On" : macroScore <= 33 && macroScore > 0 ? "Risk-Off" : "Neutral";
-  const macroColor = macroScore >= 66 ? "var(--green)" : macroScore <= 33 && macroScore > 0 ? "var(--red)" : "var(--orange)";
+  const macroData: MacroOutlookData = macro ?? {};
+  const macroScore = Number(macroData.score ?? 0);
+  const macroRegime =
+    macroData.regime === "risk-on"
+      ? "Risk-On"
+      : macroData.regime === "risk-off"
+        ? "Risk-Off"
+        : macroScore >= 60
+          ? "Risk-On"
+          : macroScore <= 40 && macroScore > 0
+            ? "Risk-Off"
+            : "Neutral";
+  const macroColor =
+    macroData.regime === "risk-on" || macroScore >= 60
+      ? "var(--green)"
+      : macroData.regime === "risk-off" || (macroScore <= 40 && macroScore > 0)
+        ? "var(--red)"
+        : "var(--orange)";
 
   const sectors: Array<Record<string, unknown>> = (() => {
     const raw = sectorsRaw as unknown;
@@ -500,28 +514,11 @@ export default function DashboardPage() {
                 <Link to="/agents"><ExternalLink className="w-3.5 h-3.5" style={{ color: "var(--text-muted)" }} /></Link>
               </div>
 
-              <MacroGauge score={macroScore} />
-
-              <div className="mt-3 flex items-center justify-between px-3 py-2 rounded-lg" style={{ background: `${macroColor}15`, border: `1px solid ${macroColor}30` }}>
-                <span className="text-xs font-semibold" style={{ color: macroColor, fontFamily: "var(--font-mono)" }}>
-                  {macroScore > 0 ? macroRegime : "Calculating\u2026"}
-                </span>
-                <span className="text-xs font-bold tabular-nums" style={{ color: macroColor, fontFamily: "var(--font-mono)" }}>
-                  {macroScore > 0 ? `${macroScore}/100` : "?"}
-                </span>
-              </div>
-
-              {Array.isArray((macroData as { drivers?: unknown[] })?.drivers) && (
-                <div className="mt-3 space-y-1.5">
-                  <div className="text-[10px] tracking-wide mb-2" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>Key drivers</div>
-                  {(macroData as { drivers: string[] }).drivers.slice(0, 4).map((d, i) => (
-                    <div key={i} className="flex items-start gap-2 text-xs py-1.5 border-b last:border-0" style={{ color: "var(--text-secondary)", borderColor: "var(--border-subtle)" }}>
-                      <span className="mt-1.5 w-1 h-1 rounded-full flex-shrink-0" style={{ background: "var(--text-muted)" }} />
-                      {d}
-                    </div>
-                  ))}
-                </div>
-              )}
+              <MacroRegimePanel
+                data={macroData}
+                isLoading={macroLoading}
+                isFetching={macroFetching}
+              />
             </GlassCard>
           </motion.div>
 
