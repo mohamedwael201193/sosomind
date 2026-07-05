@@ -1,8 +1,6 @@
 import { Router } from 'express';
 import { supabase } from '../db/supabase';
 import { asyncHandler } from '../utils/http';
-import { sosovalue } from '../clients/sosovalue';
-
 const router = Router();
 
 router.get('/accuracy', asyncHandler(async (_req, res) => {
@@ -21,19 +19,16 @@ router.get('/accuracy', asyncHandler(async (_req, res) => {
     byStatus[s.status] = (byStatus[s.status] ?? 0) + 1;
   }
 
-  // Estimate signal accuracy by checking current price vs entry for executed signals
-  const executed = (signals ?? []).filter((s) => s.status === 'executed');
-  let correct = 0;
-  for (const sig of executed.slice(0, 10)) {
-    try {
-      const snap: any = await sosovalue.getMarketSnapshot(sig.asset);
-      const currentPrice = Number(snap?.price ?? snap?.last_price ?? 0);
-      // Placeholder: would compare with entry price from trades table
-      correct++; // assume correct for now (requires joining trades table)
-    } catch {}
-  }
+  const { data: outcomeRows } = await supabase
+    .from('signals')
+    .select('outcome')
+    .gte('created_at', since)
+    .not('outcome', 'is', null);
 
-  const winRate = executed.length > 0 ? (correct / executed.length) * 100 : null;
+  const hits = (outcomeRows ?? []).filter((s) => s.outcome === 'HIT').length;
+  const stops = (outcomeRows ?? []).filter((s) => s.outcome === 'STOP').length;
+  const decisive = hits + stops;
+  const winRate = decisive > 0 ? (hits / decisive) * 100 : null;
   const avgConfidence = total > 0
     ? (signals ?? []).reduce((s, x) => s + Number(x.confidence ?? 0), 0) / total
     : 0;

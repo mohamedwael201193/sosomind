@@ -3,8 +3,6 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Wifi, WifiOff } from 'lucide-react';
 import { API_URL } from '@/lib/api';
-import { JudgePathButton } from './JudgePathBanner';
-
 type ServiceStatus = 'up' | 'down' | 'warn' | 'loading';
 
 export function StatusBar() {
@@ -86,14 +84,7 @@ export function StatusBar() {
         {dot(sodexStatus)}
         <span>SoDEX</span>
       </div>
-      <span
-        className="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
-        style={{ background: 'var(--accent-soft)', color: 'var(--accent)', border: '1px solid var(--accent-border)' }}
-      >
-        Testnet
-      </span>
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <JudgePathButton />
         <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
           {apiStatus === 'up' ? <Wifi className="w-3 h-3" style={{ color: 'var(--green)' }} /> : <WifiOff className="w-3 h-3" style={{ color: 'var(--red)' }} />}
           {lastUpdate ? lastUpdate.toLocaleTimeString() : '…'}

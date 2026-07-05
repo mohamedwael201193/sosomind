@@ -4,9 +4,7 @@ import { Sidebar } from './Sidebar';
 import { MobileNav } from './MobileNav';
 import { StatusBar } from './StatusBar';
 import { PageTransition } from './PageTransition';
-import { DemoTour } from './DemoTour';
 import { CommandPalette } from './CommandPalette';
-import { JudgePathBanner } from './JudgePathBanner';
 
 const STANDALONE_ROUTES = ['/landing', '/docs', '/trade/sign'];
 
@@ -28,11 +26,9 @@ export function ConditionalLayout({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <MobileNav />
       <main className="md:ml-[240px] min-h-screen p-6 pb-20 md:pb-24 relative z-10">
-        <JudgePathBanner />
         <PageTransition>{children}</PageTransition>
       </main>
       <StatusBar />
-      <DemoTour />
       <CommandPalette />
     </>
   );

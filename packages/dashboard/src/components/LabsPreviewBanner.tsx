@@ -13,7 +13,7 @@ export function LabsPreviewBanner({ feature }: { feature?: string }) {
         <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Labs · Preview</p>
         <p className="text-xs mt-1 leading-relaxed text-[var(--text-secondary)]">
           {feature
-            ? `${feature} is an experimental surface. Data may be limited or stubbed — core trading loop lives in Signals, Trade, and Portfolio.`
+            ? `${feature} is an experimental surface. Data may be limited on this page. Core trading lives in Signals, Trade, and Portfolio.`
             : 'This page is in Labs preview. Data may be limited — the hero loop is Track Record → Signals → Trade → Portfolio.'}
         </p>
       </div>

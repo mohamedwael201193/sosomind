@@ -92,8 +92,9 @@ export default function TrackRecordPage() {
             <strong className="text-[var(--text-primary)]"> HIT</strong> = TP reached ·
             <strong className="text-[var(--text-primary)]"> STOP</strong> = SL hit ·
             <strong className="text-[var(--text-primary)]"> DRIFT</strong> = neither within 72h (not a loss).
-            Hit rate = HIT ÷ (HIT + STOP) only — DRIFT excluded.
-            This is a buildathon proof artifact — not financial advice.{" "}
+            Hit rate = HIT ÷ (HIT + STOP) only. DRIFT excluded.
+            Outcomes are measured against live spot prices. Execution PnL may differ from signal outcome.
+            Not financial advice.{" "}
             <Link to="/methodology" className="underline text-[var(--accent)]">Methodology →</Link>
           </p>
         </div>

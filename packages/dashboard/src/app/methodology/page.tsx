@@ -228,7 +228,7 @@ export default function MethodologyPage() {
         <SectionHeader
           label="00 — Trust Model"
           title="Custody & Signing Paths"
-          sub="Honest disclosure for judges — dashboard relay is non-custodial; Telegram uses hosted signing on server decrypt."
+          sub="Dashboard relay is non-custodial. Telegram uses hosted encrypted signing on server decrypt."
         />
         <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--glass-border)" }}>
           <table className="w-full text-sm">
@@ -531,7 +531,7 @@ export default function MethodologyPage() {
       </section>
 
       {/* ── CTA ── */}
-      {/* ── Trust Model (Wave 2) ── */}
+      {/* ── Trust Model ── */}
       <section className="mb-14">
         <SectionHeader
           label="06 — Trust Model"
@@ -574,10 +574,10 @@ export default function MethodologyPage() {
         style={{ background: "rgba(0,255,127,0.04)", border: "1px solid rgba(0,255,127,0.15)" }}
       >
         <h3 className="text-xl font-black mb-2 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
-          5-minute judge path
+          Start the trading loop
         </h3>
         <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>
-          Track Record → Signal audit → Risk preflight → MetaMask sign → Portfolio proof
+          Track record, signal audit, risk preflight, wallet sign, portfolio proof
         </p>
         <div className="flex flex-wrap gap-3 justify-center">
           <Link to="/track-record" className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-bold" style={{ background: "#00ff7f", color: "#030a05" }}>

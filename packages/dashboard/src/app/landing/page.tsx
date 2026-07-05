@@ -12,6 +12,7 @@ import {
   X, Code2,
 } from "lucide-react";
 import { API_URL } from '@/lib/env';
+import { ProductionState } from '@/components/ProductionState';
 import { useEffect, useRef, useState } from "react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import MCP from "@lobehub/icons/es/MCP";
@@ -117,21 +118,15 @@ const DATA_SOURCES = [
   { name: "News Feed",          tools: 11, type: "AI",   icon: FileText    },
 ];
 
-const LEADERBOARD = [
-  { rank: 1, name: "alpha_sage",  returns: "+312%", signals: 248, winRate: "74%" },
-  { rank: 2, name: "quant_node",  returns: "+187%", signals: 192, winRate: "69%" },
-  { rank: 3, name: "whale_watch", returns: "+154%", signals: 310, winRate: "65%" },
-];
-
 const FAQ_ITEMS = [
   { q: "What is SoSoMind?",                a: "SoSoMind is a multi-agent AI-powered trading platform that combines real-time market intelligence, automated signals, and direct DEX execution into a single unified interface." },
   { q: "How do signals work?",             a: "Our Signal Engine aggregates data from 13 live sources, runs them through 5 specialist AI agents, and surfaces high-confidence directional signals with confluence scoring." },
-  { q: "What is the Agent Orchestrator?",  a: "The Orchestrator is the central brain — it receives your intent, decides which specialist agents to activate, enforces risk limits, and assembles the final recommendation." },
+  { q: "What is the Agent Orchestrator?",  a: "The Orchestrator is the central brain. It receives your intent, decides which specialist agents to activate, enforces risk limits, and assembles the final recommendation." },
   { q: "How does DEX execution work?",     a: "Type a natural language trade command or click execute on any signal. The NLP agent parses your intent, the Execution agent routes it to SoDEX, and you confirm with an EIP-712 signature." },
-  { q: "Is paper trading available?",      a: "Yes. Toggle paper mode at any time to test strategies in live market conditions with simulated capital — no real funds at risk." },
-  { q: "What data sources are used?",      a: "SoSoMind connects to 13 live data sources including SoSoValue (35 MCP tools), SoDEX (25 MCP tools), Binance, on-chain analytics, macro event calendars, and social sentiment feeds." },
-  { q: "How does risk monitoring work?",   a: "The Risk Agent continuously tracks portfolio VaR, correlation, and drawdown. Circuit breakers automatically reduce exposure when thresholds are breached." },
-  { q: "How do I get started?",            a: "Connect your MetaMask wallet from the landing page, complete a 2-minute Trader Persona quiz, and your personalized agent dashboard is ready instantly." },
+  { q: "Is paper trading available?",      a: "Yes. Use paper trading to test strategies in live market conditions with simulated capital and no real funds at risk." },
+  { q: "What data sources are used?",      a: "SoSoMind connects to live data sources including SoSoValue, SoDEX, Binance, on-chain analytics, macro event calendars, and social sentiment feeds." },
+  { q: "How does risk monitoring work?",   a: "The Risk Agent continuously tracks portfolio exposure, correlation, and drawdown. Circuit breakers automatically reduce exposure when thresholds are breached." },
+  { q: "How do I get started?",            a: "Connect your wallet from the dashboard, complete the trader persona setup, and your personalized terminal is ready." },
 ];
 
 // ── Micro-components ──────────────────────────────────────────────────────────
@@ -307,13 +302,38 @@ export default function LandingPage() {
   const [heroTab, setHeroTab] = useState(0);
   const [mounted, setMounted] = useState(false);
   const [liveTrackRecord, setLiveTrackRecord] = useState<PublicSignalsResponse | null>(null);
+  const [trackRecordLoading, setTrackRecordLoading] = useState(true);
+  const [paperLeaderboard, setPaperLeaderboard] = useState<any[] | null>(null);
+  const [marketLeaderboard, setMarketLeaderboard] = useState<any[] | null>(null);
   const execRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    setTrackRecordLoading(true);
     fetch(`${API_URL}/api/public/signals`)
-      .then((r) => r.ok ? r.json() : null)
+      .then((r) => (r.ok ? r.json() : null))
       .then((json) => { if (json?.data && json?.meta) setLiveTrackRecord(json); })
-      .catch(() => {/* silently fall back to static data */});
+      .catch(() => setLiveTrackRecord(null))
+      .finally(() => setTrackRecordLoading(false));
+  }, []);
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/paper/leaderboard?limit=3`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        const rows = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
+        setPaperLeaderboard(rows.slice(0, 3));
+      })
+      .catch(() => setPaperLeaderboard([]));
+  }, []);
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/marketplace/leaderboard?limit=3`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        const rows = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
+        setMarketLeaderboard(rows.slice(0, 3));
+      })
+      .catch(() => setMarketLeaderboard([]));
   }, []);
 
   useEffect(() => { setMounted(true); }, []);
@@ -345,8 +365,16 @@ export default function LandingPage() {
   }, []);
 
   const winRateDisplay = liveTrackRecord?.meta?.hit_rate != null
-    ? String(liveTrackRecord.meta.hit_rate) + '%'
-    : '\u2014';
+    ? `${liveTrackRecord.meta.hit_rate}%`
+    : trackRecordLoading
+      ? '…'
+      : '—';
+
+  const signalCountDisplay = liveTrackRecord?.meta?.total != null
+    ? String(liveTrackRecord.meta.total)
+    : trackRecordLoading
+      ? '…'
+      : '—';
 
   const liveStats = STATS.map(s =>
     s.label === 'Signal Win Rate' && liveTrackRecord?.meta?.hit_rate != null
@@ -590,10 +618,10 @@ export default function LandingPage() {
               className="flex flex-wrap gap-x-6 gap-y-2"
             >
               {[
-                ["2,400+","Assets"],
-                ["18K+","Signals"],
-                [winRateDisplay,"Win Rate"],
-                ["15","AI Agents"],
+                ["35", "SoSoValue methods"],
+                ["32", "SoDEX spot pairs"],
+                [signalCountDisplay, "Resolved signals"],
+                [winRateDisplay, "Hit rate"],
               ].map(([v, l]) => (
                 <div key={l} className="flex items-baseline gap-1.5">
                   <span className="font-black text-base" style={{ color: "#f97316" }}>{v}</span>
@@ -1614,19 +1642,40 @@ export default function LandingPage() {
               Signals are evaluated hourly against live prices. HIT when take-profit is reached, STOP when stop-loss fires, DRIFT after 72 hours without resolution.
             </p>
           </motion.div>
-          {/* Live stats — computed from /api/public/signals or fall back to static */}
+          {/* Live stats from /api/public/signals */}
           {(() => {
             const resolved = liveTrackRecord?.data ?? [];
             const meta = liveTrackRecord?.meta;
-            const isLive = !!meta;
-            const total = isLive ? meta!.total : 100;
-            const hits = isLive ? meta!.hits : 68;
-            const stops = isLive ? resolved.filter((s) => s.outcome === 'STOP').length : 19;
-            const drifts = isLive ? resolved.filter((s) => s.outcome === 'DRIFT').length : 8;
-            const hitRate = (isLive && total > 0 && meta!.hit_rate != null) ? meta!.hit_rate : 68;
-            const stopRate = isLive && total > 0 ? Math.round((stops / total) * 100) : 19;
-            const driftRate = isLive && total > 0 ? Math.round((drifts / total) * 100) : 8;
-            const pendingRate = isLive ? Math.max(0, 100 - hitRate - stopRate - driftRate) : 5;
+            const isLive = !!meta && meta.total > 0;
+
+            if (trackRecordLoading) {
+              return <ProductionState state="loading" compact className="mb-10" />;
+            }
+
+            if (!isLive) {
+              return (
+                <ProductionState
+                  state="unavailable"
+                  title="Track record loading"
+                  message="Resolved signal outcomes will appear here once the backend has evaluated signals."
+                  action={
+                    <Link to="/track-record" className="text-sm font-semibold text-[var(--accent)]">
+                      Open track record
+                    </Link>
+                  }
+                  className="mb-10"
+                />
+              );
+            }
+
+            const total = meta!.total;
+            const hits = meta!.hits ?? resolved.filter((s) => s.outcome === 'HIT').length;
+            const stops = resolved.filter((s) => s.outcome === 'STOP').length;
+            const drifts = resolved.filter((s) => s.outcome === 'DRIFT').length;
+            const hitRate = meta!.hit_rate != null ? meta!.hit_rate : 0;
+            const stopRate = total > 0 ? Math.round((stops / total) * 100) : 0;
+            const driftRate = total > 0 ? Math.round((drifts / total) * 100) : 0;
+            const pendingRate = Math.max(0, 100 - hitRate - stopRate - driftRate);
             return (
               <>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
@@ -1655,15 +1704,10 @@ export default function LandingPage() {
                     </span>
                     <div className="flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: isLive ? "#22c55e" : "#f97316" }} />
-                      <span className="text-[10px] font-mono" style={{ color: isLive ? "#22c55e" : "#f97316" }}>{isLive ? "LIVE" : "DEMO"}</span>
+                      <span className="text-[10px] font-mono" style={{ color: "#22c55e" }}>LIVE</span>
                     </div>
                   </div>
-                  {(isLive ? resolved.slice(0, 6) : [
-                    { asset: "BTC", direction: "LONG",  confidence: 84, outcome: "HIT",     id: "1", outcome_price: null, created_at: "" },
-                    { asset: "ETH", direction: "LONG",  confidence: 71, outcome: "HIT",     id: "2", outcome_price: null, created_at: "" },
-                    { asset: "SOL", direction: "SHORT", confidence: 68, outcome: "STOP",    id: "3", outcome_price: null, created_at: "" },
-                    { asset: "BTC", direction: "LONG",  confidence: 79, outcome: "PENDING", id: "4", outcome_price: null, created_at: "" },
-                  ] as PublicSignal[]).map((sig, i) => (
+                  {resolved.slice(0, 6).map((sig, i) => (
                     <div key={sig.id ?? i} className="flex items-center gap-4 px-5 py-3 border-b" style={{ borderColor: "var(--glass-border)", background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)" }}>
                       <span className="text-sm font-bold w-10" style={{ color: "var(--text-primary)" }}>{sig.asset}</span>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded w-14 text-center" style={{
@@ -1917,8 +1961,18 @@ export default function LandingPage() {
             <p className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: "#f97316" }}>Community</p>
             <h2 className="text-[clamp(1.8rem,4vw,2.8rem)] font-black mb-6 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>Trader Leaderboard</h2>
             <div className="flex flex-col gap-3 mb-8">
-              {LEADERBOARD.map((t, i) => (
-                <motion.div key={t.name}
+              {paperLeaderboard === null ? (
+                <ProductionState state="loading" compact />
+              ) : paperLeaderboard.length === 0 ? (
+                <ProductionState
+                  state="empty"
+                  title="No leaderboard entries yet"
+                  message="Paper trading rankings appear once traders publish results."
+                  compact
+                />
+              ) : (
+                paperLeaderboard.map((t, i) => (
+                <motion.div key={t.user_id ?? t.name ?? i}
                   initial={{ opacity: 0, y: 16 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
@@ -1931,36 +1985,49 @@ export default function LandingPage() {
                         color: i === 0 ? "#eab308" : i === 1 ? "#94a3b8" : "#b47b59",
                         border: "1px solid currentColor",
                       }}>
-                      {t.rank}
+                      {i + 1}
                     </div>
                     <div className="flex-1">
-                      <div className="font-bold text-sm" style={{ color: "var(--text-primary)" }}>{t.name}</div>
-                      <div className="text-xs" style={{ color: "var(--text-muted)" }}>{t.signals} signals · {t.winRate} win rate</div>
+                      <div className="font-bold text-sm" style={{ color: "var(--text-primary)" }}>
+                        {t.display_name ?? t.user_id ?? 'Trader'}
+                      </div>
+                      <div className="text-xs" style={{ color: "var(--text-muted)" }}>
+                        {t.trades ?? t.signals ?? 0} trades
+                        {t.win_rate != null ? ` · ${(Number(t.win_rate) * 100).toFixed(0)}% win rate` : ''}
+                      </div>
                     </div>
-                    <span className="font-black text-sm" style={{ color: "#22c55e" }}>{t.returns}</span>
+                    <span className="font-black text-sm" style={{ color: t.total_pnl_usd >= 0 ? "#22c55e" : "#ef4444" }}>
+                      {t.total_pnl_usd != null
+                        ? `${t.total_pnl_usd >= 0 ? '+' : ''}$${Math.abs(Number(t.total_pnl_usd)).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                        : '—'}
+                    </span>
                   </SpotlightCard>
                 </motion.div>
-              ))}
+              )))}
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              {[["500+","Active Traders"],["18K+","Signals Published"]].map(([v, l]) => (
-                <div key={l} className="text-center p-4 rounded-[8px] border" style={{ borderColor: "var(--glass-border)", background: "var(--bg-card)" }}>
-                  <div className="text-2xl font-black" style={{ color: "#f97316" }}>{v}</div>
-                  <div className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{l}</div>
-                </div>
-              ))}
-            </div>
+            <Link
+              to="/leaderboard"
+              className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--accent)] mb-8"
+            >
+              View full leaderboard <ArrowRight className="w-4 h-4" />
+            </Link>
           </motion.div>
 
           <motion.div initial={{ opacity: 0, x: 30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.6 }}>
             <p className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: "#f97316" }}>Marketplace</p>
             <h2 className="text-[clamp(1.8rem,4vw,2.8rem)] font-black mb-6 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>Signal Strategies</h2>
-            {[
-              { name: "Momentum Alpha",     author: "alpha_sage",  winRate: "74%", subs: 312, badge: "HOT" },
-              { name: "ETF Flow Arbitrage", author: "etf_quant",   winRate: "68%", subs: 189, badge: "NEW" },
-              { name: "Whale Reversal",     author: "whale_watch", winRate: "65%", subs: 247, badge: "PRO" },
-            ].map((s, i) => (
-              <motion.div key={s.name}
+            {marketLeaderboard === null ? (
+              <ProductionState state="loading" compact />
+            ) : marketLeaderboard.length === 0 ? (
+              <ProductionState
+                state="empty"
+                title="Marketplace strategies unavailable"
+                message="Published strategies will appear here when creators share verified track records."
+                compact
+              />
+            ) : (
+              marketLeaderboard.map((s, i) => (
+              <motion.div key={s.user_id ?? s.display_name ?? i}
                 initial={{ opacity: 0, y: 16 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
@@ -1970,18 +2037,30 @@ export default function LandingPage() {
                 <SpotlightCard className="p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div>
-                      <div className="font-bold text-sm" style={{ color: "var(--text-primary)" }}>{s.name}</div>
-                      <div className="text-xs" style={{ color: "var(--text-muted)" }}>by {s.author}</div>
+                      <div className="font-bold text-sm" style={{ color: "var(--text-primary)" }}>
+                        {s.display_name ?? s.user_id ?? 'Strategy'}
+                      </div>
+                      <div className="text-xs" style={{ color: "var(--text-muted)" }}>
+                        {s.followers != null ? `${s.followers} followers` : 'Community strategy'}
+                      </div>
                     </div>
-                    <span className="px-2 py-0.5 rounded text-xs font-bold" style={{ background: "rgba(249,115,22,0.12)", color: "#f97316" }}>{s.badge}</span>
                   </div>
                   <div className="flex gap-6 text-xs" style={{ color: "var(--text-muted)" }}>
-                    <span>Win rate <strong style={{ color: "#22c55e" }}>{s.winRate}</strong></span>
-                    <span>{s.subs} subscribers</span>
+                    {s.win_rate_published != null || s.winRate != null ? (
+                      <span>
+                        Win rate{' '}
+                        <strong style={{ color: "#22c55e" }}>
+                          {((Number(s.win_rate_published ?? s.winRate) * 100) || 0).toFixed(0)}%
+                        </strong>
+                      </span>
+                    ) : null}
+                    {s.total_pnl_usd != null ? (
+                      <span>PnL ${Number(s.total_pnl_usd).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                    ) : null}
                   </div>
                 </SpotlightCard>
               </motion.div>
-            ))}
+            )))}
           </motion.div>
         </div>
       </section>

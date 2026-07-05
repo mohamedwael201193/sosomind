@@ -8,7 +8,8 @@
 [![Bot](https://img.shields.io/badge/telegram-%40SosoMindbot-0088cc?style=flat-square&logo=telegram)](https://t.me/SosoMindbot)
 [![Backend](https://img.shields.io/badge/backend-render.com-46e3b7?style=flat-square)](https://render.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?style=flat-square&logo=typescript)](https://www.typescriptlang.org)
-[![Next.js](https://img.shields.io/badge/Next.js-14-000000?style=flat-square&logo=nextdotjs)](https://nextjs.org)
+[![Vite](https://img.shields.io/badge/Vite-6-646cff?style=flat-square&logo=vite)](https://vitejs.dev)
+[![React](https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react)](https://react.dev)
 
 Multi-agent AI research · Real-time sector intelligence · EIP-712 DEX execution · Telegram trading bot · **32 live spot pairs**
 
@@ -20,7 +21,7 @@ Multi-agent AI research · Real-time sector intelligence · EIP-712 DEX executio
 
 SoSoMind turns live SoSoValue intelligence into risk-checked, user-approved SoDEX trades — with a public HIT/STOP/DRIFT outcome ledger. **Dashboard signing is non-custodial (MetaMask relay).** Telegram uses a **hosted encrypted wallet** with explicit disclosure.
 
-**Current deployment status:** Active testnet (SoDEX Testnet, chainId=138565). Backend live on Render, dashboard live on Vercel. Bot is reachable at [@SosoMindbot](https://t.me/SosoMindbot). **32 spot markets live** — crypto (BTC ETH SOL XRP ADA DOGE LINK AVAX BNB UNI LTC ZEC HYPE SHIB AAVE XAUT USDT SOSO), synthetic stocks (TSLA NVDA META AAPL AMZN GOOGL MSFT), SSI indexes (MAG7ssi MEMEssi DEFIssi USSI).
+**Current deployment status:** Production stack on Render (backend) and Vercel (dashboard). SoDEX mainnet trading enabled. Bot reachable at [@SosoMindbot](https://t.me/SosoMindbot). **32 spot markets** across crypto, synthetic stocks, and SSI indexes.
 
 ---
 
@@ -30,9 +31,9 @@ SoSoMind turns live SoSoValue intelligence into risk-checked, user-approved SoDE
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                            CLIENT SURFACES                                   │
 │                                                                              │
-│   Next.js Dashboard          MCP Clients           Telegram App              │
+│   Vite Dashboard             MCP Clients           Telegram App              │
 │   sosomind.vercel.app        (Claude / Cursor)      @SosoMindbot             │
-│   React 19 + TypeScript      stdio transport        grammY + EIP-712         │
+│   React 19 + Vite + TS       stdio transport        grammY + EIP-712         │
 └────────┬──────────────────────────┬─────────────────────────┬───────────────┘
          │ HTTPS/REST               │ MCP stdio               │ Bot Webhook
          ▼                          ▼                         ▼
@@ -86,13 +87,13 @@ sosomind/
 │   │       ├── content/      Autonomous briefing generation + publishing
 │   │       └── db/           Supabase typed CRUD, migrations
 │   │
-│   ├── dashboard/            Next.js 14 + React 19 + TailwindCSS
+│   ├── dashboard/            Vite 6 + React 19 + React Router + TailwindCSS
 │   │   └── src/
-│   │       ├── app/          Pages: landing, trade, signals, sectors, macro,
+│   │       ├── app/          Page modules: landing, trade, signals, sectors,
 │   │       │                 research, portfolio, roadmap, docs, methodology
-│   │       ├── components/   SpotlightCard, MagneticButton, Logo, Charts
+│   │       ├── components/   SpotlightCard, GlassCard, Logo, Charts
 │   │       ├── context/      WalletContext, ThemeContext
-│   │       └── lib/          api.ts (axios), websocket.ts
+│   │       └── lib/          api.ts, env.ts (VITE_*), websocket.ts
 │   │
 │   ├── mcp-sosovalue/        35 MCP tools over stdio (all 9 SoSoValue modules)
 │   ├── mcp-sodex/            25 MCP tools over stdio (spot, perps, account, writes)
@@ -395,8 +396,10 @@ npm run dev
 
 # 5. Start dashboard (new terminal)
 cd packages/dashboard
+cp .env.example .env.local
+# Set VITE_API_URL=http://localhost:10000 and VITE_WS_URL=ws://localhost:10001
 npm run dev
-# Dashboard runs on :3000
+# Dashboard runs on http://127.0.0.1:3000
 
 # 6. Verify
 curl http://localhost:10000/api/health

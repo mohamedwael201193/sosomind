@@ -14,11 +14,10 @@ import { Link } from "react-router-dom";
 import {
   TrendingUp, TrendingDown, Wallet, Zap, Globe2, BarChart3,
   Activity, ArrowRight, Send, Radio, ArrowUpDown,
-  Bell, Search, Layers, ExternalLink, Target, CandlestickChart,
+  Bell, Search, Layers, ExternalLink, CandlestickChart,
 } from "lucide-react";
 import { SetupProgress } from "@/components/SetupProgress";
 import { useSetupProgress } from "@/hooks/useSetupProgress";
-import { startJudgePath } from "@/components/JudgePathBanner";
 import { useWallet } from "@/context/WalletContext";
 
 // -- Stat Card
@@ -354,7 +353,7 @@ export default function DashboardPage() {
                 {hitRatePct ? `${hitRatePct}% hit rate` : "Live proof ledger"} ? {activeSignals} signals
               </h2>
               <p className="text-sm mt-2 max-w-xl leading-relaxed text-[var(--text-secondary)]">
-                Intel ? signal ? preflight ? signed order ? public outcomes on Supabase.
+                Intel, signal, preflight, signed order, and public outcomes on Supabase.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -366,15 +365,6 @@ export default function DashboardPage() {
                 <CandlestickChart className="w-4 h-4" />
                 {primaryCtaLabel}
               </Link>
-              <button
-                type="button"
-                onClick={() => startJudgePath()}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all duration-200 hover:border-[var(--accent-border)] hover:-translate-y-0.5 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-border)]"
-                style={{ borderColor: "var(--glass-border)", color: "var(--text-secondary)" }}
-              >
-                <Target className="w-4 h-4" />
-                Judge path
-              </button>
               <Link
                 to="/track-record"
                 className="inline-flex items-center gap-1 px-3 py-2.5 text-xs font-semibold text-[var(--accent)] transition-all duration-200 hover:gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-border)] rounded-lg"
@@ -389,7 +379,7 @@ export default function DashboardPage() {
         ) : (
           <GlassCard padding="md" animate>
             <p className="text-[10px] font-semibold tracking-wide text-[var(--green)] mb-2">Ready</p>
-            <p className="text-sm font-bold text-[var(--text-primary)]">SoDEX testnet connected</p>
+            <p className="text-sm font-bold text-[var(--text-primary)]">Trading account ready</p>
             <Link to="/portfolio" className="text-xs font-semibold mt-2 inline-flex items-center gap-1 text-[var(--accent)]">
               View portfolio <ArrowRight className="w-3 h-3" />
             </Link>
