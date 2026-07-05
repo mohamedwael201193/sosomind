@@ -36,7 +36,19 @@ services:
       - key: SODEX_ADDRESS
         sync: false
       - key: SODEX_CHAIN_ID
-        value: "138565"
+        value: "286623"
+      - key: SODEX_MAINNET_URL
+        value: https://mainnet-gw.sodex.dev/api/v1
+      - key: SODEX_TESTNET_URL
+        value: https://testnet-gw.sodex.dev/api/v1
+      - key: SOSOMIND_DEFAULT_PROFILE
+        value: mainnet-limited
+      - key: TRADING_ENABLED
+        value: "true"
+      - key: TRADING_MAX_NOTIONAL_USD
+        value: "100"
+      - key: KILL_SWITCH_TRADING
+        value: "false"
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_MODEL

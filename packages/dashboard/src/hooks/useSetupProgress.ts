@@ -2,8 +2,9 @@
 
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { fetcher } from '@/lib/api';
+import { fetchWithMeta } from '@/lib/api';
 import { useWallet } from '@/context/WalletContext';
+import { useEnvironment } from '@/context/EnvironmentContext';
 
 export type SetupStepId =
   | 'connect'
@@ -20,43 +21,45 @@ export interface SetupStep {
   external?: string;
 }
 
+interface AccountStatus {
+  accountID: number;
+  tradingEnabled: boolean;
+  spot: { usdcAvailable: number; funded: boolean };
+  environment: { label: string; chainId: number; isTestnet: boolean; sodexAppUrl: string; faucetAvailable: boolean; minDepositUsd: number };
+}
+
 export function useSetupProgress() {
   const { address, token } = useWallet();
+  const { selector, chainId } = useEnvironment();
 
-  const accountQuery = useQuery<number>({
-    queryKey: ['setup', 'accountid', address],
+  const statusQuery = useQuery<AccountStatus>({
+    queryKey: ['setup', 'status', selector, address],
     enabled: Boolean(address),
-    staleTime: 15_000,
+    staleTime: 12_000,
     refetchInterval: address ? 15_000 : false,
     queryFn: async () => {
-      const j = await fetcher(`/api/sodex/user/${address}/accountid`);
-      return Number((j as { accountID?: number })?.accountID ?? 0);
+      const { data } = await fetchWithMeta<AccountStatus>(`/api/account/status?address=${address}`);
+      return data;
     },
   });
 
-  const balanceQuery = useQuery<{ balances?: Array<{ coin: string; total: string; locked: string }> }>({
-    queryKey: ['setup', 'balances', address],
-    enabled: Boolean(address),
-    staleTime: 12_000,
-    refetchInterval: address ? 12_000 : false,
-    queryFn: () => fetcher(`/api/sodex/user/${address}/balances`),
-  });
-
   const ordersQuery = useQuery<unknown[]>({
-    queryKey: ['setup', 'orders', address],
+    queryKey: ['setup', 'orders', selector, address],
     enabled: Boolean(address),
     staleTime: 30_000,
-    queryFn: () => fetcher(`/api/sodex/user/${address}/orders/history?limit=5`),
+    queryFn: async () => {
+      const rows = await fetchWithMeta<unknown[]>(`/api/sodex/user/${address}/orders/history?limit=5`);
+      return Array.isArray(rows.data) ? rows.data : [];
+    },
   });
 
-  const usdcSpot = useMemo(() => {
-    const coin = (balanceQuery.data?.balances ?? []).find((b) => b.coin === 'vUSDC');
-    if (!coin) return 0;
-    return Math.max(0, parseFloat(coin.total) - parseFloat(coin.locked || '0'));
-  }, [balanceQuery.data]);
-
+  const env = statusQuery.data?.environment;
+  const usdcSpot = statusQuery.data?.spot?.usdcAvailable ?? 0;
+  const minDeposit = env?.minDepositUsd ?? 5;
+  const sodexUrl = env?.sodexAppUrl ?? (selector === 'testnet' ? 'https://testnet.sodex.com' : 'https://sodex.com');
   const hasTrade = Array.isArray(ordersQuery.data) && ordersQuery.data.length > 0;
-  const accountID = accountQuery.data ?? 0;
+  const accountID = statusQuery.data?.accountID ?? 0;
+  const networkLabel = env?.isTestnet ? 'ValueChain Testnet' : 'ValueChain Mainnet';
 
   const steps: SetupStep[] = useMemo(
     () => [
@@ -68,21 +71,21 @@ export function useSetupProgress() {
       },
       {
         id: 'network',
-        label: 'ValueChain Testnet',
+        label: networkLabel,
         done: Boolean(address),
-        href: '/profile',
+        href: '/account',
       },
       {
         id: 'enable',
         label: 'Enable trading on SoDEX',
         done: accountID > 0,
-        external: 'https://testnet.sodex.com/portfolio',
+        external: `${sodexUrl}/portfolio`,
       },
       {
         id: 'spot',
         label: 'Fund Spot USDC',
-        done: usdcSpot >= 5,
-        external: 'https://testnet.sodex.com/faucet',
+        done: usdcSpot >= minDeposit,
+        external: env?.faucetAvailable ? `${sodexUrl}/faucet` : `${sodexUrl}/portfolio`,
       },
       {
         id: 'trade',
@@ -91,7 +94,7 @@ export function useSetupProgress() {
         href: '/trade',
       },
     ],
-    [address, token, accountID, usdcSpot, hasTrade],
+    [address, token, accountID, usdcSpot, hasTrade, networkLabel, sodexUrl, minDeposit, env?.faucetAvailable],
   );
 
   const completedCount = steps.filter((s) => s.done).length;
@@ -106,6 +109,7 @@ export function useSetupProgress() {
     nextStep,
     accountID,
     usdcSpot,
-    isLoading: Boolean(address) && (accountQuery.isLoading || balanceQuery.isLoading),
+    chainId,
+    isLoading: Boolean(address) && statusQuery.isLoading,
   };
 }

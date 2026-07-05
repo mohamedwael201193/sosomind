@@ -6,6 +6,7 @@ import { Settings, Shield, Bell, Cpu, BarChart2, Sliders, Wallet } from 'lucide-
 import { PageHeader } from '@/components/LoadingSkeleton';
 import { ConnectWallet } from '@/components/ConnectWallet';
 import { useWallet } from '@/context/WalletContext';
+import { useEnvironment } from '@/context/EnvironmentContext';
 
 const SECTION = ({ title, icon: Icon, children }: { title: string; icon: any; children: React.ReactNode }) => (
   <motion.div className="card" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 14 }}>
@@ -65,14 +66,58 @@ const RangeSlider = ({ label, min, max, step, defaultVal, suffix = '' }: { label
 
 export default function SettingsPage() {
   const { address, profile, refreshProfile } = useWallet();
+  const { selector, setSelector, config, chainId } = useEnvironment();
 
   // Refresh profile whenever address/token loads (covers initial mount + reconnect)
   useEffect(() => {
     if (address) refreshProfile();
   }, [address]);
+
   return (
     <div>
-      <PageHeader title="Settings" subtitle="Configure risk parameters and notification preferences" />
+      <PageHeader title="Settings" subtitle="Configure environment, risk parameters, and notification preferences" />
+
+      <motion.div className="card mb-4" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
+          <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(16,185,129,0.1)', display: 'grid', placeItems: 'center' }}>
+            <Sliders size={14} style={{ color: 'var(--green)' }} />
+          </div>
+          <h3 style={{ fontSize: 14, fontWeight: 700 }}>Trading Environment</h3>
+        </div>
+        <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14, lineHeight: 1.6 }}>
+          Select testnet or mainnet. All SoDEX reads and relay signing use chain {chainId}.
+          {config?.trading?.killSwitch ? ' Trading kill switch is ON server-side.' : ''}
+        </p>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {(['testnet', 'mainnet'] as const).map((id) => (
+            <button
+              key={id}
+              onClick={() => setSelector(id)}
+              style={{
+                flex: 1,
+                padding: '12px 16px',
+                borderRadius: 10,
+                border: selector === id ? '1px solid var(--green)' : '1px solid var(--border)',
+                background: selector === id ? 'rgba(16,185,129,0.08)' : 'transparent',
+                color: selector === id ? 'var(--green)' : 'var(--text)',
+                fontWeight: 600,
+                fontSize: 13,
+                cursor: 'pointer',
+              }}
+            >
+              {id === 'testnet' ? 'SoDEX Testnet' : 'SoDEX Mainnet'}
+              <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--muted)', marginTop: 4 }}>
+                Chain {id === 'testnet' ? '138565' : '286623'}
+              </div>
+            </button>
+          ))}
+        </div>
+        {config?.active && (
+          <div style={{ marginTop: 12, fontSize: 11, color: 'var(--muted)' }}>
+            Active profile: {config.active.label} · writes {config.active.writesAllowed ? 'enabled' : 'disabled'} · max ${config.active.maxNotionalUsd} notional
+          </div>
+        )}
+      </motion.div>
 
       <div className="card mb-4 text-xs leading-relaxed" style={{ color: 'var(--text-muted)', borderColor: 'var(--accent-border)' }}>
         <strong style={{ color: 'var(--text-primary)' }}>AI providers:</strong> Active cascade is configured server-side (OpenRouter → Groq → Gemini → …).
@@ -152,7 +197,7 @@ export default function SettingsPage() {
           <SECTION title="Data Sources" icon={Sliders}>
             {[
               { label: 'SoSoValue ETF API', status: 'Connected' },
-              { label: 'SoDEX Testnet', status: 'Connected' },
+              { label: selector === 'testnet' ? 'SoDEX Testnet' : 'SoDEX Mainnet', status: 'Connected' },
               { label: 'Binance (fallback)', status: 'Standby' },
               { label: 'ElevenLabs Voice', status: 'Configurable' },
             ].map((s, i) => (

@@ -19,6 +19,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { fetcher, api } from '@/lib/api';
 import { placeSpotOrder, getRelayInfo } from '@/lib/sodex-client';
 import { useWallet } from '@/context/WalletContext';
+import { useEnvironment } from '@/context/EnvironmentContext';
 import { GlassCard } from '@/components/GlassCard';
 import {
   ArrowUpRight, ArrowDownRight, Loader2, ShieldCheck,
@@ -196,6 +197,7 @@ function CandlestickChart({ klines, symbol }: { klines: any[]; symbol: string })
 
 function TradeInner() {
   const { address, token } = useWallet();
+  const { selector } = useEnvironment();
   const [searchParams] = useSearchParams();
   const initSide = (searchParams.get('side') ?? 'buy') as 'buy' | 'sell';
   const initType = (searchParams.get('type') === 'market' ? 'market' : 'limit') as 'limit' | 'market';
@@ -261,7 +263,7 @@ function TradeInner() {
   };
 
   const symbols = useQuery<SodexSymbol[]>({
-    queryKey: ['sodex', 'spot', 'symbols'],
+    queryKey: ['sodex', selector, 'spot', 'symbols'],
     queryFn: () => fetcher('/api/sodex/spot/symbols'),
     staleTime: 30_000, // 30s — more responsive to cancel-only status changes
   });
@@ -274,13 +276,13 @@ function TradeInner() {
   );
 
   const info = useQuery({
-    queryKey: ['sodex', 'relay', 'info'],
+    queryKey: ['sodex', selector, 'relay', 'info'],
     queryFn: getRelayInfo,
     staleTime: 300_000,
   });
 
   const tickers = useQuery<Ticker[]>({
-    queryKey: ['sodex', 'spot', 'tickers'],
+    queryKey: ['sodex', selector, 'spot', 'tickers'],
     queryFn: () => fetcher('/api/sodex/spot/tickers'),
     refetchInterval: 8_000,
   });
@@ -291,7 +293,7 @@ function TradeInner() {
   );
 
   const balanceQuery = useQuery<BalanceData>({
-    queryKey: ['sodex', 'user-balance', address],
+    queryKey: ['sodex', selector, 'user-balance', address],
     enabled: Boolean(address),
     refetchInterval: 12_000,
     queryFn: () => fetcher(`/api/sodex/user/${address}/balances`),
@@ -299,7 +301,7 @@ function TradeInner() {
 
   // Resolve the user's real numeric SoDEX accountID (required in order bodies)
   const accountIDQuery = useQuery<number>({
-    queryKey: ['sodex', 'accountid', address],
+    queryKey: ['sodex', selector, 'accountid', address],
     enabled: Boolean(address),
     staleTime: 5 * 60_000,
     queryFn: async () => {
@@ -310,21 +312,21 @@ function TradeInner() {
   const accountID = accountIDQuery.data ?? 0;
 
   const orderHistory = useQuery<OrderRow[]>({
-    queryKey: ['sodex', 'user-orders-history', address],
+    queryKey: ['sodex', selector, 'user-orders-history', address],
     enabled: Boolean(address),
     refetchInterval: 10_000,
     queryFn: () => fetcher(`/api/sodex/user/${address}/orders/history?limit=30`),
   });
 
   const orderbook = useQuery<{ bids: any[]; asks: any[] }>({
-    queryKey: ['sodex', 'spot', 'orderbook', activeSymbol?.name],
+    queryKey: ['sodex', selector, 'spot', 'orderbook', activeSymbol?.name],
     enabled: Boolean(activeSymbol?.name),
     refetchInterval: 3_000,
     queryFn: () => fetcher(`/api/sodex/spot/orderbook?market=${activeSymbol!.name}&depth=12`),
   });
 
   const klines = useQuery<any[]>({
-    queryKey: ['sodex', 'spot', 'klines', activeSymbol?.name, chartInterval],
+    queryKey: ['sodex', selector, 'spot', 'klines', activeSymbol?.name, chartInterval],
     enabled: Boolean(activeSymbol?.name),
     refetchInterval: 60_000,
     queryFn: () => fetcher(

@@ -11,6 +11,7 @@ import { Wallet, TrendingUp, TrendingDown, ShieldCheck, BarChart2, RefreshCw, Lo
 import { StatCard } from '@/components/AnimatedNumber';
 import { PageHeader } from '@/components/LoadingSkeleton';
 import { useWallet } from '@/context/WalletContext';
+import { useEnvironment } from '@/context/EnvironmentContext';
 import { CryptoIcon } from '@/components/CryptoIcon';
 
 const CHART_COLORS = ['#10b981','#3b82f6','#8b5cf6','#f59e0b','#ef4444','#06b6d4','#84cc16'];
@@ -28,29 +29,30 @@ function fmt(n: number, dec = 2) {
 
 export default function PortfolioPage() {
   const { address, connect, isConnecting } = useWallet();
+  const { selector } = useEnvironment();
 
   const balanceQuery = useQuery<any>({
-    queryKey: ['sodex', 'user-balance', address],
+    queryKey: ['sodex', selector, 'user-balance', address],
     enabled: Boolean(address),
     refetchInterval: 15_000,
     queryFn: () => fetcher(`/api/sodex/user/${address}/balances`),
   });
 
   const tickers = useQuery<any[]>({
-    queryKey: ['sodex', 'spot', 'tickers'],
+    queryKey: ['sodex', selector, 'spot', 'tickers'],
     refetchInterval: 10_000,
     queryFn: () => fetcher('/api/sodex/spot/tickers'),
   });
 
   const orderHistory = useQuery<any[]>({
-    queryKey: ['sodex', 'user-orders-history', address],
+    queryKey: ['sodex', selector, 'user-orders-history', address],
     enabled: Boolean(address),
     refetchInterval: 15_000,
     queryFn: () => fetcher(`/api/sodex/user/${address}/orders/history?limit=50`),
   });
 
   const symbols = useQuery<any[]>({
-    queryKey: ['sodex', 'spot', 'symbols'],
+    queryKey: ['sodex', selector, 'spot', 'symbols'],
     staleTime: 60_000,
     queryFn: () => fetcher('/api/sodex/spot/symbols'),
   });

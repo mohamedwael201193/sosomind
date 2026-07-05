@@ -23,7 +23,11 @@ import content from './routes/content.js';
 import ssi from './routes/ssi.js';
 import roadmap from './routes/roadmap.js';
 import risk from './routes/risk.js';
+import configRoutes from './routes/config.js';
+import accountRoutes from './routes/account.js';
+import tradingRoutes from './routes/trading.js';
 import trades from './routes/trades.js';
+import { attachEnvironment } from './middleware/environment.js';
 import audit from './routes/audit.js';
 import stats from './routes/stats.js';
 import market from './routes/market.js';
@@ -65,6 +69,7 @@ export async function startServer() {
     legacyHeaders: false,
   });
   app.use(limiter);
+  app.use(attachEnvironment);
 
   app.use((req, _res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
@@ -110,6 +115,9 @@ export async function startServer() {
   app.use('/api/fundraising', fundraising);
   app.use('/api/macro', macro);
   app.use('/api/analyses', charts);
+  app.use('/api/config', configRoutes);
+  app.use('/api/account', accountRoutes);
+  app.use('/api/trading', tradingRoutes);
   app.use('/api/sodex/relay', sodexRelay);
   app.use('/api/sodex', sodex);
   // features before agents legacy mount — /api/signals/funding must not hit /signals/:id

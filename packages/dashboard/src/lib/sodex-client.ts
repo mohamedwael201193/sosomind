@@ -19,6 +19,7 @@ import {
 import { getActiveWalletProvider } from './wallet-provider';
 
 import { API_URL } from './env';
+import { ENV_STORAGE_KEY, readStoredEnvironment } from './environment';
 
 export interface RelayInfo {
   chainId: number;
@@ -28,14 +29,36 @@ export interface RelayInfo {
   allowedActions: string[];
 }
 
-let cachedInfo: Promise<RelayInfo> | null = null;
+let infoCache = new Map<string, Promise<RelayInfo>>();
+
+function envHeader(): string {
+  if (typeof window === 'undefined') return readStoredEnvironment();
+  return localStorage.getItem(ENV_STORAGE_KEY) || readStoredEnvironment();
+}
+
+export function clearRelayInfoCache() {
+  infoCache.clear();
+}
+
 export function getRelayInfo(): Promise<RelayInfo> {
-  if (!cachedInfo) {
-    cachedInfo = fetch(`${API_URL}/api/sodex/relay/info`)
-      .then(r => r.json())
-      .catch(() => ({ chainId: 138565, isTestnet: true, spotBase: '', perpsBase: '', allowedActions: [] }));
+  const env = envHeader();
+  if (!infoCache.has(env)) {
+    infoCache.set(
+      env,
+      fetch(`${API_URL}/api/sodex/relay/info`, {
+        headers: { 'X-SoSoMind-Environment': env },
+      })
+        .then((r) => r.json())
+        .catch(() => ({
+          chainId: env === 'testnet' ? 138565 : 286623,
+          isTestnet: env === 'testnet',
+          spotBase: '',
+          perpsBase: '',
+          allowedActions: [],
+        })),
+    );
   }
-  return cachedInfo;
+  return infoCache.get(env)!;
 }
 
 export interface SignAndSubmitArgs {
@@ -145,7 +168,11 @@ export async function signAndSubmit(args: SignAndSubmitArgs): Promise<RelayResul
 
   const r = await fetch(`${API_URL}/api/sodex/relay`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      'X-SoSoMind-Environment': envHeader(),
+    },
     body: JSON.stringify({
       scope: args.scope,
       actionName: args.actionName,

@@ -13,6 +13,7 @@ import NewsletterPage from '@/app/newsletter/page';
 import PersonaPage from '@/app/persona/page';
 import PlaybookPage from '@/app/playbook/page';
 import PortfolioPage from '@/app/portfolio/page';
+import AccountPage from '@/app/account/page';
 import ProfilePage from '@/app/profile/page';
 import RebalancePage from '@/app/rebalance/page';
 import ResearchPage from '@/app/research/page';
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="/persona" element={<PersonaPage />} />
         <Route path="/playbook" element={<PlaybookPage />} />
         <Route path="/portfolio" element={<PortfolioPage />} />
+        <Route path="/account" element={<AccountPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/rebalance" element={<RebalancePage />} />
         <Route path="/research" element={<ResearchPage />} />

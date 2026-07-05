@@ -24,6 +24,7 @@ import { ensureSoDEXChain } from '@/lib/sodex-client';
 import { setActiveWalletProvider } from '@/lib/wallet-provider';
 import { ensureReownAppKit } from '@/lib/reown-config';
 import { API_URL } from '@/lib/env';
+import { chainIdForSelector, readStoredEnvironment } from '@/lib/environment';
 
 ensureReownAppKit();
 const TOKEN_KEY = 'sosomind_token';
@@ -70,7 +71,8 @@ async function authenticateWithBackend(
   setActiveWalletProvider(walletProvider);
 
   try {
-    await ensureSoDEXChain(walletProvider as any, 138565);
+    const chainId = chainIdForSelector(readStoredEnvironment());
+    await ensureSoDEXChain(walletProvider as any, chainId);
   } catch (chainErr: any) {
     console.warn('[WalletContext] chain switch skipped:', chainErr?.message);
   }

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_URL } from './env';
+import { ENV_STORAGE_KEY, readStoredEnvironment } from './environment';
 
 export { API_URL };
 
@@ -7,6 +8,15 @@ export const api = axios.create({
   baseURL: API_URL,
   timeout: 20000,
   headers: { 'Content-Type': 'application/json' },
+});
+
+api.interceptors.request.use((config) => {
+  const env = typeof window !== 'undefined'
+    ? (localStorage.getItem(ENV_STORAGE_KEY) || readStoredEnvironment())
+    : readStoredEnvironment();
+  config.headers = config.headers ?? {};
+  config.headers['X-SoSoMind-Environment'] = env;
+  return config;
 });
 
 export interface ResponseMeta {

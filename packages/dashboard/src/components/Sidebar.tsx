@@ -78,6 +78,7 @@ const navSections: NavSection[] = [
   {
     label: "ACCOUNT",
     items: [
+      { href: "/account", label: "Account & Funding", icon: Wallet },
       { href: "/profile", label: "Profile", icon: User },
       { href: "/status", label: "System Status", icon: Activity },
       { href: "/settings", label: "Settings", icon: Settings },

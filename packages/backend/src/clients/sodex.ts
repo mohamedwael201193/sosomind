@@ -2,6 +2,8 @@ import axios, { AxiosInstance } from "axios";
 import { ethers } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
+import type { Request } from "express";
+import { getDefaultProfileId, getProfile, type EnvironmentProfile } from "../config/environment.js";
 
 // SoDEX REST + EIP-712 signing client.
 // Per docs at https://sodex.com/documentation/api/rest-v1
@@ -339,6 +341,12 @@ export class SoDEXClient {
       return 0;
     }
   }
+  async getAccountStateForAddress(address: string) {
+    return this.read(this.spot, `/accounts/${address}/state`);
+  }
+  async getPerpsBalancesForAddress(address: string) {
+    return this.read(this.perps, `/accounts/${address}/balances`);
+  }
   async getSpotOrdersForAddress(address: string, symbol?: string) {
     return this.read(this.spot, `/accounts/${address}/orders`, { params: symbol ? { symbol } : undefined });
   }
@@ -554,3 +562,35 @@ export const sodex = new SoDEXClient({
   accountID: process.env.SODEX_ACCOUNT_ID ? parseInt(process.env.SODEX_ACCOUNT_ID, 10) : 0,
   apiKeyName: process.env.SODEX_API_KEY_NAME || "",
 });
+
+const clientCache = new Map<number, SoDEXClient>();
+
+function buildClient(profile: EnvironmentProfile): SoDEXClient {
+  const defaultChain = parseInt(process.env.SODEX_CHAIN_ID || '138565', 10);
+  const isDefault = profile.chainId === defaultChain;
+  return new SoDEXClient({
+    chainId: profile.chainId,
+    isTestnet: profile.isTestnet,
+    privateKey: isDefault ? process.env.SODEX_PRIVATE_KEY : undefined,
+    address: isDefault ? process.env.SODEX_ADDRESS : undefined,
+    accountID: isDefault && process.env.SODEX_ACCOUNT_ID
+      ? parseInt(process.env.SODEX_ACCOUNT_ID, 10)
+      : 0,
+    apiKeyName: isDefault ? (process.env.SODEX_API_KEY_NAME || '') : '',
+  });
+}
+
+export function getSodexClient(profile?: EnvironmentProfile): SoDEXClient {
+  const p = profile ?? getProfile(getDefaultProfileId());
+  let client = clientCache.get(p.chainId);
+  if (!client) {
+    client = buildClient(p);
+    clientCache.set(p.chainId, client);
+  }
+  return client;
+}
+
+export function getSodexClientFromRequest(req: Request): SoDEXClient {
+  const profile = req.sosomindEnv ?? getProfile(getDefaultProfileId());
+  return getSodexClient(profile);
+}

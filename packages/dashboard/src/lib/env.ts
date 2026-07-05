@@ -13,3 +13,6 @@ export const REOWN_PROJECT_ID =
 
 export const APP_ORIGIN =
   (env.VITE_APP_ORIGIN as string | undefined) || 'https://sosomind.vercel.app';
+
+export const DEFAULT_ENVIRONMENT =
+  (env.VITE_DEFAULT_ENVIRONMENT as 'testnet' | 'mainnet' | undefined) || 'mainnet';

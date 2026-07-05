@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { lazy, Suspense, useState } from 'react';
 import { ThemeProvider } from '../context/ThemeContext';
+import { EnvironmentProvider } from '../context/EnvironmentContext';
 
 const WalletProvider = lazy(() =>
   import('../context/WalletContext').then((m) => ({ default: m.WalletProvider })),
@@ -21,9 +22,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
       <QueryClientProvider client={client}>
-        <Suspense fallback={null}>
-          <WalletProvider>{children}</WalletProvider>
-        </Suspense>
+        <EnvironmentProvider>
+          <Suspense fallback={null}>
+            <WalletProvider>{children}</WalletProvider>
+          </Suspense>
+        </EnvironmentProvider>
       </QueryClientProvider>
     </ThemeProvider>
   );
